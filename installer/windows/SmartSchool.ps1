@@ -51,11 +51,11 @@ if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
     $lan = New-Object System.Windows.Forms.RadioButton
     $lan.Text = 'Offline on school Wi-Fi (LAN)  - recommended'; $lan.Checked = $true
     $lan.Location = New-Object System.Drawing.Point(24, 66); $lan.Size = New-Object System.Drawing.Size(500, 30); $f.Controls.Add($lan)
-    Add-Label $f "   Good for: slow or no internet, one computer, no hosting cost.`n   Keep in mind: no student/parent accounts; works only inside the school network." 98 70 | Out-Null
+    Add-Label $f "   Staff do all the clerk work (registering students).`n   Opens on campus only - no student/parent accounts." 98 70 | Out-Null
     $onl = New-Object System.Windows.Forms.RadioButton
     $onl.Text = 'Online (uses a MySQL database / web host)'
     $onl.Location = New-Object System.Drawing.Point(24, 176); $onl.Size = New-Object System.Drawing.Size(500, 30); $f.Controls.Add($onl)
-    Add-Label $f "   Good for: parent and student accounts, email notifications.`n   Keep in mind: needs a MySQL database and someone to look after it." 208 70 | Out-Null
+    Add-Label $f "   Families apply from home; students and parents get their own accounts.`n   Needs a web host and a MySQL database." 208 70 | Out-Null
     Add-Label $f 'You can change this later in Settings (Superadmin only).' 296 28 | Out-Null
     $ok = New-Object System.Windows.Forms.Button
     $ok.Text = 'Continue'; $ok.Location = New-Object System.Drawing.Point(384, 410); $ok.Size = New-Object System.Drawing.Size(140, 44)

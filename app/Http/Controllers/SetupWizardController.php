@@ -172,7 +172,7 @@ class SetupWizardController extends Controller
             'people.*.name' => 'nullable|max:120',
             'people.*.email' => 'nullable|required_with:people.*.name|email|max:150|distinct|unique:users,email',
             'people.*.role' => ['nullable', 'required_with:people.*.name', Rule::in($roles)],
-        ]);
+        ], ['people.*.email.unique' => 'This email already has an account – see "Already added" and use "New temporary password" if you lost it.']);
 
         return $this->createAccounts(collect($d['people'] ?? [])->filter(fn ($p) => trim((string) ($p['name'] ?? '')) !== ''));
     }
