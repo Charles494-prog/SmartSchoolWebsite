@@ -35,7 +35,7 @@
             {{-- Section nav --}}
             <nav class="hidden lg:block">
                 <ul class="sticky top-24 space-y-0.5 text-sm">
-                    @foreach($sections + ['privacy' => ['Privacy notice']] as $id => [$title])
+                    @foreach($sections + ['tuition' => ['Tuition'], 'privacy' => ['Privacy notice']] as $id => [$title])
                         <li><a href="#{{ $id }}" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5">{{ $title }}</a></li>
                     @endforeach
                     <li class="pt-3"><a href="{{ route('crud.index', 'school-years') }}" class="block rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">School years →</a></li>
@@ -91,6 +91,61 @@
                         </div>
                     </section>
                 @endforeach
+
+                @php
+                    $tAmounts = $tuition; $tVals = array_values(array_filter($tAmounts));
+                    $tAll = old('tuition_all', $tVals ? max($tVals) : '');
+                @endphp
+                <section id="tuition" class="card scroll-mt-24 p-0" x-data="{ type: @js(old('school_type', $S('school_type'))), mode: @js(old('tuition_mode', $S('tuition_mode'))) }">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">Tuition</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">For {{ $year?->name ? 'S.Y. '.$year->name : 'the current school year' }}. Other fees (miscellaneous, ID, books) are on the <a class="link" href="{{ route('crud.index', 'fee-items') }}">Fees</a> page.</p>
+                    </div>
+                    <div class="space-y-5 px-6 py-5">
+                        <fieldset>
+                            <legend class="text-sm font-medium text-slate-900">What kind of school is this?</legend>
+                            <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                @foreach(['public' => ['Public school', 'No tuition. Students pay ₱0.'], 'private' => ['Private school', 'Students pay tuition.']] as $v => [$t, $d])
+                                    <label class="flex min-h-11 cursor-pointer gap-3 rounded-xl border p-4" :class="type === '{{ $v }}' ? 'border-brand-600 ring-1 ring-brand-600' : 'border-slate-200'">
+                                        <input type="radio" name="school_type" value="{{ $v }}" x-model="type" class="mt-1">
+                                        <span><span class="block text-sm font-semibold">{{ $t }}</span><span class="block text-xs text-slate-500">{{ $d }}</span></span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                        <div x-show="type === 'private'" x-cloak class="space-y-5">
+                            <fieldset>
+                                <legend class="text-sm font-medium text-slate-900">How much is tuition?</legend>
+                                <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                    @foreach(['same' => ['Same for every grade level', 'One amount for everyone.'], 'per_level' => ['Different per grade level', 'Set an amount for each level.']] as $v => [$t, $d])
+                                        <label class="flex min-h-11 cursor-pointer gap-3 rounded-xl border p-4" :class="mode === '{{ $v }}' ? 'border-brand-600 ring-1 ring-brand-600' : 'border-slate-200'">
+                                            <input type="radio" name="tuition_mode" value="{{ $v }}" x-model="mode" class="mt-1">
+                                            <span><span class="block text-sm font-semibold">{{ $t }}</span><span class="block text-xs text-slate-500">{{ $d }}</span></span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </fieldset>
+                            <div x-show="mode === 'same'">
+                                <label for="tuition_all" class="text-sm font-medium text-slate-900">Tuition per student for the school year (₱)</label>
+                                <input id="tuition_all" type="number" step="0.01" min="0" name="tuition_all" value="{{ $tAll }}" class="input mt-1 max-w-48" :disabled="mode !== 'same' || type !== 'private'">
+                                @error('tuition_all')<p class="field-error">{{ $message }}</p>@enderror
+                            </div>
+                            <div x-show="mode === 'per_level'" class="overflow-hidden rounded-xl border border-slate-200">
+                                <table class="table">
+                                    <thead><tr><th>Grade level</th><th>Tuition for the school year (₱)</th></tr></thead>
+                                    <tbody>
+                                    @forelse($levels as $id => $name)
+                                        <tr><td class="font-medium">{{ $name }}</td><td><input type="number" step="0.01" min="0" name="tuition[{{ $id }}]" value="{{ old('tuition.'.$id, $tAmounts[$id] ?? '') }}" class="input max-w-48" aria-label="Tuition for {{ $name }}" :disabled="mode !== 'per_level' || type !== 'private'"></td></tr>
+                                    @empty
+                                        <tr><td colspan="2" class="muted">Add grade levels first (School setup → Grade levels).</td></tr>
+                                    @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-500">Changing tuition updates every student's balance for this school year right away.</p>
+                    </div>
+                </section>
 
                 <section id="privacy" class="card scroll-mt-24 p-0">
                     <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">

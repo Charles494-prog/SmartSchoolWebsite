@@ -10,6 +10,7 @@ use App\Models\ClassSubject;
 use App\Models\Discount;
 use App\Models\Employee;
 use App\Models\Enrollment;
+use App\Models\FeeItem;
 use App\Models\GradeLevel;
 use App\Models\GradingRequest;
 use App\Models\GuidanceRecord;
@@ -402,6 +403,27 @@ class SchoolTest extends TestCase
         // HR cannot hand out the Administrator role
         $this->as('hr@school.test');
         $this->post('/manage/employees', array_merge($base, ['employee_no' => 'EMP-901', 'login_email' => 'x@school.test', 'login_role' => 'admin']))->assertSessionHasErrors('login_role');
+    }
+
+    public function test_tuition_setup_in_settings(): void
+    {
+        $this->as('admin@school.test');
+        $base = collect(Setting::DEFAULTS)->only(['school_name', 'passing_grade', 'late_after', 'honors_with_highest', 'honors_with_high', 'honors_with', 'library_loan_days', 'library_fine_per_day', 'privacy_notice'])->map(fn ($v) => $v ?: 'x')->all();
+        $base['late_after'] = '07:30';
+        $levels = GradeLevel::pluck('id');
+        $sy = SchoolYear::current();
+        $tuition = fn () => FeeItem::where('school_year_id', $sy->id)->where('category', 'tuition')->whereNotNull('grade_level_id')->pluck('amount', 'grade_level_id');
+
+        $this->put('/settings', $base + ['school_type' => 'private', 'tuition_mode' => 'same', 'tuition_all' => 30000])->assertSessionHasNoErrors();
+        $this->assertSame([30000.0], $tuition()->unique()->values()->all());
+        $this->assertCount($levels->count(), $tuition());
+
+        $this->put('/settings', $base + ['school_type' => 'private', 'tuition_mode' => 'per_level', 'tuition' => [$levels[0] => 18000]])->assertSessionHasNoErrors();
+        $this->assertEquals(18000, $tuition()[$levels[0]]);
+
+        $this->put('/settings', $base + ['school_type' => 'public'])->assertSessionHasNoErrors();
+        $this->assertSame([0.0], $tuition()->unique()->values()->all());
+        $this->assertSame('public', Setting::get('school_type'));
     }
 
     public function test_forced_password_change_and_inactive_block(): void

@@ -40,17 +40,27 @@
     </a>
 
     <nav class="flex-1 overflow-y-auto px-4 py-4">
+        @php $groups = \App\Support\Nav::for($u); @endphp
         <div class="space-y-1">
-            @foreach($primary as $i)
-                <a href="{{ $i['url'] }}" class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition {{ $i['active'] ? 'bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white' }}">
-                    <x-icon :name="$i['icon']" class="h-5 w-5 shrink-0 {{ $i['active'] ? 'text-brand-600 dark:text-brand-300' : 'text-slate-400 group-hover:text-slate-600' }}" />
-                    <span class="truncate">{{ $i['label'] }}</span>
-                    @if($i['icon'] === 'message' && $unread)<span class="ml-auto h-2 w-2 rounded-full bg-rose-500"></span>@endif
-                </a>
+            @foreach($groups as $group => $items)
+                @php $hasActive = collect($items)->contains('active', true); @endphp
+                @if($group === '')
+                    @foreach($items as $i)@include('components.layouts._nav-link', ['i' => $i])@endforeach
+                @else
+                    <div x-data="{ open: {{ $hasActive ? 'true' : 'false' }} || localStorage.getItem('nav:{{ $group }}') === '1' }" class="pt-2">
+                        <button type="button" class="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-600" :aria-expanded="open" x-on:click="open = !open; localStorage.setItem('nav:{{ $group }}', open ? '1' : '0')">
+                            {{ $group }}
+                            <x-icon name="chevron" class="ml-auto h-3.5 w-3.5 transition" ::class="open ? 'rotate-90' : ''" />
+                        </button>
+                        <div x-show="open" x-cloak class="mt-0.5 space-y-0.5">
+                            @foreach($items as $i)@include('components.layouts._nav-link', ['i' => $i])@endforeach
+                        </div>
+                    </div>
+                @endif
             @endforeach
         </div>
         <button @click="$dispatch('palette')" class="mt-6 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 dark:ring-white/10 dark:hover:bg-white/5">
-            <x-icon name="search" class="h-5 w-5 text-slate-400" /> Everything else…
+            <x-icon name="search" class="h-5 w-5 text-slate-400" /> Search everything
             <kbd class="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10">Ctrl K</kbd>
         </button>
     </nav>

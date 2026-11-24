@@ -21,6 +21,8 @@ class Setting extends Model
 
     public const DEFAULTS = [
         'school_name' => 'My School',
+        'school_type' => 'private',
+        'tuition_mode' => 'per_level',
         'school_id' => '',
         'school_address' => '',
         'school_head' => '',
