@@ -96,7 +96,7 @@
                     </button>
                     <div x-show="o" x-cloak x-transition @click.outside="o=false" class="absolute right-0 mt-2 w-60 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
                         <div class="border-b border-slate-100 px-4 py-3"><div class="text-sm font-semibold">{{ $u->name }}</div><div class="truncate text-xs text-slate-500">{{ $u->email }}</div></div>
-                        <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile (photo, name, bio, password)</a>
+                        <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile</a>
                         <a href="{{ route('privacy') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="shield" class="h-4 w-4 text-slate-400" /> Privacy</a>
                         <form method="post" action="{{ route('logout') }}">@csrf<button class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"><x-icon name="logout" class="h-4 w-4" /> Log out</button></form>
                     </div>
