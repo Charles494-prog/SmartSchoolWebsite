@@ -1,0 +1,243 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Assessment;
+use App\Models\AttendanceRecord;
+use App\Models\ClassSubject;
+use App\Models\Enrollment;
+use App\Models\Score;
+use App\Models\Section;
+use App\Models\Setting;
+use App\Models\Student;
+
+/**
+ * DepEd K-12 grading (DepEd Order No. 8, s. 2015), configurable per subject:
+ *   component % = total score / total highest possible score × 100
+ *   initial grade = Σ component % × weight
+ *   quarterly grade = transmuted initial grade (can be turned off in Settings)
+ */
+class Grading
+{
+    /** Preset weights (ww, pt, qa) per subject group. */
+    public const PRESETS = [
+        'Languages, AP, EsP (Gr 1–10)' => [30, 50, 20],
+        'Science, Math (Gr 1–10)' => [40, 40, 20],
+        'MAPEH, EPP/TLE (Gr 1–10)' => [20, 60, 20],
+        'SHS Core subjects' => [25, 50, 25],
+        'SHS Academic track' => [25, 45, 30],
+        'SHS Work immersion / Research' => [35, 40, 25],
+        'SHS TVL / Sports / Arts' => [20, 60, 20],
+    ];
+
+    /** DepEd transmutation table as a formula. */
+    public static function transmute(float $initial): int
+    {
+        $initial = max(0, min(100, $initial));
+        if ($initial >= 60) {
+            return (int) min(100, 75 + floor(round(($initial - 60) / 1.6, 6)));
+        }
+
+        return (int) (60 + floor(round($initial / 4, 6)));
+    }
+
+    /**
+     * @param  array<string, array{0: float, 1: float}>  $totals  component => [score total, highest possible total]
+     * @param  array<string, int>  $weights  component => weight (percent)
+     */
+    public static function initialGrade(array $totals, array $weights): ?float
+    {
+        $sum = 0.0;
+        $usedWeight = 0;
+        foreach ($weights as $c => $w) {
+            [$score, $max] = $totals[$c] ?? [0, 0];
+            if ($max <= 0) {
+                continue;
+            }
+            $sum += ($score / $max * 100) * $w / 100;
+            $usedWeight += $w;
+        }
+        if ($usedWeight === 0) {
+            return null;
+        }
+
+        // If a component has no assessments yet, scale by the weights that exist.
+        return round($sum * 100 / $usedWeight, 2);
+    }
+
+    public static function quarterly(?float $initial): ?int
+    {
+        if ($initial === null) {
+            return null;
+        }
+
+        return Setting::get('use_transmutation') === '1' ? self::transmute($initial) : (int) round($initial);
+    }
+
+    public static function descriptor(?float $grade): string
+    {
+        return match (true) {
+            $grade === null => '',
+            $grade >= 90 => 'Outstanding',
+            $grade >= 85 => 'Very Satisfactory',
+            $grade >= 80 => 'Satisfactory',
+            $grade >= 75 => 'Fairly Satisfactory',
+            default => 'Did Not Meet Expectations',
+        };
+    }
+
+    public static function honor(?float $average): ?string
+    {
+        if ($average === null) {
+            return null;
+        }
+
+        return match (true) {
+            $average >= (float) Setting::get('honors_with_highest') => 'With Highest Honors',
+            $average >= (float) Setting::get('honors_with_high') => 'With High Honors',
+            $average >= (float) Setting::get('honors_with') => 'With Honors',
+            default => null,
+        };
+    }
+
+    /**
+     * Grade sheet for a class and term: per student the component totals, initial and quarterly grade.
+     *
+     * @return array<int, array{student: Student, totals: array, initial: ?float, quarterly: ?int}>
+     */
+    public static function sheet(ClassSubject $cs, int $term): array
+    {
+        $students = $cs->section->students()->get();
+        $assessments = $cs->assessments()->where('term', $term)->get();
+        $scores = Score::whereIn('assessment_id', $assessments->pluck('id'))->get()->groupBy('student_id');
+        $weights = $cs->weights();
+        $att = $weights['at'] > 0 ? self::attendanceTotals($cs, $term) : [];
+        $rows = [];
+        foreach ($students as $s) {
+            $mine = ($scores[$s->id] ?? collect())->keyBy('assessment_id');
+            $totals = [];
+            foreach ($assessments as $a) {
+                $totals[$a->component] ??= [0.0, 0.0];
+                $totals[$a->component][0] += (float) ($mine[$a->id]->score ?? 0);
+                $totals[$a->component][1] += (float) $a->max_score;
+            }
+            if (isset($att[$s->id])) {
+                $totals['at'] = $att[$s->id];
+            }
+            $initial = self::initialGrade($totals, $weights);
+            $rows[$s->id] = ['student' => $s, 'totals' => $totals, 'initial' => $initial, 'quarterly' => self::quarterly($initial)];
+        }
+
+        return $rows;
+    }
+
+    /** Quarterly grades of one student in one class: term => grade. */
+    public static function studentTerms(ClassSubject $cs, Student $s): array
+    {
+        $out = [];
+        $terms = $cs->section->gradeLevel->terms ?: 4;
+        $assessments = $cs->assessments()->get()->groupBy('term');
+        $scores = Score::where('student_id', $s->id)->whereIn('assessment_id', $cs->assessments()->select('id'))->get()->keyBy('assessment_id');
+        for ($t = 1; $t <= $terms; $t++) {
+            $totals = [];
+            foreach ($assessments[$t] ?? [] as $a) {
+                $totals[$a->component] ??= [0.0, 0.0];
+                $totals[$a->component][0] += (float) ($scores[$a->id]->score ?? 0);
+                $totals[$a->component][1] += (float) $a->max_score;
+            }
+            $w = $cs->weights();
+            if ($w['at'] > 0 && ($a = self::attendanceTotals($cs, $t)[$s->id] ?? null)) {
+                $totals['at'] = $a;
+            }
+            $out[$t] = self::quarterly(self::initialGrade($totals, $w));
+        }
+
+        return $out;
+    }
+
+    /** Date range of a grading period: the school year split into equal parts. */
+    public static function termRange(ClassSubject $cs, int $term): array
+    {
+        $sy = $cs->section->schoolYear;
+        $n = max(1, $cs->section->gradeLevel->terms ?: 4);
+        $days = $sy->starts_on->diffInDays($sy->ends_on) + 1;
+        $from = $sy->starts_on->copy()->addDays((int) floor($days * ($term - 1) / $n));
+        $to = $sy->starts_on->copy()->addDays((int) floor($days * $term / $n) - 1);
+
+        return [$from->toDateString(), $to->toDateString()];
+    }
+
+    /**
+     * Attendance as a grade component: [present days, days recorded] per student for this class and term.
+     * Present and excused count fully, late counts half. Uses this subject's class attendance; if the teacher
+     * never scanned in class, the section's daily (gate) attendance is used instead.
+     *
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function attendanceTotals(ClassSubject $cs, int $term): array
+    {
+        [$from, $to] = self::termRange($cs, $term);
+        $q = AttendanceRecord::whereBetween('date', [$from, $to]);
+        $rows = (clone $q)->where('class_subject_id', $cs->id)->get();
+        if ($rows->isEmpty()) {
+            $rows = (clone $q)->whereNull('class_subject_id')->where('section_id', $cs->section_id)->get();
+        }
+        $points = ['present' => 1, 'excused' => 1, 'late' => 0.5, 'absent' => 0];
+        $out = [];
+        foreach ($rows->groupBy('student_id') as $sid => $recs) {
+            $out[$sid] = [(float) $recs->sum(fn ($r) => $points[$r->status] ?? 0), (float) $recs->count()];
+        }
+
+        return $out;
+    }
+
+    public static function finalGrade(array $terms): ?float
+    {
+        $vals = array_values(array_filter($terms, fn ($g) => $g !== null));
+        if ($vals === [] || count($vals) < count($terms)) {
+            return null; // final grade only when every term has a grade
+        }
+
+        return round(array_sum($vals) / count($vals));
+    }
+
+    /**
+     * Report card data (SF9) for an enrollment.
+     *
+     * @return array{subjects: array, general_average: ?float, honor: ?string}
+     */
+    public static function reportCard(Enrollment $e): array
+    {
+        $subjects = [];
+        if ($e->section) {
+            foreach ($e->section->classSubjects()->with(['subject', 'section.gradeLevel'])->get()->sortBy('subject.name') as $cs) {
+                $terms = self::studentTerms($cs, $e->student);
+                $final = self::finalGrade($terms);
+                $subjects[] = ['name' => $cs->subject->name, 'terms' => $terms, 'final' => $final, 'remark' => $final === null ? '' : ($final >= (float) Setting::get('passing_grade') ? 'Passed' : 'Failed')];
+            }
+        }
+        $finals = array_filter(array_column($subjects, 'final'), fn ($g) => $g !== null);
+        $ga = ($finals !== [] && count($finals) === count($subjects)) ? round(array_sum($finals) / count($finals), 2) : null;
+
+        return ['subjects' => $subjects, 'general_average' => $ga, 'honor' => self::honor($ga)];
+    }
+
+    /** Recompute and store general averages for a section; returns ranking (best first). */
+    public static function rankSection(Section $section): array
+    {
+        $rows = [];
+        foreach ($section->enrollments()->where('status', 'enrolled')->with('student')->get() as $e) {
+            $rc = self::reportCard($e);
+            $e->updateQuietly(['general_average' => $rc['general_average']]);
+            $rows[] = ['enrollment' => $e, 'average' => $rc['general_average'], 'honor' => $rc['honor']];
+        }
+        usort($rows, fn ($a, $b) => ($b['average'] ?? -1) <=> ($a['average'] ?? -1));
+
+        return $rows;
+    }
+
+    public static function componentLabel(string $c): string
+    {
+        return Assessment::COMPONENTS[$c] ?? ($c === 'at' ? 'Attendance' : $c);
+    }
+}

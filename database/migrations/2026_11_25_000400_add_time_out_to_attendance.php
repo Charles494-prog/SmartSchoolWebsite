@@ -1,0 +1,20 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('attendance_records', function (Blueprint $t) {
+            $t->time('time_out')->nullable()->after('time_in');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('attendance_records', fn (Blueprint $t) => $t->dropColumn('time_out'));
+    }
+};

@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\Auditable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Assignment extends Model
+{
+    use Auditable;
+
+    protected $guarded = ['id'];
+
+    protected $casts = ['due_at' => 'datetime', 'max_score' => 'float'];
+
+    public function classSubject(): BelongsTo
+    {
+        return $this->belongsTo(ClassSubject::class);
+    }
+
+    public function submissions(): HasMany
+    {
+        return $this->hasMany(Submission::class);
+    }
+}
