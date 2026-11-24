@@ -37,9 +37,9 @@ function New-Form($title, $h) {
     $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.BackColor = 'White'; $f.Font = $Font
     $f
 }
-function Add-Label($f, $text, $y, $h = 28, $bold = $false) {
+function Add-Label($f, $text, $y, $h = 28, $bold = $false, $w = 500) {
     $l = New-Object System.Windows.Forms.Label
-    $l.Text = $text; $l.Location = New-Object System.Drawing.Point(24, $y); $l.Size = New-Object System.Drawing.Size(500, $h)
+    $l.Text = $text; $l.Location = New-Object System.Drawing.Point(24, $y); $l.Size = New-Object System.Drawing.Size($w, $h)
     if ($bold) { $l.Font = New-Object System.Drawing.Font('Segoe UI', 13, [System.Drawing.FontStyle]::Bold) }
     $f.Controls.Add($l); $l
 }
@@ -73,20 +73,29 @@ if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
         Set-EnvValue 'DB_CONNECTION' 'sqlite'; Set-EnvValue 'DB_DATABASE' $db
         Set-EnvValue 'APP_URL' ("http://{0}:{1}" -f (Get-LanIp), $Port)
     } else {
-        $d = New-Form 'SmartSchool - database details' 420
+        $guide = 'https://smartschoolinstallation.vercel.app/#hosting'
+        $q = "Online mode runs SmartSchool on a web server so families can use it from home.`n`nThe easiest way: rent a server (VPS) and run the one-command installer there - it sets up the database, website and HTTPS for you.`n`nDo you already have a MySQL database you want this computer to use?`n`nYes - enter the database details now.`nNo - open the step-by-step hosting guide."
+        if ([System.Windows.Forms.MessageBox]::Show($q, 'SmartSchool - Online', 'YesNo', 'Question') -ne 'Yes') {
+            Remove-Item $Env -ErrorAction SilentlyContinue
+            Start-Process $guide
+            exit
+        }
+        $d = New-Form 'SmartSchool - database details' 460
         Add-Label $d 'Enter your MySQL database details' 20 32 $true | Out-Null
+        Add-Label $d 'Your hosting company gives you these. See "Hosting & database" on the SmartSchool website.' 300 40 | Out-Null
         $boxes = @{}; $y = 64
         foreach ($k in @('Host=127.0.0.1', 'Port=3306', 'Database=smartschool', 'User=smartschool', 'Password=', 'Website address=https://')) {
             $name, $def = $k -split '=', 2
-            Add-Label $d $name ($y + 4) 26 | Out-Null
+            Add-Label $d $name ($y + 4) 26 $false 160 | Out-Null
             $t = New-Object System.Windows.Forms.TextBox
-            $t.Text = $def; $t.Location = New-Object System.Drawing.Point(190, $y); $t.Size = New-Object System.Drawing.Size(330, 30)
+            $t.Text = $def; $t.Location = New-Object System.Drawing.Point(190, $y); $t.Size = New-Object System.Drawing.Size(330, 30); $t.BorderStyle = 'FixedSingle'
             if ($name -eq 'Password') { $t.UseSystemPasswordChar = $true }
             $d.Controls.Add($t); $boxes[$name] = $t; $y += 40
         }
         $b = New-Object System.Windows.Forms.Button
-        $b.Text = 'Continue'; $b.Location = New-Object System.Drawing.Point(384, 320); $b.Size = New-Object System.Drawing.Size(140, 44)
+        $b.Text = 'Continue'; $b.Location = New-Object System.Drawing.Point(384, 350); $b.Size = New-Object System.Drawing.Size(140, 44)
         $b.DialogResult = 'OK'; $d.AcceptButton = $b; $d.Controls.Add($b)
+        foreach ($t in $boxes.Values) { $t.BringToFront() }
         if ($d.ShowDialog() -ne 'OK') { Remove-Item $Env; exit }
         Set-EnvValue 'DB_CONNECTION' 'mysql'
         Set-EnvValue 'DB_HOST' $boxes['Host'].Text; Set-EnvValue 'DB_PORT' $boxes['Port'].Text

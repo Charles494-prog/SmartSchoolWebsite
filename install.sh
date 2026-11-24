@@ -33,6 +33,7 @@ $php_ok || need_pkg+=(php-cli)
 for ext in sqlite3 mbstring xml gd zip intl curl; do
   php -m 2>/dev/null | grep -qi "^${ext}$" || need_pkg+=("php-${ext}")
 done
+php -m 2>/dev/null | grep -qi "^pdo_mysql$" || need_pkg+=(php-mysql)
 command -v composer >/dev/null || need_pkg+=(composer)
 command -v node >/dev/null || need_pkg+=(nodejs npm)
 command -v git >/dev/null || need_pkg+=(git)
@@ -89,15 +90,42 @@ if [ "$MODE" = lan ]; then
   LAN_IP=${LAN_IP:-127.0.0.1}
   set_env APP_URL "http://$LAN_IP:$PORT"
 else
-  echo "   Enter your MySQL database details (ask your hosting provider):"
-  set_env DB_CONNECTION mysql
-  set_env DB_HOST "$(ask '     Host [127.0.0.1]: ' 127.0.0.1)"
-  set_env DB_PORT "$(ask '     Port [3306]: ' 3306)"
-  set_env DB_DATABASE "$(ask '     Database name: ' smartschool)"
-  set_env DB_USERNAME "$(ask '     User: ' smartschool)"
-  read -r -s -p "     Password: " dbpass </dev/tty; echo
-  set_env DB_PASSWORD "$dbpass"
-  set_env APP_URL "$(ask '     Website address (https://…): ' https://localhost)"
+  echo
+  echo "   Where is this running?"
+  echo "   1) A fresh server I control (VPS / cloud server) – set up everything automatically"
+  echo "   2) Shared hosting – I already have a MySQL database from my hosting company"
+  where=$(ask "   Type 1 or 2 and press Enter [1]: " 1)
+  if [ "$where" != "2" ]; then
+    AUTO=1
+    DOMAIN=$(ask "     Your website domain (e.g. school.example.edu.ph): " "")
+    [ -n "$DOMAIN" ] || fail "a domain is needed. Point the domain's A record to this server's IP first, then run the installer again."
+    CERT_EMAIL=$(ask "     Email for the free HTTPS certificate (Let's Encrypt): " "")
+    bold "     Installing the web server and database (Nginx, MariaDB, PHP-FPM)…"
+    sudo apt-get install -y -qq nginx mariadb-server php-fpm php-mysql certbot python3-certbot-nginx >/dev/null
+    DB_PASS=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)
+    sudo mysql -e "CREATE DATABASE IF NOT EXISTS smartschool CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      CREATE USER IF NOT EXISTS 'smartschool'@'localhost' IDENTIFIED BY '$DB_PASS';
+      ALTER USER 'smartschool'@'localhost' IDENTIFIED BY '$DB_PASS';
+      GRANT ALL PRIVILEGES ON smartschool.* TO 'smartschool'@'localhost'; FLUSH PRIVILEGES;"
+    set_env DB_CONNECTION mysql
+    set_env DB_HOST 127.0.0.1
+    set_env DB_PORT 3306
+    set_env DB_DATABASE smartschool
+    set_env DB_USERNAME smartschool
+    set_env DB_PASSWORD "$DB_PASS"
+    set_env APP_URL "https://$DOMAIN"
+    ok "Database 'smartschool' created (password saved only in $DIR/.env)"
+  else
+    echo "   Enter your MySQL database details (your hosting company gives you these):"
+    set_env DB_CONNECTION mysql
+    set_env DB_HOST "$(ask '     Host [127.0.0.1]: ' 127.0.0.1)"
+    set_env DB_PORT "$(ask '     Port [3306]: ' 3306)"
+    set_env DB_DATABASE "$(ask '     Database name: ' smartschool)"
+    set_env DB_USERNAME "$(ask '     User: ' smartschool)"
+    read -r -s -p "     Password: " dbpass </dev/tty; echo
+    set_env DB_PASSWORD "$dbpass"
+    set_env APP_URL "$(ask '     Website address (https://…): ' https://localhost)"
+  fi
 fi
 ok "Mode: $([ "$MODE" = lan ] && echo 'Offline on school Wi-Fi (LAN)' || echo 'Online (web host)')"
 
@@ -108,13 +136,51 @@ php artisan db:seed --force -q 2>/dev/null || true
 php artisan config:cache -q && php artisan route:cache -q && php artisan view:cache -q
 ok "Database ready"
 
+if [ "$MODE" = hosted ] && [ "${AUTO:-0}" = 1 ]; then
+  bold "     Setting up the website…"
+  sock=$(ls /run/php/php*-fpm.sock 2>/dev/null | sort -V | tail -1)
+  [ -n "$sock" ] || fail "PHP-FPM is not running. Try: sudo systemctl start php*-fpm"
+  chmod o+x "$HOME"
+  sudo chgrp -R www-data "$DIR/storage" "$DIR/bootstrap/cache"
+  sudo chmod -R g+rwX "$DIR/storage" "$DIR/bootstrap/cache"
+  sudo tee /etc/nginx/sites-available/smartschool >/dev/null <<EON
+server {
+    listen 80;
+    server_name $DOMAIN;
+    root $DIR/public;
+    index index.php;
+    client_max_body_size 25M;
+    location / { try_files \$uri \$uri/ /index.php?\$query_string; }
+    location ~ \.php\$ { include snippets/fastcgi-php.conf; fastcgi_pass unix:$sock; }
+    location ~ /\.(?!well-known) { deny all; }
+}
+EON
+  sudo ln -sf /etc/nginx/sites-available/smartschool /etc/nginx/sites-enabled/smartschool
+  sudo rm -f /etc/nginx/sites-enabled/default
+  sudo nginx -t -q && sudo systemctl reload nginx
+  if command -v ufw >/dev/null && sudo ufw status 2>/dev/null | grep -q "Status: active"; then sudo ufw allow 'Nginx Full' >/dev/null; fi
+  if [ -n "$CERT_EMAIL" ]; then
+    sudo certbot --nginx -d "$DOMAIN" -m "$CERT_EMAIL" --agree-tos --redirect -n -q && ok "HTTPS is on" \
+      || warn "HTTPS could not be set up yet – check that $DOMAIN points to this server, then run: sudo certbot --nginx -d $DOMAIN"
+  else
+    warn "No email given – HTTPS skipped. Later run: sudo certbot --nginx -d $DOMAIN"
+  fi
+  ( crontab -l 2>/dev/null | grep -v 'smartschool.*schedule:run'; echo "* * * * * cd $DIR && php artisan schedule:run >> /dev/null 2>&1" ) | crontab -
+  ok "Background jobs (reminders, backups) turned on"
+  echo
+  bold "SmartSchool is online!"
+  printf '      \033[1;32mhttps://%s\033[0m\n' "$DOMAIN"
+  echo "  • Open it and create the Superadmin. Write its email and password down – nobody can recover it."
+  exit 0
+fi
+
 if [ "$MODE" = hosted ]; then
   echo
-  bold "Almost done (online mode)"
-  echo "  • Point your web server's document root to: $DIR/public"
+  bold "Almost done (shared hosting)"
+  echo "  • In your hosting panel, set the website's document root to: $DIR/public"
   echo "  • Add this cron job so reminders and backups run:"
   echo "      * * * * * cd $DIR && php artisan schedule:run >> /dev/null 2>&1"
-  echo "  • Then open your website address and log in."
+  echo "  • Then open your website address and create the Superadmin."
   exit 0
 fi
 
