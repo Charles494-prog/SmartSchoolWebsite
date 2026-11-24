@@ -21,7 +21,8 @@ class EnvCheck
             if (! empty($config['app.debug'])) {
                 $p[] = 'APP_DEBUG must be false in production (it shows code to visitors).';
             }
-            if (! str_starts_with((string) $config['app.url'], 'https://')) {
+            // LAN mode runs on the school network without a certificate, so http is expected there.
+            if (($config['smartschool.mode'] ?? 'hosted') !== 'lan' && ! str_starts_with((string) $config['app.url'], 'https://')) {
                 $p[] = 'APP_URL must start with https:// in production.';
             }
         }
@@ -31,7 +32,7 @@ class EnvCheck
 
     public static function assert(): void
     {
-        $cfg = ['app.key' => config('app.key'), 'database.default' => config('database.default'), 'app.debug' => config('app.debug'), 'app.url' => config('app.url')];
+        $cfg = ['app.key' => config('app.key'), 'database.default' => config('database.default'), 'app.debug' => config('app.debug'), 'app.url' => config('app.url'), 'smartschool.mode' => config('smartschool.mode')];
         if ($problems = self::problems($cfg, app()->environment())) {
             throw new RuntimeException("SmartSchool cannot start:\n- ".implode("\n- ", $problems));
         }

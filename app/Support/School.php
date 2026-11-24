@@ -26,7 +26,9 @@ class School
 
     public static function mode(): string
     {
-        $m = Setting::get('deployment_mode');
+        // One source of truth: the mode chosen in the installer (SMARTSCHOOL_MODE in .env),
+        // unless the Superadmin later changed it in settings.
+        $m = Setting::get('deployment_mode') ?: config('smartschool.mode');
 
         return in_array($m, [self::HOSTED, self::LAN], true) ? $m : self::HOSTED;
     }

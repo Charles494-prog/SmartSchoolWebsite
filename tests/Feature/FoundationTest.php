@@ -80,6 +80,9 @@ class FoundationTest extends TestCase
         $this->assertFalse(School::allows('unknown_feature'));
         Setting::put('deployment_mode', 'weird');
         $this->assertSame(School::HOSTED, School::mode());
+        Setting::put('deployment_mode', '');
+        config(['smartschool.mode' => 'lan']);
+        $this->assertTrue(School::isLan(), 'falls back to the mode chosen in the installer');
     }
 
     public function test_env_check(): void
@@ -88,5 +91,6 @@ class FoundationTest extends TestCase
         $this->assertSame([], EnvCheck::problems($ok, 'production'));
         $this->assertCount(2, EnvCheck::problems(['app.debug' => true, 'app.url' => 'http://x'] + $ok, 'production'));
         $this->assertCount(1, EnvCheck::problems(['app.key' => ''] + $ok, 'local'));
+        $this->assertSame([], EnvCheck::problems(['app.url' => 'http://192.168.1.10:8000', 'smartschool.mode' => 'lan'] + $ok, 'production'));
     }
 }

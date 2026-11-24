@@ -4,6 +4,13 @@
 
 Laravel 13 + MySQL/MariaDB, Blade + Tailwind + Alpine (mobile-friendly).
 
+## Install on Linux (one command)
+```sh
+curl -fsSL https://raw.githubusercontent.com/Charles494-prog/SmartSchoolWebsite/main/install.sh | bash
+```
+It installs what's needed, asks Offline (LAN) or Online, prepares the database and prints the address to open.
+The mode chosen here (`SMARTSCHOOL_MODE` in `.env`) is the single source of truth, read through `App\Support\School`.
+
 ## Start / stop
 - Double-click **SmartSchool** on the Desktop, or run `./start-school.sh` (opens http://127.0.0.1:8000).
 - `./stop-school.sh` to stop.
