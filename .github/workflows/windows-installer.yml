@@ -1,0 +1,58 @@
+name: Windows installer
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '8.4', tools: composer }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Build the app
+        shell: pwsh
+        run: |
+          composer install --no-dev --optimize-autoloader --no-interaction
+          npm ci; npm run build
+          $dest = 'installer/windows/build/app'
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          $skip = @('.git', '.github', 'node_modules', 'tests', 'installer', '.env')
+          Get-ChildItem -Force | Where-Object { $skip -notcontains $_.Name } | Copy-Item -Destination $dest -Recurse -Force
+          Remove-Item "$dest/database/*.sqlite" -ErrorAction SilentlyContinue
+          Get-ChildItem "$dest/storage/logs" -Filter *.log -ErrorAction SilentlyContinue | Remove-Item
+      - name: Download portable PHP for Windows
+        shell: pwsh
+        run: |
+          $rel = Invoke-RestMethod https://windows.php.net/downloads/releases/releases.json
+          $zip = $rel.'8.4'.'nts-vs17-x64'.zip.path
+          Invoke-WebRequest "https://windows.php.net/downloads/releases/$zip" -OutFile php.zip
+          Expand-Archive php.zip installer/windows/build/php
+          $ini = Get-Content installer/windows/build/php/php.ini-production
+          $ini = $ini -replace '^;extension_dir = "ext"', 'extension_dir = "ext"'
+          foreach ($e in 'curl','fileinfo','gd','intl','mbstring','openssl','pdo_mysql','pdo_sqlite','sqlite3','zip','sodium') { $ini = $ini -replace "^;extension=$e$", "extension=$e" }
+          $ini += 'memory_limit = 512M'; $ini += 'upload_max_filesize = 20M'; $ini += 'post_max_size = 25M'
+          Set-Content installer/windows/build/php/php.ini $ini
+          installer/windows/build/php/php.exe -m
+      - name: Build SmartSchool-Setup.exe
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.1.0' }
+          choco install nsis -y --no-progress | Out-Null
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$ver installer/windows/SmartSchool.nsi
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-FileHash installer/windows/SmartSchool-Setup.exe -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with: { name: SmartSchool-Setup, path: installer/windows/SmartSchool-Setup.exe }
+      - name: Publish release
+        shell: pwsh
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v0.1.0' }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create $tag --title "SmartSchool $tag" --notes "Windows installer. Run SmartSchool-Setup.exe and choose Offline (LAN) or Online on first launch." }
+          gh release upload $tag installer/windows/SmartSchool-Setup.exe --clobber
