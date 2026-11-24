@@ -39,25 +39,41 @@ command -v node >/dev/null || need_pkg+=(nodejs npm)
 command -v git >/dev/null || need_pkg+=(git)
 command -v unzip >/dev/null || need_pkg+=(unzip)
 
+PREBUILT=0
 if [ ${#need_pkg[@]} -gt 0 ]; then
-  command -v apt-get >/dev/null || fail "please install: ${need_pkg[*]} (this script knows apt-based systems like Ubuntu)."
-  bold "1/4  Installing what SmartSchool needs: ${need_pkg[*]}"
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq "${need_pkg[@]}" >/dev/null
+  if command -v apt-get >/dev/null && command -v sudo >/dev/null && sudo -v 2>/dev/null; then
+    bold "1/4  Installing what SmartSchool needs: ${need_pkg[*]}"
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq "${need_pkg[@]}" >/dev/null
+  elif $php_ok; then
+    # Shared hosting (e.g. Hostinger): no sudo, but PHP is there – use the ready-made package.
+    PREBUILT=1
+    warn "Can't install system packages here (shared hosting?) – using the ready-made SmartSchool package instead."
+  else
+    fail "PHP 8.3 or newer is needed. On shared hosting, choose PHP 8.3+ in your hosting panel (Hostinger: hPanel > Advanced > PHP Configuration), then run this again."
+  fi
 fi
 php -r 'exit(version_compare(PHP_VERSION, "8.3.0", ">=") ? 0 : 1);' || fail "PHP 8.3 or newer is needed (found $(php -r 'echo PHP_VERSION;')). On older Ubuntu, add the ondrej/php PPA first."
-ok "PHP $(php -r 'echo PHP_VERSION;'), Composer, Node.js ready"
+ok "PHP $(php -r 'echo PHP_VERSION;') ready"
 
 # ---------------------------------------------------------------- 2. download / update
 bold "2/4  Downloading SmartSchool to $DIR"
-if [ -d "$DIR/.git" ]; then
-  git -C "$DIR" pull --ff-only -q && ok "Updated to the latest version"
+if [ "$PREBUILT" = 1 ]; then
+  mkdir -p "$DIR"
+  curl -fsSL -o /tmp/smartschool-app.zip "https://github.com/Charles494-prog/SmartSchoolWebsite/releases/latest/download/smartschool-app.zip" || fail "could not download SmartSchool."
+  unzip -oq /tmp/smartschool-app.zip -d "$DIR" && rm -f /tmp/smartschool-app.zip
+  cd "$DIR"
+  ok "Downloaded the ready-made package"
 else
-  git clone -q --depth 1 "$REPO" "$DIR" && ok "Downloaded"
+  if [ -d "$DIR/.git" ]; then
+    git -C "$DIR" pull --ff-only -q && ok "Updated to the latest version"
+  else
+    git clone -q --depth 1 "$REPO" "$DIR" && ok "Downloaded"
+  fi
+  cd "$DIR"
+  composer install --no-dev --optimize-autoloader --no-interaction -q
+  npm ci --silent >/dev/null 2>&1 && npm run build --silent >/dev/null 2>&1
 fi
-cd "$DIR"
-composer install --no-dev --optimize-autoloader --no-interaction -q
-npm ci --silent >/dev/null 2>&1 && npm run build --silent >/dev/null 2>&1
 ok "Program files ready"
 
 # ---------------------------------------------------------------- 3. mode
@@ -176,11 +192,26 @@ fi
 
 if [ "$MODE" = hosted ]; then
   echo
-  bold "Almost done (shared hosting)"
-  echo "  • In your hosting panel, set the website's document root to: $DIR/public"
-  echo "  • Add this cron job so reminders and backups run:"
-  echo "      * * * * * cd $DIR && php artisan schedule:run >> /dev/null 2>&1"
-  echo "  • Then open your website address and create the Superadmin."
+  bold "Connecting your website to SmartSchool"
+  guess=$(ls -d "$HOME"/domains/*/public_html 2>/dev/null | head -1)
+  guess=${guess:-$HOME/public_html}
+  WEBROOT=$(ask "     Your website folder [$guess]: " "$guess")
+  if [ -L "$WEBROOT" ] && [ "$(readlink -f "$WEBROOT")" = "$(readlink -f "$DIR/public")" ]; then
+    ok "Already connected"
+  else
+    if [ -e "$WEBROOT" ]; then
+      mv "$WEBROOT" "$WEBROOT.before-smartschool-$(date +%Y%m%d%H%M%S)"
+      warn "Your old website folder was kept as $WEBROOT.before-smartschool-…"
+    fi
+    ln -s "$DIR/public" "$WEBROOT" && ok "Website folder now shows SmartSchool"
+  fi
+  ( crontab -l 2>/dev/null | grep -v 'smartschool.*schedule:run'; echo "* * * * * cd $DIR && php artisan schedule:run >> /dev/null 2>&1" ) | crontab - 2>/dev/null \
+    && ok "Background jobs (reminders, backups) turned on" \
+    || warn "Add this cron job in your hosting panel: cd $DIR && php artisan schedule:run"
+  echo
+  bold "SmartSchool is online!"
+  echo "  • Open $(grep '^APP_URL=' .env | cut -d= -f2) and create the Superadmin. Write its email and password down."
+  echo "  • Turn on free SSL (https) for your domain in your hosting panel if it isn't on yet."
   exit 0
 fi
 
