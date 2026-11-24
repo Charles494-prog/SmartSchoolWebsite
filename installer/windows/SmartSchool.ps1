@@ -46,19 +46,19 @@ function Add-Label($f, $text, $y, $h = 28, $bold = $false) {
 
 # ---------- First launch: choose the mode ----------
 if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
-    $f = New-Form 'SmartSchool – first-time setup' 470
+    $f = New-Form 'SmartSchool - first-time setup' 520
     Add-Label $f 'How will your school use SmartSchool?' 20 32 $true | Out-Null
     $lan = New-Object System.Windows.Forms.RadioButton
-    $lan.Text = 'Offline on school Wi-Fi (LAN)  – recommended'; $lan.Checked = $true
+    $lan.Text = 'Offline on school Wi-Fi (LAN)  - recommended'; $lan.Checked = $true
     $lan.Location = New-Object System.Drawing.Point(24, 66); $lan.Size = New-Object System.Drawing.Size(500, 30); $f.Controls.Add($lan)
-    Add-Label $f "   Good for: slow or no internet, one computer, no hosting cost.`n   Keep in mind: no student/parent accounts; works only inside the school network." 98 50 | Out-Null
+    Add-Label $f "   Good for: slow or no internet, one computer, no hosting cost.`n   Keep in mind: no student/parent accounts; works only inside the school network." 98 70 | Out-Null
     $onl = New-Object System.Windows.Forms.RadioButton
     $onl.Text = 'Online (uses a MySQL database / web host)'
-    $onl.Location = New-Object System.Drawing.Point(24, 160); $onl.Size = New-Object System.Drawing.Size(500, 30); $f.Controls.Add($onl)
-    Add-Label $f "   Good for: parent and student accounts, email notifications.`n   Keep in mind: needs a MySQL database and someone to look after it." 192 50 | Out-Null
-    Add-Label $f 'You can change this later in Settings (Superadmin only).' 260 28 | Out-Null
+    $onl.Location = New-Object System.Drawing.Point(24, 176); $onl.Size = New-Object System.Drawing.Size(500, 30); $f.Controls.Add($onl)
+    Add-Label $f "   Good for: parent and student accounts, email notifications.`n   Keep in mind: needs a MySQL database and someone to look after it." 208 70 | Out-Null
+    Add-Label $f 'You can change this later in Settings (Superadmin only).' 296 28 | Out-Null
     $ok = New-Object System.Windows.Forms.Button
-    $ok.Text = 'Continue'; $ok.Location = New-Object System.Drawing.Point(384, 360); $ok.Size = New-Object System.Drawing.Size(140, 44)
+    $ok.Text = 'Continue'; $ok.Location = New-Object System.Drawing.Point(384, 410); $ok.Size = New-Object System.Drawing.Size(140, 44)
     $ok.DialogResult = 'OK'; $f.AcceptButton = $ok; $f.Controls.Add($ok)
     if ($f.ShowDialog() -ne 'OK') { exit }
     $mode = if ($lan.Checked) { 'lan' } else { 'hosted' }
@@ -73,7 +73,7 @@ if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
         Set-EnvValue 'DB_CONNECTION' 'sqlite'; Set-EnvValue 'DB_DATABASE' $db
         Set-EnvValue 'APP_URL' ("http://{0}:{1}" -f (Get-LanIp), $Port)
     } else {
-        $d = New-Form 'SmartSchool – database details' 420
+        $d = New-Form 'SmartSchool - database details' 420
         Add-Label $d 'Enter your MySQL database details' 20 32 $true | Out-Null
         $boxes = @{}; $y = 64
         foreach ($k in @('Host=127.0.0.1', 'Port=3306', 'Database=smartschool', 'User=smartschool', 'Password=', 'Website address=https://')) {
@@ -95,7 +95,7 @@ if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
     }
 
     $wait = New-Form 'SmartSchool' 160
-    Add-Label $wait 'Preparing SmartSchool… this takes about a minute.' 40 30 | Out-Null
+    Add-Label $wait 'Preparing SmartSchool... this takes about a minute.' 40 30 | Out-Null
     $wait.Show(); $wait.Refresh()
     $ok1 = (Artisan @('key:generate', '--force')) -eq 0
     $ok2 = $ok1 -and ((Artisan @('migrate', '--force')) -eq 0)
@@ -127,7 +127,7 @@ Add-Label $s 'SmartSchool is running' 20 32 $true | Out-Null
 Add-Label $s 'Open this address on any phone or computer on the same Wi-Fi:' 64 28 | Out-Null
 $a = Add-Label $s $url 98 36 $true
 $a.ForeColor = [System.Drawing.Color]::FromArgb(31, 95, 70)
-Add-Label $s 'First time? Log in and create your Superadmin. Write its email and password down – nobody can recover it for you. Keep this window open; closing it stops SmartSchool.' 140 70 | Out-Null
+Add-Label $s 'First time? Log in and create your Superadmin. Write its email and password down - nobody can recover it for you. Keep this window open; closing it stops SmartSchool.' 140 70 | Out-Null
 $s.Add_FormClosed({
     Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.ExecutablePath -eq $Php } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
