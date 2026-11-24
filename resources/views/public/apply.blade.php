@@ -8,8 +8,9 @@
         <p class="mt-3 text-slate-600">It takes about 5 minutes. After you submit, you'll get a reference number to check the status. Documents can be uploaded now or brought to the registrar.</p>
     </div>
 
-    @if(! $year)
-        <p class="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">Admission is not open yet. Please check again later.</p>
+    @php $opensLater = $year?->enrollment_opens_on?->isFuture(); @endphp
+    @if(! $year || $opensLater)
+        <p class="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">{{ $opensLater ? 'Admission opens on '.$year->enrollment_opens_on->format('M j, Y').'.' : 'Admission is not open yet.' }} Please check again later.</p>
     @else
     @if($errors->any())<div class="mt-8 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">Please check the fields marked in red.</div>@endif
 

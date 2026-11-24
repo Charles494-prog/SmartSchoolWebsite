@@ -30,7 +30,7 @@ class ApplicationController extends Controller
     public function store(Request $request)
     {
         $year = SchoolYear::current();
-        abort_unless($year, 503, 'Enrollment is not open yet.');
+        abort_unless($year && ! $year->enrollment_opens_on?->isFuture(), 503, 'Enrollment is not open yet.');
         $data = $request->validate([
             'grade_level_id' => 'required|exists:grade_levels,id',
             'applicant_type' => 'required|in:new,transferee,returnee',

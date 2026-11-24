@@ -40,6 +40,6 @@ class FirstRunController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard')->with('ok', 'Welcome! Your Superadmin account is ready. Next: School settings → tuition, then add school years, sections and staff.');
+        return redirect()->route('setup.wizard');
     }
 }

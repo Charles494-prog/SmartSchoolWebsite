@@ -1,30 +1,29 @@
 @php $tiles = \App\Support\Nav::tiles($u); @endphp
 <x-layouts.app title="Home">
     {{-- Greeting --}}
-    <div class="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-indigo-500 to-violet-500 p-6 text-white shadow-lg shadow-brand-500/20 sm:p-8">
-        <div class="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-white/10"></div>
-        <div class="absolute right-24 -bottom-16 h-40 w-40 rounded-full bg-white/10"></div>
-        <div class="relative">
-            <div class="text-sm font-medium text-indigo-100">{{ now()->format('l, F j') }} · School year {{ $sy?->name ?? 'not set yet' }}</div>
-            <h1 class="mt-1 text-2xl font-bold sm:text-3xl">Welcome back, {{ $u->name }}</h1>
-            <p class="mt-1 text-indigo-100">You're signed in as <b>{{ $u->roleLabel() }}</b>. Pick what you want to do below.</p>
+    <div class="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6 dark:border-white/10">
+        <div>
+            <p class="text-sm text-slate-500">{{ now()->format('l, M j, Y') }} · S.Y. {{ $sy?->name ?? 'not set yet' }}</p>
+            <h1 class="mt-1 text-2xl font-semibold text-slate-900 sm:text-3xl">Good {{ now()->hour < 12 ? 'morning' : (now()->hour < 18 ? 'afternoon' : 'evening') }}, {{ explode(' ', $u->name)[0] }}</h1>
+            <p class="mt-1 text-sm text-slate-600">Signed in as {{ $u->roleLabel() }}</p>
         </div>
     </div>
 
     {{-- Setup checklist (admins, until done) --}}
     @isset($steps)
         @php $done = collect($steps)->where(1, true)->count(); @endphp
-        @if($done < count($steps))
-            <div class="card mb-8" x-data="{ open: true }">
+        @if($done < count($steps) && ! \App\Support\School::isSetUp())
+            <div class="card mb-8" x-data="{ open: false }">
                 <div class="flex flex-wrap items-center gap-4">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><x-icon name="sparkles" /></div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-600"><x-icon name="settings" /></div>
                     <div class="flex-1">
                         <h2 class="h2">Set up your school</h2>
                         <p class="muted">{{ $done }} of {{ count($steps) }} steps done – follow them in order.</p>
                     </div>
+                    <a href="{{ route('setup.wizard') }}" class="btn btn-primary btn-sm">Continue setup</a>
                     <button @click="open=!open" class="btn btn-sm" x-text="open ? 'Hide' : 'Show steps'"></button>
                 </div>
-                <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-2 rounded-full bg-gradient-to-r from-brand-500 to-violet-500" style="width: {{ $done / count($steps) * 100 }}%"></div></div>
+                <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-2 rounded-full bg-brand-600" style="width: {{ $done / count($steps) * 100 }}%"></div></div>
                 <ol x-show="open" class="mt-5 grid gap-2 sm:grid-cols-2">
                     @foreach($steps as $i => [$label, $ok, $url])
                         <li>
@@ -103,7 +102,7 @@
                 @php $max = max(1, $byLevel->max(1) ?? 1); @endphp
                 <div class="space-y-3">
                     @forelse($byLevel as [$name, $n])
-                        <div class="text-sm"><div class="mb-1 flex justify-between"><span class="text-slate-600">{{ $name }}</span><b>{{ $n }}</b></div><div class="h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-gradient-to-r from-brand-500 to-violet-500" style="width: {{ $n / $max * 100 }}%"></div></div></div>
+                        <div class="text-sm"><div class="mb-1 flex justify-between"><span class="text-slate-600">{{ $name }}</span><b>{{ $n }}</b></div><div class="h-2 rounded-full bg-slate-100"><div class="h-2 rounded-full bg-brand-600" style="width: {{ $n / $max * 100 }}%"></div></div></div>
                     @empty <p class="muted">No enrollments yet.</p> @endforelse
                 </div>
             </div>
@@ -112,7 +111,7 @@
                 @php $tmax = max(1, $trend->max(1) ?? 1); @endphp
                 <div class="flex h-44 items-end gap-3">
                     @forelse($trend as [$name, $n])
-                        <div class="flex flex-1 flex-col items-center gap-1"><span class="text-xs font-bold">{{ $n }}</span><div class="w-full rounded-t-lg bg-gradient-to-t from-brand-500 to-violet-400" style="height: {{ max(6, $n / $tmax * 130) }}px"></div><span class="text-[11px] text-slate-500">{{ $name }}</span></div>
+                        <div class="flex flex-1 flex-col items-center gap-1"><span class="text-xs font-bold">{{ $n }}</span><div class="w-full rounded-t-lg bg-brand-600" style="height: {{ max(6, $n / $tmax * 130) }}px"></div><span class="text-[11px] text-slate-500">{{ $name }}</span></div>
                     @empty <p class="muted">No data yet.</p> @endforelse
                 </div>
             </div>

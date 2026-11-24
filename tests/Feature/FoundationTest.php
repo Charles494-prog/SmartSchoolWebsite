@@ -62,6 +62,7 @@ class FoundationTest extends TestCase
     public function test_write_requests_are_rate_limited(): void
     {
         $u = User::factory()->create(['role' => 'admin'])->fresh();
+        Setting::put('setup_completed_at', now()->toDateTimeString());
         $this->actingAs($u);
         for ($i = 0; $i < 120; $i++) {
             $this->post('/announcements', []);

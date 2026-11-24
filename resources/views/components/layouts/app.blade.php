@@ -19,20 +19,20 @@
     <title>{{ $title ?? 'Home' }} · {{ $school }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full font-sans text-slate-800 antialiased dark:text-slate-200" x-data="{ menu: false }" @keydown.window.prevent.ctrl.k="$dispatch('palette')" @keydown.window.prevent.meta.k="$dispatch('palette')">
+<body class="h-full font-sans text-slate-800 antialiased dark:text-slate-200" x-data="{ menu: false, mini: localStorage.getItem('navMini') === '1' }" x-init="$watch('mini', v => localStorage.setItem('navMini', v ? '1' : '0'))" @keydown.window.prevent.ctrl.k="$dispatch('palette')" @keydown.window.prevent.meta.k="$dispatch('palette')">
 
 {{-- Mobile drawer backdrop --}}
 <div x-show="menu" x-cloak x-transition.opacity @click="menu=false" class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden"></div>
 
 {{-- Sidebar --}}
-<aside :class="menu ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col bg-white ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 transition-transform duration-200 lg:translate-x-0">
+<aside :class="[menu ? 'translate-x-0' : '-translate-x-full', mini ? 'lg:w-20' : 'lg:w-72']" class="fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col bg-white ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 transition-transform duration-200 lg:translate-x-0">
     <a href="{{ $isPortal ? route('portal') : route('dashboard') }}" class="flex items-center gap-3 px-6 pt-6 pb-4">
         @if(\App\Models\Setting::get('logo_path'))
             <img src="{{ route('school.logo') }}" class="h-10 w-10 rounded-xl object-contain ring-1 ring-slate-200" alt="">
         @else
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/30"><x-icon name="cap" class="h-5 w-5" /></div>
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><x-icon name="cap" class="h-5 w-5" /></div>
         @endif
-        <div class="min-w-0">
+        <div class="min-w-0" :class="mini && 'lg:hidden'">
             <div class="truncate text-sm font-bold text-slate-900 dark:text-white">{{ $school }}</div>
             <div class="text-xs text-slate-500">{{ $isPortal ? ($u->role === 'parent' ? 'Parent portal' : 'Student portal') : 'Staff portal' }}</div>
         </div>
@@ -48,11 +48,11 @@
                     @foreach($items as $i)@include('components.layouts._nav-link', ['i' => $i])@endforeach
                 @else
                     <div x-data="{ open: {{ $hasActive ? 'true' : 'false' }} || localStorage.getItem('nav:{{ $group }}') === '1' }" class="pt-2">
-                        <button type="button" class="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-600" :aria-expanded="open" x-on:click="open = !open; localStorage.setItem('nav:{{ $group }}', open ? '1' : '0')">
+                        <button type="button" :class="mini && 'lg:hidden'" class="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-600" :aria-expanded="open" x-on:click="open = !open; localStorage.setItem('nav:{{ $group }}', open ? '1' : '0')">
                             {{ $group }}
                             <x-icon name="chevron" class="ml-auto h-3.5 w-3.5 transition" ::class="open ? 'rotate-90' : ''" />
                         </button>
-                        <div x-show="open" x-cloak class="mt-0.5 space-y-0.5">
+                        <div x-show="open || mini" x-cloak class="mt-0.5 space-y-0.5">
                             @foreach($items as $i)@include('components.layouts._nav-link', ['i' => $i])@endforeach
                         </div>
                     </div>
@@ -60,24 +60,17 @@
             @endforeach
         </div>
         <button @click="$dispatch('palette')" class="mt-6 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 dark:ring-white/10 dark:hover:bg-white/5">
-            <x-icon name="search" class="h-5 w-5 text-slate-400" /> Search everything
-            <kbd class="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10">Ctrl K</kbd>
+            <x-icon name="search" class="h-5 w-5 shrink-0 text-slate-400" /> <span :class="mini && 'lg:hidden'">Search everything</span>
+            <kbd :class="mini && 'lg:hidden'" class="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10">Ctrl K</kbd>
         </button>
     </nav>
+    <button type="button" class="hidden min-h-11 items-center gap-3 border-t border-slate-100 px-7 py-3 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 lg:flex dark:border-white/10 dark:hover:bg-white/5" x-on:click="mini = !mini" :aria-label="mini ? 'Expand menu' : 'Collapse menu'">
+        <x-icon name="chevron-left" class="h-5 w-5 shrink-0 transition" ::class="mini && 'rotate-180'" /><span :class="mini && 'lg:hidden'">Collapse menu</span>
+    </button>
 
-    <div class="border-t border-slate-100 p-4 dark:border-white/10">
-        <div class="flex items-center gap-3 rounded-xl p-2">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">{{ $initials }}</div>
-            <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-semibold text-slate-900 dark:text-white">{{ $u->name }}</div>
-                <div class="truncate text-xs text-slate-500">{{ $u->roleLabel() }}</div>
-            </div>
-            <form method="post" action="{{ route('logout') }}">@csrf<button class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="Log out"><x-icon name="logout" class="h-[18px] w-[18px]" /></button></form>
-        </div>
-    </div>
 </aside>
 
-<div class="lg:pl-72">
+<div :class="mini ? 'lg:pl-20' : 'lg:pl-72'" class="lg:pl-72 transition-[padding] duration-200">
     {{-- Top bar --}}
     <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-slate-900/80">
         <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
@@ -97,12 +90,13 @@
                     @if($unread)<span class="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $unread > 9 ? '9+' : $unread }}</span>@endif
                 </a>
                 <div x-data="{ o:false }" class="relative">
-                    <button @click="o=!o" class="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100">
-                        <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $initials }}</span>
+                    <button @click="o=!o" class="flex items-center gap-2 rounded-xl p-1.5 pr-2.5 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Account menu" :aria-expanded="o">
+                        @if($u->avatar_path)<img src="{{ route('profile.photo', $u) }}" class="h-8 w-8 rounded-full object-cover" alt="">@else<span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $initials }}</span>@endif
+                        <span class="hidden text-left sm:block"><span class="block max-w-40 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $u->name }}</span><span class="block text-xs text-slate-500">{{ $u->roleLabel() }}</span></span>
                     </button>
                     <div x-show="o" x-cloak x-transition @click.outside="o=false" class="absolute right-0 mt-2 w-60 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
                         <div class="border-b border-slate-100 px-4 py-3"><div class="text-sm font-semibold">{{ $u->name }}</div><div class="truncate text-xs text-slate-500">{{ $u->email }}</div></div>
-                        <a href="{{ route('password.edit') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="key" class="h-4 w-4 text-slate-400" /> Change password</a>
+                        <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile (photo, name, bio, password)</a>
                         <a href="{{ route('privacy') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="shield" class="h-4 w-4 text-slate-400" /> Privacy</a>
                         <form method="post" action="{{ route('logout') }}">@csrf<button class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"><x-icon name="logout" class="h-4 w-4" /> Log out</button></form>
                     </div>

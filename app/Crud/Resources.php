@@ -34,8 +34,9 @@ class Resources
                 'columns' => ['name' => 'School year', 'starts_on' => 'Starts', 'ends_on' => 'Ends', 'is_current' => 'Current'],
                 'fields' => [
                     ['name' => 'name', 'label' => 'Name', 'rules' => 'required|max:20', 'placeholder' => '2026-2027'],
-                    ['name' => 'starts_on', 'label' => 'Start date', 'type' => 'date', 'rules' => 'required|date'],
-                    ['name' => 'ends_on', 'label' => 'End date', 'type' => 'date', 'rules' => 'required|date|after:starts_on'],
+                    ['name' => 'enrollment_opens_on', 'label' => 'Registration opens on', 'type' => 'date', 'rules' => 'nullable|date|before_or_equal:starts_on', 'help' => 'When families can start applying. Leave empty to open now.'],
+                    ['name' => 'starts_on', 'label' => 'First day of classes', 'type' => 'date', 'rules' => 'required|date'],
+                    ['name' => 'ends_on', 'label' => 'Last day of classes', 'type' => 'date', 'rules' => 'required|date|after:starts_on'],
                     ['name' => 'is_current', 'label' => 'This is the current school year', 'type' => 'checkbox', 'rules' => 'boolean'],
                 ],
                 'after_save' => function ($m) {

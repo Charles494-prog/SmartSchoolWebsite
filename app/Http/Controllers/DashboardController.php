@@ -19,6 +19,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Services\Grading;
 use App\Support\Role;
+use App\Support\School;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -28,6 +29,12 @@ class DashboardController extends Controller
         $u = $request->user();
         if ($u->hasRole(Role::STUDENT, Role::PARENT)) {
             return redirect()->route('portal');
+        }
+        // Pop up the setup wizard once per sign-in until the school is set up.
+        if ($u->isAdmin() && ! School::isSetUp() && ! Section::exists() && ! $request->session()->has('wizard_seen')) {
+            $request->session()->put('wizard_seen', true);
+
+            return redirect()->route('setup.wizard');
         }
         if ($u->role === Role::GUARD) {
             return redirect()->route('attendance.scan');

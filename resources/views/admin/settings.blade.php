@@ -35,7 +35,7 @@
             {{-- Section nav --}}
             <nav class="hidden lg:block">
                 <ul class="sticky top-24 space-y-0.5 text-sm">
-                    @foreach($sections + ['tuition' => ['Tuition'], 'privacy' => ['Privacy notice']] as $id => [$title])
+                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'privacy' => ['Privacy notice']] as $id => [$title])
                         <li><a href="#{{ $id }}" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5">{{ $title }}</a></li>
                     @endforeach
                     <li class="pt-3"><a href="{{ route('crud.index', 'school-years') }}" class="block rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">School years →</a></li>
@@ -144,6 +144,34 @@
                             </div>
                         </div>
                         <p class="text-xs text-slate-500">Changing tuition updates every student's balance for this school year right away.</p>
+                    </div>
+                </section>
+
+                <section id="mode" class="card scroll-mt-24 p-0" x-data="{ mode: @js(\App\Support\School::mode()) }">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">How SmartSchool runs</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">Chosen in the installer. Change it when your school moves from the school Wi-Fi to the internet, or back.</p>
+                    </div>
+                    <div class="space-y-4 px-6 py-5">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            @foreach(['lan' => ['Offline on school Wi-Fi (LAN)', 'Works inside the school network. Staff register students; no student or parent accounts.'], 'hosted' => ['Online (web host)', 'Reachable from anywhere. Student and parent accounts, online applications and email notices.']] as $v => [$t, $d])
+                                <label class="flex min-h-11 cursor-pointer gap-3 rounded-xl border p-4" :class="mode === '{{ $v }}' ? 'border-brand-600 ring-1 ring-brand-600' : 'border-slate-200'">
+                                    <input type="radio" name="deployment_mode" value="{{ $v }}" x-model="mode" class="mt-1">
+                                    <span><span class="block text-sm font-semibold">{{ $t }}</span><span class="block text-xs text-slate-500">{{ $d }}</span></span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div x-show="mode !== @js(\App\Support\School::mode())" x-cloak class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                            <p class="font-semibold" x-text="mode === 'hosted' ? 'Before switching to Online' : 'Before switching to LAN'"></p>
+                            <ul class="mt-1 list-disc space-y-1 pl-5" x-show="mode === 'hosted'">
+                                <li>Make a backup first (School setup → Backups).</li>
+                                <li>This turns on the online features. To reach SmartSchool from outside the school, it must also run on a web host – install it there with the Online option and restore your backup.</li>
+                            </ul>
+                            <ul class="mt-1 list-disc space-y-1 pl-5" x-show="mode === 'lan'">
+                                <li>Student and parent logins stop working; their data is kept.</li>
+                                <li>Online applications and email notices are turned off.</li>
+                            </ul>
+                        </div>
                     </div>
                 </section>
 

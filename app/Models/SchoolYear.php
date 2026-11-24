@@ -12,7 +12,7 @@ class SchoolYear extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['starts_on' => 'date', 'ends_on' => 'date', 'is_current' => 'boolean'];
+    protected $casts = ['enrollment_opens_on' => 'date', 'starts_on' => 'date', 'ends_on' => 'date', 'is_current' => 'boolean'];
 
     public static function current(): ?self
     {

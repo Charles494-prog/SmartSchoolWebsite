@@ -36,7 +36,7 @@
             <div class="flex-1 overflow-y-auto p-2">
                 <template x-for="c in list" :key="c.id">
                     <button @click="select(c)" :class="current && current.id === c.id ? 'bg-brand-50 dark:bg-brand-500/15' : 'hover:bg-slate-50 dark:hover:bg-white/5'" class="flex w-full items-center gap-3 rounded-xl p-2.5 text-left">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-sm font-bold text-white" x-text="c.with.initials"></span>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white" x-text="c.with.initials"></span>
                         <span class="min-w-0 flex-1">
                             <span class="flex items-center gap-2"><span class="truncate text-sm" :class="c.unread ? 'font-bold' : 'font-semibold'" x-text="c.with.name"></span><span class="ml-auto shrink-0 text-[11px] text-slate-400" x-text="c.time"></span></span>
                             <span class="block truncate text-xs" :class="c.unread ? 'font-semibold text-slate-800 dark:text-slate-100' : 'text-slate-500'" x-text="c.last || c.with.role"></span>
@@ -55,7 +55,7 @@
             <template x-if="current">
                 <div class="flex items-center gap-3 border-b border-slate-100 px-3 py-2.5 dark:border-white/10">
                     @unless($full)<button @click="current=null; refreshList()" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" title="Back"><x-icon name="chevron-left" class="h-5 w-5" /></button>@endunless
-                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-xs font-bold text-white" x-text="current.with.initials"></span>
+                    <span class="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white" x-text="current.with.initials"></span>
                     <span class="min-w-0 flex-1"><span class="block truncate text-sm font-semibold" x-text="current.with.name"></span><span class="block text-xs text-slate-500" x-text="current.with.role"></span></span>
                     @unless($full)<button @click="open=false" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" title="Close"><x-icon name="x" class="h-5 w-5" /></button>@endunless
                 </div>

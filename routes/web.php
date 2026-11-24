@@ -17,7 +17,9 @@ use App\Http\Controllers\HelpController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SectionController;
+use App\Http\Controllers\SetupWizardController;
 use App\Http\Controllers\StudentController;
 use App\Http\Middleware\ThrottleWrites;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +44,10 @@ Route::middleware('guest')->group(function () {
 // ---------------------------------------------------------------- signed-in
 Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'password'])->middleware('throttle:10,1')->name('profile.password');
+    Route::get('/profile/photo/{user}', [ProfileController::class, 'photo'])->name('profile.photo');
     Route::get('/password', [AuthController::class, 'editPassword'])->name('password.edit');
     Route::put('/password', [AuthController::class, 'updatePassword'])->name('password.update');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -191,6 +197,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Administration
     Route::middleware('role:admin')->group(function () {
+        Route::get('/setup-wizard/{step?}', [SetupWizardController::class, 'show'])->name('setup.wizard');
+        Route::post('/setup-wizard/finish', [SetupWizardController::class, 'finish'])->name('setup.finish');
+        Route::post('/setup-wizard/{step}', [SetupWizardController::class, 'save'])->name('setup.save');
         Route::get('/settings', [AdminController::class, 'settings'])->name('settings.edit');
         Route::put('/settings', [AdminController::class, 'saveSettings'])->name('settings.update');
         Route::get('/audit', [AdminController::class, 'audit'])->name('audit');

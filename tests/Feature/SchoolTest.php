@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\SetupWizardController;
 use App\Models\Application;
 use App\Models\AttendanceRecord;
 use App\Models\AuditLog;
@@ -29,6 +30,7 @@ use App\Services\Attendance;
 use App\Services\Billing;
 use App\Services\Chat;
 use App\Services\Grading;
+use App\Support\School;
 use Carbon\Carbon;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,7 +78,8 @@ class SchoolTest extends TestCase
         foreach ($pages as $email => $urls) {
             $this->as($email);
             foreach ($urls as $url) {
-                $this->get($url)->assertOk();
+                $r = $this->get($url);
+                $this->assertSame(200, $r->status(), $url.' -> '.$r->headers->get('Location'));
             }
         }
         foreach (['/login', '/apply', '/apply/status', '/privacy'] as $url) {
@@ -432,12 +435,46 @@ class SchoolTest extends TestCase
         $this->get('/login')->assertRedirect('/setup');
         $data = ['school_name' => 'Rizal High', 'name' => 'Ana Cruz', 'email' => 'ana@school.test', 'password' => 'Secret12345', 'password_confirmation' => 'Secret12345'];
         $this->post('/setup', $data)->assertSessionHasErrors('written_down');
-        $this->post('/setup', $data + ['written_down' => 1])->assertRedirect(route('dashboard'));
+        $this->post('/setup', $data + ['written_down' => 1])->assertRedirect(route('setup.wizard'));
         $this->assertSame('admin', User::where('email', 'ana@school.test')->value('role'));
         $this->assertSame('Rizal High', Setting::get('school_name'));
         auth()->logout();
         $this->get('/setup')->assertNotFound();
         $this->get('/login')->assertOk();
+    }
+
+    public function test_setup_wizard_steps_save_and_can_be_skipped(): void
+    {
+        $this->as('admin@school.test');
+        foreach (array_keys(SetupWizardController::STEPS) as $step) {
+            $this->get("/setup-wizard/{$step}")->assertOk();
+        }
+        $this->post('/setup-wizard/year', ['name' => '2027-2028', 'enrollment_opens_on' => '2027-05-01', 'starts_on' => '2027-06-14', 'ends_on' => '2028-04-10'])->assertRedirect('/setup-wizard/levels');
+        $this->assertSame('2027-2028', SchoolYear::current()->name);
+        $this->post('/setup-wizard/rooms', ['rooms' => [['name' => 'Lab 1', 'capacity' => 30], ['name' => '', 'capacity' => 40]]]);
+        $this->assertSame(30, Room::where('name', 'Lab 1')->value('capacity'));
+        $this->post('/setup-wizard/subjects', ['ww' => 40, 'pt' => 40, 'qa' => 10])->assertSessionHasErrors('ww');
+        $this->post('/setup-wizard/staff', ['people' => [['name' => 'Gina Guard', 'email' => 'gina@school.test', 'role' => 'guard']]])
+            ->assertRedirect('/setup-wizard/staff')->assertSessionHas('wizard_accounts');
+        $this->assertTrue(User::where('email', 'gina@school.test')->value('must_change_password'));
+        $this->post('/setup-wizard/sections', ['sections' => [['name' => 'Zeta Wizard', 'grade_level_id' => GradeLevel::first()->id, 'room' => 'Lab 1']]]);
+        $this->assertSame(30, Section::where('name', 'Zeta Wizard')->value('capacity'));
+        $this->post('/setup-wizard/finish')->assertRedirect(route('dashboard'));
+        $this->assertTrue(School::isSetUp());
+        $this->as('teacher@school.test');
+        $this->get('/setup-wizard')->assertForbidden();
+    }
+
+    public function test_profile_edit_name_bio_photo_and_password(): void
+    {
+        Storage::fake('local');
+        $u = $this->as('teacher@school.test');
+        $this->get('/profile')->assertOk();
+        $this->put('/profile', ['name' => 'Ana Reyes', 'bio' => 'Grade 7 adviser', 'photo' => UploadedFile::fake()->image('me.jpg', 300, 400)])->assertSessionHas('ok');
+        $u->refresh();
+        $this->assertSame(['Ana Reyes', 'Grade 7 adviser'], [$u->name, $u->bio]);
+        $this->get('/profile/photo/'.$u->id)->assertOk();
+        $this->put('/profile/password', ['current_password' => 'wrong', 'password' => 'NewPass12345', 'password_confirmation' => 'NewPass12345'])->assertSessionHasErrors('current_password');
     }
 
     public function test_forced_password_change_and_inactive_block(): void
