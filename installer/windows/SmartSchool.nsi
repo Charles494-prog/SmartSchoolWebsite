@@ -25,12 +25,18 @@ SetCompressor /SOLID lzma
 
 !define LAUNCH 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\SmartSchool.ps1"'
 
+!macro StopSmartSchool
+  ; Close a running SmartSchool (its PHP server locks files in $INSTDIR\php)
+  nsExec::Exec `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { ($$_.ExecutablePath -like '$INSTDIR\*') -or ($$_.CommandLine -like '*$INSTDIR\SmartSchool.ps1*') } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 2"`
+!macroend
+
 Function LaunchApp
   Exec '${LAUNCH}'
 FunctionEnd
 
 Section "Install"
   SetOutPath "$INSTDIR"
+  !insertmacro StopSmartSchool
   File "SmartSchool.ps1"
   File /r "build\php"
   File /r "build\app"
@@ -52,6 +58,7 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+  !insertmacro StopSmartSchool
   nsExec::Exec 'netsh advfirewall firewall delete rule name="SmartSchool"'
   Delete "$DESKTOP\SmartSchool.lnk"
   RMDir /r "$SMPROGRAMS\SmartSchool"
