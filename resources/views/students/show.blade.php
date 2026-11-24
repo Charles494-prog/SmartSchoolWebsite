@@ -1,22 +1,42 @@
 <x-layouts.app :title="$s->full_name">
-    <div class="mb-4 flex flex-wrap items-start gap-3">
-        @if($s->photo_path)<img src="{{ route('students.photo', $s) }}" class="h-20 w-20 rounded-2xl object-cover ring-1 ring-slate-200" alt="">@else<div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-100 text-slate-300 ring-1 ring-slate-200" title="No photo yet – add it in Edit"><x-icon name="user" class="h-9 w-9" /></div>@endif
-        <div class="flex-1">
-            <h1 class="h1">{{ $s->full_name }}</h1>
-            <p class="muted">School ID {{ $s->student_no }} · LRN {{ $s->lrn ?: 'not yet entered' }} · {{ $s->sex }} · {{ $s->age }} yrs · <x-status :value="$s->status" /></p>
-            @if($current)<p class="mt-1 text-sm">{{ $current->gradeLevel->name }} {{ $current->section ? '– '.$current->section->name : '(no section yet)' }} · S.Y. {{ $current->schoolYear->name ?? '' }}</p>@endif
-        </div>
-        <div class="flex flex-wrap gap-2">
-            @if($canEdit)<a href="{{ route('students.edit', $s) }}" class="btn">Edit</a>@endif
-            <a href="{{ route('students.id', $s) }}" target="_blank" class="btn">ID card with QR</a>
-            @if($current)<a href="{{ route('students.sf9', $current) }}" target="_blank" class="btn">Report card</a>@endif
-            @if($canEdit)<a href="{{ route('students.sf10', $s) }}" target="_blank" class="btn">Permanent record</a>
-            <a href="{{ route('students.export', $s) }}" class="btn" title="Data Privacy Act: copy of personal data">Export data</a>@endif
+    @php
+        $tabs = ['overview' => 'Overview', 'grades' => 'Grades', 'attendance' => 'Attendance', 'account' => 'Account & login'];
+        if ($clinic !== null || $guidance !== null) { $tabs['health'] = 'Health & guidance'; }
+    @endphp
+    <div class="card mb-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+            @if($s->photo_path)<img src="{{ route('students.photo', $s) }}" class="h-20 w-20 rounded-full object-cover ring-1 ring-slate-200" alt="">@else<div class="flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 text-slate-400 ring-1 ring-slate-200" title="No photo yet – add it in Edit"><x-icon name="user" class="h-9 w-9" /></div>@endif
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2"><h1 class="h1">{{ $s->full_name }}</h1><x-status :value="$s->status" /></div>
+                <p class="mt-1 text-sm text-slate-600">{{ $current ? $current->gradeLevel->name.($current->section ? ' – '.$current->section->name : ' (no section yet)').' · S.Y. '.($current->schoolYear->name ?? '') : 'Not enrolled this school year' }}</p>
+                <p class="muted mt-1 text-sm">ID {{ $s->student_no }} · LRN {{ $s->lrn ?: 'not entered' }} · {{ $s->sex }} · {{ $s->age }} yrs</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                @if($canEdit)<a href="{{ route('students.edit', $s) }}" class="btn btn-primary">Edit</a>@endif
+                <div class="relative" x-data="{ open: false }" x-on:click.outside="open = false">
+                    <button type="button" class="btn" x-on:click="open = !open" :aria-expanded="open"><x-icon name="download" class="h-4 w-4" /> Documents</button>
+                    <div x-show="open" x-cloak class="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:bg-slate-900">
+                        <a href="{{ route('students.id', $s) }}" target="_blank" class="block rounded-lg px-3 py-2.5 text-sm hover:bg-slate-50">ID card with QR</a>
+                        @if($current)<a href="{{ route('students.sf9', $current) }}" target="_blank" class="block rounded-lg px-3 py-2.5 text-sm hover:bg-slate-50">Report card (this year)</a>@endif
+                        @if($canEdit)
+                            <a href="{{ route('students.sf10', $s) }}" target="_blank" class="block rounded-lg px-3 py-2.5 text-sm hover:bg-slate-50"><span class="font-medium">Transcript of records (TOR)</span><span class="block text-xs text-slate-500">Every grade level, first to latest</span></a>
+                            <a href="{{ route('students.export', $s) }}" class="block rounded-lg px-3 py-2.5 text-sm hover:bg-slate-50">Export personal data</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-3">
-        <div class="space-y-4 lg:col-span-2">
+    <div x-data="{ tab: (location.hash || '#overview').slice(1) }" x-init="$watch('tab', t => history.replaceState(null, '', '#' + t))">
+        <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
+            @foreach($tabs as $k => $label)
+                <button type="button" role="tab" class="-mb-px min-h-11 border-b-2 px-4 text-sm font-medium whitespace-nowrap" :class="tab === '{{ $k }}' ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'" x-on:click="tab = '{{ $k }}'">{{ $label }}</button>
+            @endforeach
+        </div>
+
+        <div x-show="tab === 'overview'" class="grid gap-4 lg:grid-cols-3">
+            <div class="space-y-4 lg:col-span-2">
             <div class="card">
                 <h2 class="h2 mb-3">Profile</h2>
                 <dl class="grid gap-3 text-sm sm:grid-cols-3">
@@ -48,7 +68,7 @@
                 </div>
                 @if($canEdit)
                     <details class="mt-4" @if($errors->hasAny(['name','relationship','email'])) open @endif>
-                        <summary class="cursor-pointer font-semibold text-brand-700">+ Add guardian</summary>
+                        <summary class="cursor-pointer font-semibold text-brand-700">Add guardian</summary>
                         <form method="post" action="{{ route('students.guardians.add', $s) }}" class="mt-3 grid gap-3 sm:grid-cols-3">
                             @csrf
                             <x-field name="name" label="Full name" required />
@@ -67,38 +87,8 @@
                 @endif
             </div>
 
-            @if($report)
-                <div class="card overflow-x-auto">
-                    <h2 class="h2 mb-3">Grades this school year</h2>
-                    <table class="table">
-                        <thead><tr><th>Subject</th>@foreach(range(1, $current->gradeLevel->terms) as $t)<th>Q{{ $t }}</th>@endforeach<th>Final</th><th>Remarks</th></tr></thead>
-                        <tbody>
-                        @forelse($report['subjects'] as $sub)
-                            <tr><td>{{ $sub['name'] }}</td>@foreach($sub['terms'] as $g)<td>{{ $g ?? '' }}</td>@endforeach<td class="font-semibold">{{ $sub['final'] ?? '' }}</td><td>{{ $sub['remark'] }}</td></tr>
-                        @empty
-                            <tr><td colspan="9" class="muted">No subjects yet (assign a section with classes).</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                    @if($report['general_average'])<p class="mt-3 font-semibold">General average: {{ $report['general_average'] }} {{ $report['honor'] ? '· '.$report['honor'] : '' }}</p>@endif
-                </div>
-            @endif
-
-            @if($clinic !== null)
-                <div class="card">
-                    <h2 class="h2 mb-2">Clinic visits <span class="muted">(nurse/admin only)</span></h2>
-                    @forelse($clinic as $c)<p class="text-sm">{{ $c->visited_at->format('M d, Y g:i A') }} – {{ $c->complaint }} {{ $c->sent_home ? '(sent home)' : '' }}</p>@empty<p class="muted">None.</p>@endforelse
-                </div>
-            @endif
-            @if($guidance !== null)
-                <div class="card">
-                    <h2 class="h2 mb-2">Guidance records <span class="muted">(confidential)</span></h2>
-                    @forelse($guidance as $g)<p class="text-sm"><a class="link" href="{{ route('crud.edit', ['guidance-records', $g->id]) }}">{{ $g->recorded_on->format('M d, Y') }} – {{ $g->title }}</a></p>@empty<p class="muted">None.</p>@endforelse
-                </div>
-            @endif
-        </div>
-
-        <div class="space-y-4">
+            </div>
+            <div class="space-y-4">
             <div class="card">
                 <h2 class="h2 mb-3">Enrollment history</h2>
                 <ul class="space-y-2 text-sm">
@@ -125,6 +115,31 @@
                 @endif
             </div>
 
+            </div>
+        </div>
+
+        <div x-show="tab === 'grades'" x-cloak class="space-y-4">
+            @if($report)
+                <div class="card overflow-x-auto">
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 class="h2">Grades this school year</h2>@if($canEdit)<a href="{{ route('students.sf10', $s) }}" target="_blank" class="btn btn-sm"><x-icon name="download" class="h-4 w-4" /> Transcript – all grade levels</a>@endif</div>
+                    <table class="table">
+                        <thead><tr><th>Subject</th>@foreach(range(1, $current->gradeLevel->terms) as $t)<th>Q{{ $t }}</th>@endforeach<th>Final</th><th>Remarks</th></tr></thead>
+                        <tbody>
+                        @forelse($report['subjects'] as $sub)
+                            <tr><td>{{ $sub['name'] }}</td>@foreach($sub['terms'] as $g)<td>{{ $g ?? '' }}</td>@endforeach<td class="font-semibold">{{ $sub['final'] ?? '' }}</td><td>{{ $sub['remark'] }}</td></tr>
+                        @empty
+                            <tr><td colspan="9" class="muted">No subjects yet (assign a section with classes).</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                    @if($report['general_average'])<p class="mt-3 font-semibold">General average: {{ $report['general_average'] }} {{ $report['honor'] ? '· '.$report['honor'] : '' }}</p>@endif
+                </div>
+            @endif
+
+            @if(! $report)<div class="card"><x-empty icon="award" title="No grades this school year" text="Grades appear once the student is in a section and teachers post scores." /></div>@endif
+        </div>
+
+        <div x-show="tab === 'attendance'" x-cloak class="max-w-2xl">
             <div class="card">
                 <h2 class="h2 mb-2">Attendance (daily)</h2>
                 <div class="flex flex-wrap gap-2 text-sm">
@@ -135,6 +150,9 @@
                 </ul>
             </div>
 
+        </div>
+
+        <div x-show="tab === 'account'" x-cloak class="grid max-w-4xl gap-4 md:grid-cols-2">
             @if($current?->account && auth()->user()->hasRole('admin', 'cashier', 'registrar'))
                 <div class="card">
                     <h2 class="h2 mb-1">Account balance</h2>
@@ -169,5 +187,22 @@
                 @endif
             @endif
         </div>
+
+        @if(isset($tabs['health']))
+        <div x-show="tab === 'health'" x-cloak class="space-y-4">
+            @if($clinic !== null)
+                <div class="card">
+                    <h2 class="h2 mb-2">Clinic visits <span class="muted">(nurse/admin only)</span></h2>
+                    @forelse($clinic as $c)<p class="text-sm">{{ $c->visited_at->format('M d, Y g:i A') }} – {{ $c->complaint }} {{ $c->sent_home ? '(sent home)' : '' }}</p>@empty<p class="muted">None.</p>@endforelse
+                </div>
+            @endif
+            @if($guidance !== null)
+                <div class="card">
+                    <h2 class="h2 mb-2">Guidance records <span class="muted">(confidential)</span></h2>
+                    @forelse($guidance as $g)<p class="text-sm"><a class="link" href="{{ route('crud.edit', ['guidance-records', $g->id]) }}">{{ $g->recorded_on->format('M d, Y') }} – {{ $g->title }}</a></p>@empty<p class="muted">None.</p>@endforelse
+                </div>
+            @endif
+        </div>
+        @endif
     </div>
 </x-layouts.app>

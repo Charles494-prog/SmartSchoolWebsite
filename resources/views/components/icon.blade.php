@@ -42,6 +42,7 @@ $paths = [
     'chevron' => '<path d="m9 18 6-6-6-6"/>',
     'key' => '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
     'x' => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    'download' => '<path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/>',
     'file' => '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/>',
     'check' => '<path d="M20 6 9 17l-5-5"/>',
     'plus' => '<path d="M5 12h14"/><path d="M12 5v14"/>',
