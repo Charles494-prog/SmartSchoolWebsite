@@ -117,38 +117,168 @@ if (-not (Get-EnvValue 'SMARTSCHOOL_MODE')) {
     }
 }
 
-# ---------- Start (every launch) ----------
+# ---------- Control panel (every launch) ----------
 $mode = Get-EnvValue 'SMARTSCHOOL_MODE'
-$ip = if ($mode -eq 'lan') { Get-LanIp } else { '127.0.0.1' }
-$url = "http://{0}:{1}" -f $ip, $Port
-if ($mode -eq 'lan') { Set-EnvValue 'APP_URL' $url; Artisan @('config:cache') | Out-Null }
+$script:ip = if ($mode -eq 'lan') { Get-LanIp } else { '127.0.0.1' }
+$script:url = "http://{0}:{1}" -f $script:ip, $Port
+$script:procs = @()
 
-Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like "*$App*" -or $_.ExecutablePath -eq $Php } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-$env:PHP_CLI_SERVER_WORKERS = '6'
-Start-Process -FilePath $Php -ArgumentList @('artisan', 'serve', "--host=$ip", "--port=$Port") -WorkingDirectory $App -WindowStyle Hidden
-Start-Process -FilePath $Php -ArgumentList @('artisan', 'schedule:work') -WorkingDirectory $App -WindowStyle Hidden
-Start-Sleep -Seconds 3
-Start-Process $url
+function Stop-Server {
+    foreach ($p in $script:procs) { try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch {} }
+    $script:procs = @()
+    Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.ExecutablePath -eq $Php } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+function Start-Server {
+    Stop-Server
+    if ($mode -eq 'lan') {
+        $script:ip = Get-LanIp
+        $script:url = "http://{0}:{1}" -f $script:ip, $Port
+        Set-EnvValue 'APP_URL' $script:url
+        Artisan @('config:cache') | Out-Null
+    }
+    $env:PHP_CLI_SERVER_WORKERS = '6'
+    $script:procs = @(
+        (Start-Process -FilePath $Php -ArgumentList @('artisan', 'serve', "--host=$($script:ip)", "--port=$Port") -WorkingDirectory $App -WindowStyle Hidden -PassThru),
+        (Start-Process -FilePath $Php -ArgumentList @('artisan', 'schedule:work') -WorkingDirectory $App -WindowStyle Hidden -PassThru)
+    )
+}
+function Test-Web {
+    try { (Invoke-WebRequest -Uri "$($script:url)/health" -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200 } catch { $false }
+}
 
 # The Windows firewall only lets other devices in on a Private network.
 $public = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue | Where-Object { $_.NetworkCategory -eq 'Public' })
 if ($mode -eq 'lan' -and $public.Count -gt 0) {
-    $msg = "This computer's network ($($public[0].Name)) is set to Public, so phones and other computers can't reach SmartSchool.`n`nMake it Private now? (Windows will ask for permission.)`n`nOn every other Windows computer that will use SmartSchool, also set the school Wi-Fi to Private: Settings > Network & internet > Wi-Fi > (your network) > Private network."
+    $msg = "This computer's network ($($public[0].Name)) is set to Public, so phones and other computers can't reach SmartSchool.`n`nMake it Private now? (Windows will ask for permission.)`n`nOn every other Windows computer that will use SmartSchool, also set the school network (Wi-Fi or cable) to Private."
     if ([System.Windows.Forms.MessageBox]::Show($msg, 'SmartSchool - network', 'YesNo', 'Warning') -eq 'Yes') {
         $ids = ($public | ForEach-Object { $_.InterfaceIndex }) -join ','
         try { Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList "-NoProfile -Command Set-NetConnectionProfile -InterfaceIndex $ids -NetworkCategory Private" } catch {}
     }
 }
 
-$s = New-Form 'SmartSchool is running' 340
-Add-Label $s 'SmartSchool is running' 20 32 $true | Out-Null
-Add-Label $s 'Open this address on any phone or computer on the same Wi-Fi:' 64 28 | Out-Null
-$a = Add-Label $s $url 98 36 $true
-$a.ForeColor = [System.Drawing.Color]::FromArgb(31, 95, 70)
-Add-Label $s 'Use the same Wi-Fi, set to a Private network, on every device. First time? The browser asks you to create the Superadmin. Write its email and password down - nobody can recover it for you. Keep this window open; closing it stops SmartSchool.' 140 70 | Out-Null
-$s.Add_FormClosed({
-    Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { $_.ExecutablePath -eq $Php } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# ---- window
+$green = [System.Drawing.Color]::FromArgb(22, 163, 74); $amber = [System.Drawing.Color]::FromArgb(217, 119, 6)
+$red = [System.Drawing.Color]::FromArgb(220, 38, 38); $muted = [System.Drawing.Color]::FromArgb(100, 116, 139)
+$ink = [System.Drawing.Color]::FromArgb(17, 24, 39); $line = [System.Drawing.Color]::FromArgb(229, 231, 235)
+$s = New-Object System.Windows.Forms.Form
+$s.Text = 'SmartSchool Server'; $s.ClientSize = New-Object System.Drawing.Size(560, 470); $s.StartPosition = 'CenterScreen'
+$s.FormBorderStyle = 'FixedSingle'; $s.MaximizeBox = $false; $s.BackColor = 'White'; $s.Font = $Font; $s.AutoScaleMode = 'Dpi'
+
+function New-Dot($x, $y, $size) {
+    $d = New-Object System.Windows.Forms.Panel
+    $d.Location = New-Object System.Drawing.Point($x, $y); $d.Size = New-Object System.Drawing.Size($size, $size)
+    $gp = New-Object System.Drawing.Drawing2D.GraphicsPath; $gp.AddEllipse(0, 0, $size, $size)
+    $d.Region = New-Object System.Drawing.Region($gp); $d.BackColor = $muted
+    $s.Controls.Add($d); $d
+}
+function New-Text($text, $x, $y, $w, $h, $size = 11, $bold = $false, $color = $ink) {
+    $l = New-Object System.Windows.Forms.Label
+    $l.Text = $text; $l.Location = New-Object System.Drawing.Point($x, $y); $l.Size = New-Object System.Drawing.Size($w, $h)
+    $l.Font = New-Object System.Drawing.Font('Segoe UI', $size, $(if ($bold) { [System.Drawing.FontStyle]::Bold } else { [System.Drawing.FontStyle]::Regular }))
+    $l.ForeColor = $color; $s.Controls.Add($l); $l
+}
+function New-Button($text, $x, $y, $w, $primary = $false) {
+    $b = New-Object System.Windows.Forms.Button
+    $b.Text = $text; $b.Location = New-Object System.Drawing.Point($x, $y); $b.Size = New-Object System.Drawing.Size($w, 44)
+    $b.FlatStyle = 'Flat'; $b.Cursor = 'Hand'
+    if ($primary) { $b.BackColor = [System.Drawing.Color]::FromArgb(31, 95, 70); $b.ForeColor = 'White'; $b.FlatAppearance.BorderSize = 0 }
+    else { $b.BackColor = 'White'; $b.FlatAppearance.BorderColor = $line }
+    $s.Controls.Add($b); $b
+}
+
+# header status
+$bigDot = New-Dot 28 30 18
+$title = New-Text 'Starting...' 56 22 460 34 16 $true
+$sub = New-Text 'Please wait a moment.' 56 56 470 24 10 $false $muted
+
+# indicators
+$sep1 = New-Object System.Windows.Forms.Label; $sep1.Location = New-Object System.Drawing.Point(28, 92); $sep1.Size = New-Object System.Drawing.Size(504, 1); $sep1.BackColor = $line; $s.Controls.Add($sep1)
+$webDot = New-Dot 30 112 12;  New-Text 'Website' 52 105 160 26 | Out-Null; $webState = New-Text '' 220 105 310 26 11 $false $muted
+$jobDot = New-Dot 30 146 12;  New-Text 'Background jobs' 52 139 160 26 | Out-Null; $jobState = New-Text '' 220 139 310 26 11 $false $muted
+$netDot = New-Dot 30 180 12;  New-Text 'Network' 52 173 160 26 | Out-Null; $netState = New-Text '' 220 173 310 26 11 $false $muted
+
+# address
+$sep2 = New-Object System.Windows.Forms.Label; $sep2.Location = New-Object System.Drawing.Point(28, 214); $sep2.Size = New-Object System.Drawing.Size(504, 1); $sep2.BackColor = $line; $s.Controls.Add($sep2)
+New-Text 'Open this address on any phone or computer on the school network:' 28 226 504 24 10 $false $muted | Out-Null
+$addr = New-Text $script:url 28 252 330 34 15 $true ([System.Drawing.Color]::FromArgb(31, 95, 70))
+$copy = New-Button 'Copy' 372 248 76
+$open = New-Button 'Open' 456 248 76
+
+$hint = New-Text 'Every device must use the same network (Wi-Fi or cable) set to Private. Keep this window open - closing it shuts SmartSchool down.' 28 298 504 48 10 $false $muted
+
+# controls
+$restart = New-Button 'Restart' 28 380 150
+$power = New-Button 'Shut down' 190 380 150
+$logs = New-Button 'Open logs' 352 380 180
+
+$copy.Add_Click({ [System.Windows.Forms.Clipboard]::SetText($script:url); $copy.Text = 'Copied' })
+$open.Add_Click({ Start-Process $script:url })
+$logs.Add_Click({ Start-Process explorer.exe (Join-Path $App 'storage\logs') })
+
+$script:wanted = $true   # should the server be running?
+$script:startedAt = Get-Date
+function Set-Dot($d, $c) { $d.BackColor = $c }
+
+function Update-Status {
+    $alive = @($script:procs | Where-Object { $_ -and -not $_.HasExited })
+    $webUp = $script:wanted -and (Test-Web)
+    $jobsUp = $script:wanted -and $alive.Count -ge 2
+    $starting = $script:wanted -and -not $webUp -and ((Get-Date) - $script:startedAt).TotalSeconds -lt 20
+
+    if (-not $script:wanted) {
+        Set-Dot $bigDot $red; $title.Text = 'SmartSchool is stopped'; $sub.Text = 'Nobody can open SmartSchool until you start it again.'
+        $power.Text = 'Start'; $power.BackColor = [System.Drawing.Color]::FromArgb(31, 95, 70); $power.ForeColor = 'White'
+    } elseif ($webUp) {
+        Set-Dot $bigDot $green; $title.Text = 'SmartSchool is running'; $sub.Text = 'Running since ' + $script:startedAt.ToString('h:mm tt') + '.'
+        $power.Text = 'Shut down'; $power.BackColor = 'White'; $power.ForeColor = $ink
+    } elseif ($starting) {
+        Set-Dot $bigDot $amber; $title.Text = 'Starting...'; $sub.Text = 'Please wait a moment.'
+    } else {
+        Set-Dot $bigDot $red; $title.Text = 'SmartSchool is not responding'; $sub.Text = 'Click Restart. If it keeps happening, click Open logs.'
+    }
+    Set-Dot $webDot $(if ($webUp) { $green } elseif ($starting) { $amber } else { $red })
+    $webState.Text = if ($webUp) { 'Online' } elseif ($starting) { 'Starting' } elseif ($script:wanted) { 'Not responding' } else { 'Stopped' }
+    Set-Dot $jobDot $(if ($jobsUp) { $green } elseif ($script:wanted) { $amber } else { $red })
+    $jobState.Text = if ($jobsUp) { 'Running (reminders, backups)' } elseif ($script:wanted) { 'Starting' } else { 'Stopped' }
+    $prof = @(Get-NetConnectionProfile -ErrorAction SilentlyContinue)
+    $isPublic = @($prof | Where-Object { $_.NetworkCategory -eq 'Public' }).Count -gt 0
+    if ($mode -ne 'lan') { Set-Dot $netDot $green; $netState.Text = 'This computer only' }
+    elseif ($prof.Count -eq 0) { Set-Dot $netDot $red; $netState.Text = 'Not connected' }
+    elseif ($isPublic) { Set-Dot $netDot $amber; $netState.Text = 'Public - other devices are blocked' }
+    else { Set-Dot $netDot $green; $netState.Text = 'Private - ' + $prof[0].Name }
+    $addr.Text = $script:url
+}
+
+$restart.Add_Click({
+    $restart.Enabled = $false; $script:wanted = $true; $script:startedAt = Get-Date
+    Set-Dot $bigDot $amber; $title.Text = 'Restarting...'; $s.Refresh()
+    Start-Server; Update-Status; $restart.Enabled = $true
+})
+$power.Add_Click({
+    if ($script:wanted) {
+        if ([System.Windows.Forms.MessageBox]::Show('Shut SmartSchool down? Nobody will be able to use it until you start it again.', 'SmartSchool', 'YesNo', 'Question') -ne 'Yes') { return }
+        $script:wanted = $false; Stop-Server
+    } else {
+        $script:wanted = $true; $script:startedAt = Get-Date; Start-Server
+    }
+    Update-Status
+})
+
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 4000
+$timer.Add_Tick({ Update-Status })
+
+$s.Add_Shown({
+    Start-Server; Update-Status; $timer.Start()
+    $waited = 0
+    while (-not (Test-Web) -and $waited -lt 15) { Start-Sleep -Milliseconds 500; $waited += 0.5; [System.Windows.Forms.Application]::DoEvents() }
+    Update-Status
+    if (Test-Web) { Start-Process $script:url }
+})
+$s.Add_FormClosing({
+    param($sender, $e)
+    if ($script:wanted -and [System.Windows.Forms.MessageBox]::Show('Closing this window shuts SmartSchool down for everyone. Close it?', 'SmartSchool', 'YesNo', 'Warning') -ne 'Yes') { $e.Cancel = $true; return }
+    $timer.Stop(); Stop-Server
 })
 [System.Windows.Forms.Application]::Run($s)

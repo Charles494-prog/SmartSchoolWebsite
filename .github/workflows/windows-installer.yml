@@ -51,6 +51,12 @@ jobs:
           Remove-Item .env, database/smoke.sqlite
           Remove-Item Env:DB_CONNECTION, Env:DB_DATABASE, Env:SMARTSCHOOL_MODE
           Pop-Location
+      - name: Check the launcher script for syntax errors
+        shell: pwsh
+        run: |
+          $errs = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/installer/windows/SmartSchool.ps1", [ref]$null, [ref]$errs) | Out-Null
+          if ($errs) { $errs | ForEach-Object { Write-Error "$($_.Message) (line $($_.Extent.StartLineNumber))" }; exit 1 }
       - name: Build SmartSchool-Setup.exe
         shell: pwsh
         run: |
