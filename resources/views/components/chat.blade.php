@@ -85,7 +85,7 @@
 </div>
 
 @once
-<script>
+<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
     function chatBox(full) {
         const csrf = '{{ csrf_token() }}';
         const json = (url, opt = {}) => fetch(url, { headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf }, ...opt }).then(r => r.ok ? r.json() : Promise.reject(r));

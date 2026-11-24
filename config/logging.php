@@ -1,5 +1,6 @@
 <?php
 
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -56,6 +57,16 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+        ],
+
+        // One JSON object per line (with request_id/user_id/path context) for easy searching.
+        'json' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/smartschool.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 30,
+            'formatter' => JsonFormatter::class,
+            'replace_placeholders' => true,
         ],
 
         'single' => [

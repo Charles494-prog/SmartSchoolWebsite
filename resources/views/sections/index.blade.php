@@ -1,7 +1,7 @@
 <x-layouts.app title="Classes & sections" :hideErrorSummary="true">
     <div x-data="{ drawer: {{ $errors->any() ? 'true' : 'false' }} }">
         <x-page-header title="Classes & sections" :subtitle="'School year '.($sy?->name ?? '—').' · '.$sections->count().' section(s)'">
-            <form><select name="school_year_id" class="input py-2" onchange="this.form.submit()">@foreach($years as $k => $v)<option value="{{ $k }}" @selected($sy?->id == $k)>S.Y. {{ $v }}</option>@endforeach</select></form>
+            <form><select x-data name="school_year_id" class="input py-2" x-on:change="$el.form.submit()">@foreach($years as $k => $v)<option value="{{ $k }}" @selected($sy?->id == $k)>S.Y. {{ $v }}</option>@endforeach</select></form>
             <a href="{{ route('timetable', ['room' => '__all']) }}" class="btn"><x-icon name="clock" class="h-4 w-4" /> Room schedules</a>
             @if($sy)<button @click="drawer=true" class="btn btn-primary"><x-icon name="plus" class="h-4 w-4" /> New section</button>@endif
         </x-page-header>

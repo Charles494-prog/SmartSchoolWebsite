@@ -5,7 +5,7 @@
 <x-layouts.app title="Timetable">
     <x-page-header title="{{ $title ?: 'Timetable' }}" subtitle="Weekly schedule. Rooms, teachers and sections can never be double-booked.">
         <a href="{{ route('timetable', ['room' => '__all']) }}" class="btn"><x-icon name="layers" class="h-4 w-4" /> All rooms</a>
-        <button onclick="window.print()" class="btn"><x-icon name="file" class="h-4 w-4" /> Print</button>
+        <button x-data x-on:click="window.print()" class="btn"><x-icon name="file" class="h-4 w-4" /> Print</button>
     </x-page-header>
 
     <div class="mb-6 flex flex-wrap items-center gap-2" x-data>
@@ -22,14 +22,14 @@
             <a href="{{ route('timetable', ['room' => '__all']) }}" class="rounded-lg px-3.5 py-1.5 text-slate-500 hover:text-slate-800">All rooms</a>
         </div>
         @if($mode === 'room')
-            <select class="input w-auto py-2" onchange="location='?room='+encodeURIComponent(this.value)"><option value="__all">All rooms</option>@foreach($rooms as $r)<option @selected(request('room') === $r)>{{ $r }}</option>@endforeach</select>
+            <select x-data class="input w-auto py-2" x-on:change="location='?room='+encodeURIComponent($el.value)"><option value="__all">All rooms</option>@foreach($rooms as $r)<option @selected(request('room') === $r)>{{ $r }}</option>@endforeach</select>
             @if($rooms->isEmpty())<span class="muted">No rooms yet. <a class="link" href="{{ route('crud.create', 'rooms') }}">Add rooms</a></span>@endif
         @elseif($mode === 'section')
-            <select class="input w-auto py-2" onchange="location='?section_id='+this.value">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected(request('section_id') == $k)>{{ $v }}</option>@endforeach</select>
+            <select x-data class="input w-auto py-2" x-on:change="location='?section_id='+$el.value">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected(request('section_id') == $k)>{{ $v }}</option>@endforeach</select>
         @elseif($mode === 'subject')
-            <select class="input w-auto py-2" onchange="location='?subject='+encodeURIComponent(this.value)">@foreach($subjects as $sub)<option @selected(request('subject') === $sub)>{{ $sub }}</option>@endforeach</select>
+            <select x-data class="input w-auto py-2" x-on:change="location='?subject='+encodeURIComponent($el.value)">@foreach($subjects as $sub)<option @selected(request('subject') === $sub)>{{ $sub }}</option>@endforeach</select>
         @elseif($teachers->isNotEmpty())
-            <select class="input w-auto py-2" onchange="location='?teacher_id='+this.value"><option value="">Me</option>@foreach($teachers as $k => $v)<option value="{{ $k }}" @selected(request('teacher_id') == $k)>{{ $v }}</option>@endforeach</select>
+            <select x-data class="input w-auto py-2" x-on:change="location='?teacher_id='+$el.value"><option value="">Me</option>@foreach($teachers as $k => $v)<option value="{{ $k }}" @selected(request('teacher_id') == $k)>{{ $v }}</option>@endforeach</select>
         @endif
     </div>
 

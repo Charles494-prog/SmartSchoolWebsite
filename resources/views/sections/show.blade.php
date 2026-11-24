@@ -100,11 +100,11 @@
                             <td><span class="font-semibold">{{ $cs->subject->name }}</span> <span class="text-xs text-slate-400">{{ $cs->subject->code }}</span></td>
                             <td>
                                 <form method="post" action="{{ route('classes.update', $cs) }}">@csrf @method('put')
-                                    <select name="teacher_id" class="input py-1.5" onchange="this.form.submit()"><option value="">— choose teacher —</option>@foreach($teachers as $k => $v)<option value="{{ $k }}" @selected($cs->teacher_id == $k)>{{ $v }}</option>@endforeach</select>
+                                    <select x-data name="teacher_id" class="input py-1.5" x-on:change="$el.form.submit()"><option value="">— choose teacher —</option>@foreach($teachers as $k => $v)<option value="{{ $k }}" @selected($cs->teacher_id == $k)>{{ $v }}</option>@endforeach</select>
                                 </form>
                             </td>
                             <td>{{ round($cs->slots->sum(fn ($s) => \Carbon\Carbon::parse($s->starts_at)->diffInMinutes(\Carbon\Carbon::parse($s->ends_at))) / 60, 1) }}</td>
-                            <td class="text-right"><form method="post" action="{{ route('classes.destroy', $cs) }}" onsubmit="return confirm('Remove {{ $cs->subject->name }} from this section?')">@csrf @method('delete')<button class="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Remove"><x-icon name="x" class="h-4 w-4" /></button></form></td>
+                            <td class="text-right"><form x-data method="post" action="{{ route('classes.destroy', $cs) }}" x-on:submit="if (!confirm('Remove {{ $cs->subject->name }} from this section?')) $event.preventDefault()">@csrf @method('delete')<button class="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Remove"><x-icon name="x" class="h-4 w-4" /></button></form></td>
                         </tr>
                     @empty
                         <tr><td colspan="4"><x-empty icon="book" title="No subjects yet" text="Add the subjects this section takes below." /></td></tr>
@@ -169,11 +169,11 @@
                 </div>
                 <div class="flex gap-2 sm:col-span-2"><button class="btn btn-primary">Save</button></div>
             </form>
-            <form method="post" action="{{ route('sections.destroy', $section) }}" class="mt-6 border-t border-slate-100 pt-4" onsubmit="return confirm('Delete this section?')">@csrf @method('delete')<button class="btn btn-danger btn-sm">Delete section</button></form>
+            <form x-data method="post" action="{{ route('sections.destroy', $section) }}" class="mt-6 border-t border-slate-100 pt-4" x-on:submit="if (!confirm('Delete this section?')) $event.preventDefault()">@csrf @method('delete')<button class="btn btn-danger btn-sm">Delete section</button></form>
         </div>
     </div>
 
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         function planner(classes, slots, busy, sectionRoom) {
             const csrf = '{{ csrf_token() }}', START = 7 * 60, END = 18 * 60;
             const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m };

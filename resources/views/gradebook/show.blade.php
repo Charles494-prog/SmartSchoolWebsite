@@ -116,10 +116,10 @@
         @endunless
     </form>
     @foreach($assessments as $a)
-        <form id="del-{{ $a->id }}" method="post" action="{{ route('gradebook.assessments.destroy', $a) }}" onsubmit="return confirm('Delete {{ $a->title }} and all its scores?')">@csrf @method('delete')</form>
+        <form id="del-{{ $a->id }}" method="post" action="{{ route('gradebook.assessments.destroy', $a) }}" x-data x-on:submit="if (!confirm('Delete {{ $a->title }} and all its scores?')) $event.preventDefault()">@csrf @method('delete')</form>
     @endforeach
     @if(! $locked && $assessments->isNotEmpty())
-        <form method="post" action="{{ route('gradebook.submit', $cs) }}" class="mt-6 border-t pt-4" onsubmit="return confirm('Submit term {{ $term }} grades? You cannot edit them unless the registrar returns them.')">
+        <form x-data method="post" action="{{ route('gradebook.submit', $cs) }}" class="mt-6 border-t pt-4" x-on:submit="if (!confirm('Submit term {{ $term }} grades? You cannot edit them unless the registrar returns them.')) $event.preventDefault()">
             @csrf <input type="hidden" name="term" value="{{ $term }}">
             <button class="btn">Submit term {{ $term }} grades for approval</button>
             <span class="muted ml-2">Every score change is recorded in the audit log.</span>

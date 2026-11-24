@@ -13,7 +13,10 @@ Single-school management system. Laravel 13 (PHP 8.5), MySQL/MariaDB (SQLite in 
 - `app/Services` – business rules (Grading, Billing, Attendance, Chat, Enrollment, Payroll). Keep rules out of views/controllers.
 - `app/Support` – Role constants, Nav (sidebar + Ctrl+K palette), Qr, Photo, helpers (`ampm()`).
 - Models use `$guarded = ['id']` and the `Auditable` trait (every create/update/delete → `audit_logs` with old/new values). Keep both.
-- Settings are key/value in `settings` via `Setting::get/put` with defaults in `Setting::DEFAULTS`. Mode/feature flags must be read from one central settings service – never scatter checks.
+- Settings are key/value in `settings` via `Setting::get/put` with defaults in `Setting::DEFAULTS`. Deployment mode (Hosted/LAN), feature flags and setup state are read ONLY through `App\Support\School` (`School::mode()`, `School::allows('feature')`, `School::isSetUp()`) – never scatter mode checks.
+- CSP is strict: every inline `<script>`/`<style>` needs `nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}"`, and inline `onclick=`/`onchange=`/`onsubmit=` handlers are forbidden (use Alpine `x-on:`). `FoundationTest` enforces this.
+- Request IDs (`X-Request-Id`) are added to every log line; logs are JSON in `storage/logs/smartschool-*.log`. Errors show friendly pages with a reference ID, never stack traces (APP_DEBUG=false outside development).
+- `/health` is the uptime check. CI (`.github/workflows/ci.yml`) runs pint, build, tests and dependency audits.
 - Roles in `App\Support\Role`; route groups use `role:` middleware; record-level checks live in controllers/policies (`User::canViewStudent`, teacher ownership of `ClassSubject`, adviser-only daily attendance, guard = gate scanner only).
 - Views: layouts in `resources/views/components/layouts/{app,guest}.blade.php`; components `x-field`, `x-toggle`, `x-filters`, `x-page-header`, `x-empty`, `x-stat`, `x-tile`, `x-icon` (inline SVG, no emoji), `x-chat`.
 - Times shown to users are 12-hour AM/PM (`ampm()`), dates like "Nov 25, 2026". Timezone Asia/Manila.

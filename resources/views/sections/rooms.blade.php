@@ -7,7 +7,7 @@
 <x-layouts.app title="All rooms">
     <x-page-header title="All rooms" subtitle="Every room's schedule side by side. Pick a day, or print every room's full week.">
         <a href="{{ route('timetable', ['room' => '__all', 'print' => 1]) }}" class="btn"><x-icon name="file" class="h-4 w-4" /> Weekly view of every room</a>
-        <button onclick="window.print()" class="btn"><x-icon name="file" class="h-4 w-4" /> Print</button>
+        <button x-data x-on:click="window.print()" class="btn"><x-icon name="file" class="h-4 w-4" /> Print</button>
     </x-page-header>
 
     @if($rooms->isEmpty())

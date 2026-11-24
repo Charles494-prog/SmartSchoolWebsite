@@ -3,8 +3,8 @@
     <div class="mt-2 mb-4 flex flex-wrap items-center gap-2">
         <h1 class="h1 flex-1">{{ $p->period_start->format('M d') }} – {{ $p->period_end->format('M d, Y') }} <x-status :value="$p->status" /></h1>
         @if($p->status === 'draft')
-            <form method="post" action="{{ route('payroll.finalize', $p) }}" onsubmit="return confirm('Finalize? Amounts can no longer be edited.')">@csrf<button class="btn btn-primary">Finalize</button></form>
-            <form method="post" action="{{ route('payroll.destroy', $p) }}" onsubmit="return confirm('Delete this draft?')">@csrf @method('delete')<button class="btn">Delete draft</button></form>
+            <form x-data method="post" action="{{ route('payroll.finalize', $p) }}" x-on:submit="if (!confirm('Finalize? Amounts can no longer be edited.')) $event.preventDefault()">@csrf<button class="btn btn-primary">Finalize</button></form>
+            <form x-data method="post" action="{{ route('payroll.destroy', $p) }}" x-on:submit="if (!confirm('Delete this draft?')) $event.preventDefault()">@csrf @method('delete')<button class="btn">Delete draft</button></form>
         @else
             <a href="{{ route('payroll.payslips', $p) }}" target="_blank" class="btn btn-primary">Print payslips</a>
         @endif

@@ -58,7 +58,7 @@
             <a href="{{ route('gradebook.index', ['level' => $id]) }}" class="rounded-full px-4 py-1.5 text-sm font-medium {{ request('level') == $id ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50' }}">{{ $name }}</a>
         @endforeach
         @if($sectionsList->count() > 1)
-            <select class="input ml-auto w-auto py-1.5" onchange="location='?level={{ request('level') }}&section='+this.value"><option value="">All sections</option>@foreach($sectionsList as $k => $v)<option value="{{ $k }}" @selected(request('section') == $k)>{{ $v }}</option>@endforeach</select>
+            <select x-data class="input ml-auto w-auto py-1.5" x-on:change="location='?level={{ request('level') }}&section='+$el.value"><option value="">All sections</option>@foreach($sectionsList as $k => $v)<option value="{{ $k }}" @selected(request('section') == $k)>{{ $v }}</option>@endforeach</select>
         @endif
     </div>
     <div class="mb-4 flex flex-wrap gap-4 text-xs text-slate-500">
@@ -76,7 +76,7 @@
                 <thead><tr><th>Subject</th><th>Teacher</th>@foreach(range(1, $sec->gradeLevel->terms) as $t)<th class="text-center">Q{{ $t }}</th>@endforeach<th></th></tr></thead>
                 <tbody>
                 @foreach($group as $c)
-                    <tr class="cursor-pointer" onclick="location='{{ route('gradebook.show', $c) }}'">
+                    <tr x-data class="cursor-pointer" x-on:click="location='{{ route('gradebook.show', $c) }}'">
                         <td class="font-medium">{{ $c->subject->name }}</td>
                         <td class="{{ $c->teacher ? '' : 'text-slate-400' }}">{{ $c->teacher?->name ?? 'No teacher' }}</td>
                         @foreach(range(1, $sec->gradeLevel->terms) as $t)

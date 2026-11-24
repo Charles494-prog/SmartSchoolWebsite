@@ -102,7 +102,7 @@
                                 <td>{{ \App\Models\Payment::METHODS[$p->method] }} <span class="text-slate-400">{{ $p->reference }}</span></td>
                                 <td class="text-right font-semibold {{ $p->is_void ? 'line-through' : '' }}">{{ $peso($p->amount) }}</td>
                                 <td class="text-right">@if(! $p->is_void && $isAdmin)
-                                    <form method="post" action="{{ route('finance.void', $p) }}" onsubmit="const r=prompt('Why is OR {{ $p->or_number }} being voided?'); if(!r) return false; this.void_reason.value=r;">@csrf<input type="hidden" name="void_reason"><button class="text-xs text-slate-400 hover:text-rose-600">Void</button></form>@endif</td>
+                                    <form x-data method="post" action="{{ route('finance.void', $p) }}" x-on:submit="const r=prompt('Why is OR {{ $p->or_number }} being voided?'); if(!r){ $event.preventDefault(); return } $el.void_reason.value=r;">@csrf<input type="hidden" name="void_reason"><button class="text-xs text-slate-400 hover:text-rose-600">Void</button></form>@endif</td>
                             </tr>
                         @empty
                             <tr><td colspan="5" class="py-8 text-center text-slate-500">No payments yet.</td></tr>
@@ -124,8 +124,8 @@
                             @csrf
                             <x-field name="amount" label="Amount (₱)" type="number" step="0.01" :value="min($a->balance(), $suggest)" required />
                             <div class="flex flex-wrap gap-2 text-xs">
-                                @if($overdue > 0)<button type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" onclick="document.getElementById('f_amount').value='{{ $overdue }}'">Overdue {{ $peso($overdue) }}</button>@endif
-                                <button type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" onclick="document.getElementById('f_amount').value='{{ $a->balance() }}'">Full balance</button>
+                                @if($overdue > 0)<button x-data type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" x-on:click="document.getElementById('f_amount').value='{{ $overdue }}'">Overdue {{ $peso($overdue) }}</button>@endif
+                                <button x-data type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" x-on:click="document.getElementById('f_amount').value='{{ $a->balance() }}'">Full balance</button>
                             </div>
                             <div>
                                 <div class="label">Method</div>

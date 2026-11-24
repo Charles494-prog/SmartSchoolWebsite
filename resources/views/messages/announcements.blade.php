@@ -8,7 +8,7 @@
                         <div class="flex-1"><div class="font-semibold">@if($a->is_pinned)<x-icon name="pin" class="mr-1 inline h-4 w-4 text-brand-500" />@endif{{ $a->title }}</div>
                             <div class="muted text-xs">{{ $a->published_at?->format('M d, Y g:i A') }} · {{ $a->author?->name }} · {{ \App\Models\Announcement::AUDIENCES[$a->audience] }}{{ $a->section ? ' · '.$a->section->name : '' }}</div></div>
                         @if(auth()->user()->isAdmin() || $a->author_id === auth()->id())
-                            <form method="post" action="{{ route('announcements.destroy', $a) }}" onsubmit="return confirm('Delete?')">@csrf @method('delete')<button class="text-xs text-red-600">Delete</button></form>
+                            <form x-data method="post" action="{{ route('announcements.destroy', $a) }}" x-on:submit="if (!confirm('Delete?')) $event.preventDefault()">@csrf @method('delete')<button class="text-xs text-red-600">Delete</button></form>
                         @endif
                     </div>
                     <p class="mt-2 whitespace-pre-line text-sm">{{ $a->body }}</p>

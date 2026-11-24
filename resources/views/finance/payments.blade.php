@@ -4,7 +4,7 @@
         <x-field name="from" label="From" type="date" :value="$from" />
         <x-field name="to" label="To" type="date" :value="$to" />
         <button class="btn">Show</button>
-        <button type="button" onclick="window.print()" class="btn">Print</button>
+        <button x-data type="button" x-on:click="window.print()" class="btn">Print</button>
     </form>
     <p class="mb-3 font-semibold">Total collected: {{ \App\Services\Billing::peso($total) }} ({{ $payments->where('is_void', false)->count() }} receipts)</p>
     <div class="card overflow-x-auto p-0">

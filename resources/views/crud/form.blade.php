@@ -29,7 +29,7 @@
             </div>
         </form>
         @if($model)
-            <form method="post" action="{{ route('crud.destroy', [$slug, $model->id]) }}" class="mt-6 border-t pt-4" onsubmit="return confirm('Delete this {{ $r['singular'] }}? This is recorded in the audit log.')">
+            <form method="post" action="{{ route('crud.destroy', [$slug, $model->id]) }}" class="mt-6 border-t pt-4" x-data x-on:submit="if (!confirm('Delete this {{ $r['singular'] }}? This is recorded in the audit log.')) $event.preventDefault()">
                 @csrf @method('delete')
                 <button class="btn btn-danger btn-sm">Delete</button>
             </form>

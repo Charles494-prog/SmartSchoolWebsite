@@ -1,9 +1,9 @@
 <x-layouts.app title="Attendance report">
     <form class="mb-4 flex flex-wrap items-end gap-2">
         <h1 class="h1 mr-auto">Monthly attendance</h1>
-        <select name="section_id" class="input max-w-xs" onchange="this.form.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select>
-        <input type="month" name="month" value="{{ $month->format('Y-m') }}" class="input w-44" onchange="this.form.submit()">
-        <button type="button" onclick="window.print()" class="btn">Print</button>
+        <select x-data name="section_id" class="input max-w-xs" x-on:change="$el.form.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select>
+        <input type="month" name="month" value="{{ $month->format('Y-m') }}" class="input w-44" x-data x-on:change="$el.form.submit()">
+        <button x-data type="button" x-on:click="window.print()" class="btn">Print</button>
     </form>
     <p class="muted mb-2">P present · L late · A absent · E excused · blank = no record. Weekdays only.</p>
     <div class="card overflow-x-auto p-0">

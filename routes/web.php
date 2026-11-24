@@ -11,15 +11,18 @@ use App\Http\Controllers\CrudController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\GradebookController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\SectionController;
 use App\Http\Controllers\StudentController;
+use App\Http\Middleware\ThrottleWrites;
 use Illuminate\Support\Facades\Route;
 
 // ---------------------------------------------------------------- public
+Route::get('/health', [HealthController::class, 'show'])->middleware('throttle:60,1')->name('health');
 Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : redirect()->route('login'));
 Route::get('/privacy', fn () => view('public.privacy'))->name('privacy');
 Route::get('/school-logo', [AdminController::class, 'logo'])->name('school.logo');
@@ -34,7 +37,7 @@ Route::middleware('guest')->group(function () {
 });
 
 // ---------------------------------------------------------------- signed-in
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/password', [AuthController::class, 'editPassword'])->name('password.edit');
     Route::put('/password', [AuthController::class, 'updatePassword'])->name('password.update');

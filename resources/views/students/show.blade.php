@@ -39,7 +39,7 @@
                                 <div class="muted">{{ $g->phone }} {{ $g->email }} {{ $g->user ? '· has portal login' : '' }}</div>
                             </div>
                             @if($canEdit)
-                                <form method="post" action="{{ route('students.guardians.remove', [$s, $g]) }}" onsubmit="return confirm('Remove this guardian from the student?')">@csrf @method('delete')<button class="btn btn-sm">Remove</button></form>
+                                <form x-data method="post" action="{{ route('students.guardians.remove', [$s, $g]) }}" x-on:submit="if (!confirm('Remove this guardian from the student?')) $event.preventDefault()">@csrf @method('delete')<button class="btn btn-sm">Remove</button></form>
                             @endif
                         </div>
                     @empty
@@ -160,7 +160,7 @@
                         <x-field name="school_name" label="Receiving school" required />
                         <x-field name="transfer_date" label="Date" type="date" :value="now()->toDateString()" required />
                         <x-field name="reason" label="Reason" type="textarea" />
-                        <button class="btn btn-danger w-full" onclick="return confirm('Mark this student as transferred out?')">Transfer out</button>
+                        <button x-data class="btn btn-danger w-full" x-on:click="return confirm('Mark this student as transferred out?')">Transfer out</button>
                     </form>
                 </details>
                 @endif

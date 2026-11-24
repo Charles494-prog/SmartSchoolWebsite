@@ -13,10 +13,10 @@
 
     <div class="mb-6 flex flex-wrap items-center gap-2">
         <form class="contents">
-            <select name="section_id" class="input w-auto py-2" onchange="this.form.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select>
+            <select x-data name="section_id" class="input w-auto py-2" x-on:change="$el.form.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select>
             <div class="flex items-center rounded-xl ring-1 ring-slate-200 dark:ring-white/10">
                 <a href="?section_id={{ $section?->id }}&date={{ $date->copy()->subDay()->toDateString() }}" class="rounded-l-xl p-2.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5" title="Previous day"><x-icon name="chevron-left" class="h-4 w-4" /></a>
-                <input type="date" name="date" value="{{ $date->toDateString() }}" max="{{ now()->toDateString() }}" class="border-0 bg-transparent py-2 text-sm focus:ring-0" onchange="this.form.submit()">
+                <input type="date" name="date" value="{{ $date->toDateString() }}" max="{{ now()->toDateString() }}" class="border-0 bg-transparent py-2 text-sm focus:ring-0" x-data x-on:change="$el.form.submit()">
                 @if($date->lt(today()))<a href="?section_id={{ $section?->id }}&date={{ $date->copy()->addDay()->toDateString() }}" class="rounded-r-xl p-2.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5" title="Next day"><x-icon name="chevron" class="h-4 w-4" /></a>@endif
             </div>
             @unless($date->isToday())<a href="?section_id={{ $section?->id }}" class="btn btn-sm">Today</a>@endunless
@@ -105,7 +105,7 @@
             </div>
         </div>
     </form>
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         function sheet(students) {
             const tone = {
                 present: ['P', 'Present', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200'],

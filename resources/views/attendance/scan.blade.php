@@ -45,7 +45,7 @@
             </div>
         </div>
     </div>
-    <script>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         function scanner() {
             return {
                 code: '', classId: '{{ $selected ?: '' }}', last: null, recent: [], camera: false, cam: null, busy: false, lastCode: '', lastAt: 0,
