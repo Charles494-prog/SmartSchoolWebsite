@@ -46,9 +46,8 @@ class PortalController extends Controller
             'report' => $e ? Grading::reportCard($e) : null,
             'attendance' => AttendanceRecord::where('student_id', $c->id)->whereNull('class_subject_id')->whereMonth('date', now()->month)->whereYear('date', now()->year)->get(),
             'balance' => $e?->account?->balance(),
-            'announcements' => Announcement::visibleTo($request->user())->orderByDesc('is_pinned')->latest('published_at')->limit(5)->get(),
-            'events' => Event::whereDate('starts_on', '>=', today())->orderBy('starts_on')->limit(5)->get(),
-            'notifications' => $request->user()->notifications()->limit(5)->get(),
+            'announcements' => Announcement::with('author', 'section.gradeLevel')->visibleTo($request->user())->orderByDesc('is_pinned')->latest('published_at')->limit(10)->get(),
+            'events' => Event::whereDate('starts_on', '>=', now()->startOfMonth())->whereDate('starts_on', '<=', now()->addMonth()->endOfMonth())->orderBy('starts_on')->get(),
         ]);
     }
 
