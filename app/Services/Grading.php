@@ -136,8 +136,9 @@ class Grading
     {
         $out = [];
         $terms = $cs->section->gradeLevel->terms ?: 4;
-        $assessments = $cs->assessments()->get()->groupBy('term');
-        $scores = Score::where('student_id', $s->id)->whereIn('assessment_id', $cs->assessments()->select('id'))->get()->keyBy('assessment_id');
+        $all = $cs->relationLoaded('assessments') ? $cs->assessments : $cs->load('assessments')->assessments;
+        $assessments = $all->groupBy('term');
+        $scores = $all->isEmpty() ? collect() : Score::where('student_id', $s->id)->whereIn('assessment_id', $all->pluck('id'))->get()->keyBy('assessment_id');
         for ($t = 1; $t <= $terms; $t++) {
             $totals = [];
             foreach ($assessments[$t] ?? [] as $a) {
@@ -146,13 +147,27 @@ class Grading
                 $totals[$a->component][1] += (float) $a->max_score;
             }
             $w = $cs->weights();
-            if ($w['at'] > 0 && ($a = self::attendanceTotals($cs, $t)[$s->id] ?? null)) {
+            if ($w['at'] > 0 && ($a = self::attendanceTotalsMemo($cs, $t)[$s->id] ?? null)) {
                 $totals['at'] = $a;
             }
             $out[$t] = self::quarterly(self::initialGrade($totals, $w));
         }
 
         return $out;
+    }
+
+    /** attendanceTotals() computed once per class and term while this request runs. */
+    private static function attendanceTotalsMemo(ClassSubject $cs, int $t): array
+    {
+        static $memo;
+        $memo ??= new \WeakMap;
+        $m = $memo[$cs] ?? [];
+        if (! array_key_exists($t, $m)) {
+            $m[$t] = self::attendanceTotals($cs, $t);
+            $memo[$cs] = $m;
+        }
+
+        return $m[$t];
     }
 
     /** Date range of a grading period: the school year split into equal parts. */
@@ -206,11 +221,12 @@ class Grading
      *
      * @return array{subjects: array, general_average: ?float, honor: ?string}
      */
-    public static function reportCard(Enrollment $e): array
+    public static function reportCard(Enrollment $e, $classSubjects = null): array
     {
         $subjects = [];
         if ($e->section) {
-            foreach ($e->section->classSubjects()->with(['subject', 'section.gradeLevel'])->get()->sortBy('subject.name') as $cs) {
+            $classSubjects ??= $e->section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments'])->get();
+            foreach ($classSubjects->sortBy('subject.name') as $cs) {
                 $terms = self::studentTerms($cs, $e->student);
                 $final = self::finalGrade($terms);
                 $subjects[] = ['name' => $cs->subject->name, 'terms' => $terms, 'final' => $final, 'remark' => $final === null ? '' : ($final >= (float) Setting::get('passing_grade') ? 'Passed' : 'Failed')];
@@ -226,8 +242,10 @@ class Grading
     public static function rankSection(Section $section): array
     {
         $rows = [];
+        $classSubjects = $section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments'])->get(); // once per section, not per student
         foreach ($section->enrollments()->where('status', 'enrolled')->with('student')->get() as $e) {
-            $rc = self::reportCard($e);
+            $e->setRelation('section', $section);
+            $rc = self::reportCard($e, $classSubjects);
             $e->updateQuietly(['general_average' => $rc['general_average']]);
             $rows[] = ['enrollment' => $e, 'average' => $rc['general_average'], 'honor' => $rc['honor']];
         }

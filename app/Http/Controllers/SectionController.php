@@ -263,7 +263,7 @@ class SectionController extends Controller
         $u = $request->user();
         $sy = SchoolYear::current();
         $sections = Section::where('school_year_id', $sy?->id)->with('gradeLevel')->get();
-        $q = ScheduleSlot::with('classSubject.subject', 'classSubject.section', 'classSubject.teacher')->whereHas('classSubject.section', fn ($s) => $s->where('school_year_id', $sy?->id));
+        $q = ScheduleSlot::with('classSubject.subject', 'classSubject.section.gradeLevel', 'classSubject.teacher')->whereHas('classSubject.section', fn ($s) => $s->where('school_year_id', $sy?->id));
         $title = '';
         $rooms = Room::orderBy('name')->pluck('name');
         if ($request->query('room') === '__all') {

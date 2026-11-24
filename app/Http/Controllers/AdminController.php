@@ -8,6 +8,7 @@ use App\Models\SchoolYear;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Tuition;
+use App\Support\AuditPresenter;
 use App\Support\School;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -84,8 +85,14 @@ class AdminController extends Controller
             $q->where('auditable_id', $request->query('id'));
         }
 
+        if ($request->filled('from')) {
+            $q->whereDate('created_at', '>=', $request->date('from'));
+        }
+        $logs = $q->paginate(40)->withQueryString();
+
         return view('admin.audit', [
-            'logs' => $q->paginate(50)->withQueryString(),
+            'logs' => $logs,
+            'entries' => AuditPresenter::present($logs->getCollection()),
             'types' => AuditLog::distinct()->whereNotNull('auditable_type')->orderBy('auditable_type')->pluck('auditable_type'),
             'users' => User::whereIn('id', AuditLog::distinct()->select('user_id'))->orderBy('name')->pluck('name', 'id'),
         ]);

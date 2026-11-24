@@ -23,7 +23,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Spot N+1 queries while developing: log them instead of breaking the page.
         Model::preventLazyLoading(! $this->app->isProduction());
-        Model::handleLazyLoadingViolationUsing(fn ($model, string $relation) => logger()->warning('N+1 lazy load', ['model' => $model::class, 'relation' => $relation]));
+        Model::handleLazyLoadingViolationUsing(function ($model, string $relation) {
+            if (env('STRICT_N_PLUS_ONE')) {
+                file_put_contents(storage_path('logs/n1.txt'), $model::class.'::'.$relation.' @ '.request()->path()."\n", FILE_APPEND);
+            }
+            logger()->warning('N+1 lazy load', ['model' => $model::class, 'relation' => $relation]);
+        });
 
         // Every signed-in change (POST/PUT/PATCH/DELETE) shares one generous per-user budget.
         RateLimiter::for('writes', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));

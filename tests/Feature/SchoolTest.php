@@ -482,6 +482,18 @@ class SchoolTest extends TestCase
         $this->put('/profile/password', ['current_password' => 'wrong', 'password' => 'NewPass12345', 'password_confirmation' => 'NewPass12345'])->assertSessionHasErrors('current_password');
     }
 
+    public function test_activity_log_reads_as_sentences(): void
+    {
+        $admin = $this->as('admin@school.test');
+        $e = Enrollment::with('student', 'section')->whereNotNull('section_id')->first();
+        $other = Section::where('school_year_id', $e->school_year_id)->where('id', '!=', $e->section_id)->first();
+        $old = $e->section->name;
+        $e->update(['section_id' => $other->id]);
+        $this->get('/audit')->assertOk()->assertSee($admin->name)->assertSee('changed enrollment')
+            ->assertSee($e->student->full_name)->assertSee($old)->assertSee($other->name)->assertDontSee('section_id');
+        $this->get('/audit?action=updated&auditable_type=Enrollment')->assertOk();
+    }
+
     public function test_forced_password_change_and_inactive_block(): void
     {
         $u = User::where('email', 'registrar@school.test')->first();

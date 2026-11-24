@@ -79,7 +79,7 @@ class DashboardController extends Controller
 
         if ($u->role === Role::TEACHER) {
             $data['classes'] = ClassSubject::with('subject', 'section.gradeLevel')->where('teacher_id', $u->id)->whereHas('section', fn ($s) => $s->where('school_year_id', $sy?->id))->get();
-            $data['todaySlots'] = ScheduleSlot::with('classSubject.subject', 'classSubject.section')->where('day_of_week', now()->dayOfWeekIso)
+            $data['todaySlots'] = ScheduleSlot::with('classSubject.subject', 'classSubject.section.gradeLevel')->where('day_of_week', now()->dayOfWeekIso)
                 ->whereHas('classSubject', fn ($c) => $c->where('teacher_id', $u->id))->orderBy('starts_at')->get();
             $data['advisory'] = Section::with('gradeLevel')->where('adviser_id', $u->id)->where('school_year_id', $sy?->id)->withCount(['enrollments' => fn ($q) => $q->where('status', 'enrolled')])->get();
         }
