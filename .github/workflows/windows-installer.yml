@@ -11,20 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
-        with: { php-version: '8.4', tools: composer }
+        with: { php-version: '8.4', tools: composer, extensions: 'fileinfo, gd, intl, zip, sqlite3, pdo_sqlite' }
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: Build the app
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           composer install --no-dev --optimize-autoloader --no-interaction
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           npm ci; npm run build
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           $dest = 'installer/windows/build/app'
           New-Item -ItemType Directory -Force $dest | Out-Null
           $skip = @('.git', '.github', 'node_modules', 'tests', 'installer', '.env')
           Get-ChildItem -Force | Where-Object { $skip -notcontains $_.Name } | Copy-Item -Destination $dest -Recurse -Force
           Remove-Item "$dest/database/*.sqlite" -ErrorAction SilentlyContinue
           Get-ChildItem "$dest/storage/logs" -Filter *.log -ErrorAction SilentlyContinue | Remove-Item
+          foreach ($f in 'vendor/autoload.php', 'public/build/manifest.json') { if (-not (Test-Path "$dest/$f")) { throw "missing $f" } }
       - name: Download portable PHP for Windows
         shell: pwsh
         run: |
@@ -38,6 +42,15 @@ jobs:
           $ini += 'memory_limit = 512M'; $ini += 'upload_max_filesize = 20M'; $ini += 'post_max_size = 25M'
           Set-Content installer/windows/build/php/php.ini $ini
           installer/windows/build/php/php.exe -m
+          # smoke test: the bundled PHP can boot the app on SQLite
+          Push-Location installer/windows/build/app
+          Copy-Item .env.example .env; New-Item database/smoke.sqlite -ItemType File | Out-Null
+          $env:DB_CONNECTION='sqlite'; $env:DB_DATABASE="$PWD/database/smoke.sqlite"; $env:SMARTSCHOOL_MODE='lan'
+          ../php/php.exe artisan key:generate --force; ../php/php.exe artisan migrate --force
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Remove-Item .env, database/smoke.sqlite
+          Remove-Item Env:DB_CONNECTION, Env:DB_DATABASE, Env:SMARTSCHOOL_MODE
+          Pop-Location
       - name: Build SmartSchool-Setup.exe
         shell: pwsh
         run: |
