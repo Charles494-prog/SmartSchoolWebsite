@@ -199,6 +199,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('/setup-wizard/{step?}', [SetupWizardController::class, 'show'])->name('setup.wizard');
         Route::post('/setup-wizard/finish', [SetupWizardController::class, 'finish'])->name('setup.finish');
+        Route::post('/setup-wizard/staff/{user}/reset', [SetupWizardController::class, 'resetPassword'])->name('setup.reset');
         Route::post('/setup-wizard/{step}', [SetupWizardController::class, 'save'])->name('setup.save');
         Route::get('/settings', [AdminController::class, 'settings'])->name('settings.edit');
         Route::put('/settings', [AdminController::class, 'saveSettings'])->name('settings.update');

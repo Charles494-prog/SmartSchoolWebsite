@@ -39,11 +39,11 @@
                     </div>
                 </div>
 
-                @if(session('wizard_accounts'))
+                @if($accounts)
                     <div class="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
                         <p class="text-sm font-semibold text-amber-900">Temporary passwords – shown only once. Write them down or print this page.</p>
                         <ul class="mt-2 divide-y divide-amber-200 text-sm">
-                            @foreach(session('wizard_accounts') as $a)
+                            @foreach($accounts as $a)
                                 <li class="flex flex-wrap gap-x-3 py-2"><b>{{ $a['name'] }}</b><span class="text-slate-600">{{ $a['role'] }}</span><span>{{ $a['email'] }}</span><code class="rounded bg-white px-2 font-mono">{{ $a['password'] }}</code></li>
                             @endforeach
                         </ul>
@@ -129,7 +129,16 @@
 
                         @case('staff')
                             @if($staff->isNotEmpty())
-                                <div class="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Already added: {{ $staff->map(fn ($u) => $u->name.' ('.$u->roleLabel().')')->implode(', ') }}</div>
+                                <div class="rounded-xl bg-slate-50 p-3 text-sm dark:bg-white/5">
+                                    <p class="mb-2 font-medium text-slate-700">Already added</p>
+                                    <ul class="divide-y divide-slate-200 dark:divide-white/10">
+                                        @foreach($staff as $p)
+                                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"><span class="font-medium text-slate-900">{{ $p->name }}</span><span class="text-slate-500">{{ $p->roleLabel() }} · {{ $p->email }}</span>
+                                                @unless($p->isAdmin())<button type="submit" form="reset-{{ $p->id }}" class="ml-auto text-sm font-medium text-brand-700 hover:underline">New temporary password</button>@endunless
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
                             @endif
                             <div x-data="{ rows: [{ name: '', email: '', role: 'teacher' }] }" class="space-y-3">
                                 <template x-for="(p, i) in rows" :key="i">
@@ -218,6 +227,9 @@
                 </form>
             </div>
 
+            @if($step === 'staff')
+                @foreach($staff as $p)<form id="reset-{{ $p->id }}" method="post" action="{{ route('setup.reset', $p) }}" class="hidden">@csrf</form>@endforeach
+            @endif
             {{-- Footer actions --}}
             <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-white/10 dark:bg-white/5">
                 @if($prev && $step !== 'done')<a href="{{ route('setup.wizard', $prev) }}" class="btn">Back</a>@endif
@@ -227,7 +239,7 @@
                     @elseif(in_array($step, ['welcome', 'students']))
                         @if($step === 'welcome')<form method="post" action="{{ route('setup.finish') }}">@csrf<button class="btn">I'll set up later</button></form>@endif
                         <a href="{{ $skip }}" class="btn btn-primary">{{ $step === 'welcome' ? "Let's go" : 'Continue' }}</a>
-                    @elseif(session('wizard_accounts'))
+                    @elseif($accounts)
                         <a href="{{ $skip }}" class="btn btn-primary">I wrote them down – continue</a>
                     @else
                         <a href="{{ $skip }}" class="btn">Skip</a>

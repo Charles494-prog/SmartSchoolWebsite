@@ -456,6 +456,11 @@ class SchoolTest extends TestCase
         $this->post('/setup-wizard/subjects', ['ww' => 40, 'pt' => 40, 'qa' => 10])->assertSessionHasErrors('ww');
         $this->post('/setup-wizard/staff', ['people' => [['name' => 'Gina Guard', 'email' => 'gina@school.test', 'role' => 'guard']]])
             ->assertRedirect('/setup-wizard/staff')->assertSessionHas('wizard_accounts');
+        $this->get('/setup-wizard/staff')->assertSee('gina@school.test')->assertSee('I wrote them down');
+        $this->post('/setup-wizard/staff', ['people' => [['name' => '', 'email' => '', 'role' => 'teacher']]])->assertRedirect('/setup-wizard/sections');
+        $gina = User::where('email', 'gina@school.test')->first();
+        $this->post("/setup-wizard/staff/{$gina->id}/reset")->assertRedirect('/setup-wizard/staff');
+        $this->get('/setup-wizard/staff')->assertSee('New temporary password made');
         $this->assertTrue(User::where('email', 'gina@school.test')->value('must_change_password'));
         $this->post('/setup-wizard/sections', ['sections' => [['name' => 'Zeta Wizard', 'grade_level_id' => GradeLevel::first()->id, 'room' => 'Lab 1']]]);
         $this->assertSame(30, Section::where('name', 'Zeta Wizard')->value('capacity'));

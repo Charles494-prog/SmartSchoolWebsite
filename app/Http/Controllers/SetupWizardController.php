@@ -41,12 +41,15 @@ class SetupWizardController extends Controller
     public function show(string $step = 'welcome')
     {
         abort_unless(isset(self::STEPS[$step]), 404);
+        $accounts = $step === 'staff' ? session('wizard_accounts') : null;
+        session()->forget('wizard_accounts');
         $keys = array_keys(self::STEPS);
         $i = array_search($step, $keys, true);
         $year = SchoolYear::current();
 
         return view('setup.wizard', [
             'step' => $step,
+            'accounts' => $accounts,
             'index' => $i,
             'total' => count($keys) - 2, // welcome and done are not counted
             'next' => $keys[$i + 1] ?? null,
@@ -68,9 +71,7 @@ class SetupWizardController extends Controller
         $message = $this->{'save'.Str::studly($step)}($request);
         $keys = array_keys(self::STEPS);
         $next = $keys[array_search($step, $keys, true) + 1] ?? 'done';
-        if (session()->has('wizard_accounts')) {
-            session()->reflash();
-
+        if (session('wizard_accounts')) {
             return redirect()->route('setup.wizard', $step)->with('wizard_ok', $message); // show the passwords first
         }
 
@@ -224,8 +225,21 @@ class SetupWizardController extends Controller
             User::create(['name' => trim($p['name']), 'email' => $p['email'], 'role' => $p['role'], 'password' => $password, 'must_change_password' => $mustChange]);
             $created[] = ['name' => trim($p['name']), 'email' => $p['email'], 'role' => Role::label($p['role']), 'password' => $password];
         }
-        session()->flash('wizard_accounts', $created);
+        if ($created) {
+            session()->put('wizard_accounts', $created); // shown until the admin continues
+        }
 
-        return count($created) ? 'Created '.count($created).' account(s). Write the temporary passwords down now – they are shown only once.' : 'No accounts added.';
+        return $created ? 'Created '.count($created).' account(s). Write the temporary passwords down now.' : 'No new accounts – moving on.';
+    }
+
+    /** New temporary password for someone added during setup (e.g. the password was not written down). */
+    public function resetPassword(User $user)
+    {
+        abort_if($user->isAdmin() || in_array($user->role, [Role::STUDENT, Role::PARENT], true), 403);
+        $password = Str::password(10, symbols: false);
+        $user->forceFill(['password' => $password, 'must_change_password' => true])->save();
+        session()->put('wizard_accounts', [['name' => $user->name, 'email' => $user->email, 'role' => Role::label($user->role), 'password' => $password]]);
+
+        return redirect()->route('setup.wizard', 'staff')->with('wizard_ok', 'New temporary password made for '.$user->name.'.');
     }
 }
