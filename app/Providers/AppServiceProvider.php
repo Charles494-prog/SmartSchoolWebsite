@@ -15,7 +15,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if (! $this->app->runningUnitTests()) {
+        // Checked when serving web requests (console commands such as package:discover
+        // must still work before .env exists, e.g. during install or CI).
+        if (! $this->app->runningInConsole()) {
             EnvCheck::assert();
         }
 
