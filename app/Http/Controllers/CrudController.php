@@ -89,11 +89,9 @@ class CrudController extends Controller
         $model ??= new $r['model'];
         $model->fill(Arr::only($data, array_keys($data)));
         $model->save();
-        if (isset($r['after_save'])) {
-            $r['after_save']($model);
-        }
+        $extra = isset($r['after_save']) ? $r['after_save']($model) : null;
 
-        return redirect()->route('crud.index', $slug)->with('ok', ucfirst($r['singular']).' saved.');
+        return redirect()->route('crud.index', $slug)->with('ok', ucfirst($r['singular']).' saved.'.(is_string($extra) ? ' '.$extra : ''));
     }
 
     public function destroy(string $resource, int $id)

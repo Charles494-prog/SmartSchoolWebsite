@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\User;
+
 final class Role
 {
     public const ADMIN = 'admin';
@@ -44,6 +46,30 @@ final class Role
     public static function staff(): array
     {
         return array_values(array_diff(array_keys(self::LABELS), [self::STUDENT, self::PARENT]));
+    }
+
+    /** Plain-language descriptions shown when giving someone a login. */
+    public const DESCRIPTIONS = [
+        self::TEACHER => 'Teacher – own classes, grades, assignments and class QR scanning',
+        self::REGISTRAR => 'Registrar – enrollment, students, sections, schedules, report cards',
+        self::CASHIER => 'Cashier / Accounting – fees, payments and receipts',
+        self::NURSE => 'School nurse / health – clinic visits (private health records)',
+        self::GUIDANCE => 'Guidance counselor – counseling notes (confidential)',
+        self::LIBRARIAN => 'Librarian – books and borrowing',
+        self::HR => 'HR / Payroll – employees and payroll',
+        self::GUARD => 'Security guard – gate QR scanner only (in and out)',
+        self::ADMIN => 'Administrator – everything, including user accounts and settings',
+    ];
+
+    /** Staff roles this user may give out (only an admin can create another admin). */
+    public static function staffChoices(?User $by): array
+    {
+        $roles = self::DESCRIPTIONS;
+        if (! $by?->isAdmin()) {
+            unset($roles[self::ADMIN]);
+        }
+
+        return $roles;
     }
 
     public static function label(string $role): string

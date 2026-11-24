@@ -4,6 +4,7 @@ namespace App\Crud;
 
 use App\Models;
 use App\Notifications\GeneralNotice;
+use App\Services\StaffAccounts;
 use App\Support\Role;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
@@ -227,6 +228,12 @@ class Resources
                 },
             ],
             'employees' => [
+                'saving' => function (array $d) {
+                    unset($d['login_email'], $d['login_role']);
+
+                    return $d;
+                },
+                'after_save' => fn ($m) => StaffAccounts::sync($m, request('login_email'), request('login_role')),
                 'model' => Models\Employee::class, 'title' => 'Employees', 'singular' => 'employee',
                 'roles' => [Role::ADMIN, Role::HR], 'order' => ['last_name', 'asc'], 'search' => ['first_name', 'last_name', 'employee_no', 'position'],
                 'columns' => ['employee_no' => 'Emp. no.', 'full_name' => 'Name', 'position' => 'Position', 'department' => 'Department', 'employment_type' => 'Type', 'monthly_salary' => 'Monthly salary', 'status' => 'Status'],
@@ -243,7 +250,9 @@ class Resources
                     ['name' => 'sss_no', 'label' => 'SSS no.', 'rules' => 'nullable|max:20'],
                     ['name' => 'philhealth_no', 'label' => 'PhilHealth no.', 'rules' => 'nullable|max:20'],
                     ['name' => 'pagibig_no', 'label' => 'Pag-IBIG no.', 'rules' => 'nullable|max:20'],
-                    ['name' => 'user_id', 'label' => 'Linked login account', 'type' => 'select', 'options' => fn () => Models\User::whereIn('role', Role::staff())->orderBy('name')->pluck('name', 'id')->all(), 'rules' => 'nullable|exists:users,id'],
+                    ['name' => 'login_email', 'label' => 'Login email', 'type' => 'email', 'help' => 'Leave empty if this person does not use SmartSchool. A temporary password is created and shown once; they must change it at first login.',
+                        'rules' => fn ($m) => ['nullable', 'email', 'max:150', Rule::unique('users', 'email')->ignore($m?->user_id)], 'placeholder' => 'name@school.edu.ph'],
+                    ['name' => 'login_role', 'label' => 'What can they open?', 'type' => 'select', 'options' => fn () => Role::staffChoices(auth()->user()), 'rules' => fn () => ['nullable', 'required_with:login_email', Rule::in(array_keys(Role::staffChoices(auth()->user())))]],
                     ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => fn () => ['active' => 'Active', 'on_leave' => 'On leave', 'resigned' => 'Resigned'], 'rules' => 'required'],
                 ],
             ],

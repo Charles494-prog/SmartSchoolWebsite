@@ -8,6 +8,7 @@ use App\Models\AttendanceRecord;
 use App\Models\AuditLog;
 use App\Models\ClassSubject;
 use App\Models\Discount;
+use App\Models\Employee;
 use App\Models\Enrollment;
 use App\Models\GradeLevel;
 use App\Models\GradingRequest;
@@ -385,6 +386,22 @@ class SchoolTest extends TestCase
         $this->get('/attendance?section_id='.$advised->id)->assertOk()->assertSee('Show every day'); // adviser with history records
         $notAdvised = Section::where('adviser_id', '!=', $t->id)->first();
         $this->post('/attendance', ['section_id' => $notAdvised->id, 'date' => today()->toDateString(), 'status' => []])->assertForbidden();
+    }
+
+    public function test_employee_form_creates_login_with_role(): void
+    {
+        $this->as('admin@school.test');
+        $base = ['employee_no' => 'EMP-900', 'first_name' => 'Rita', 'last_name' => 'Nurse', 'position' => 'School Nurse', 'employment_type' => 'regular', 'monthly_salary' => 20000, 'status' => 'active'];
+        $this->post('/manage/employees', $base + ['login_email' => 'rita@school.test'])->assertSessionHasErrors('login_role');
+        $this->post('/manage/employees', $base + ['login_email' => 'rita@school.test', 'login_role' => 'nurse'])->assertSessionHas('ok', fn ($m) => str_contains($m, 'temporary password'));
+        $e = Employee::where('employee_no', 'EMP-900')->first();
+        $this->assertSame('nurse', $e->user->role);
+        $this->assertTrue($e->user->must_change_password);
+        $this->put("/manage/employees/{$e->id}", $base + ['login_email' => 'rita.n@school.test', 'login_role' => 'guard'])->assertSessionHas('ok');
+        $this->assertSame(['rita.n@school.test', 'guard'], [$e->fresh()->user->email, $e->fresh()->user->role]);
+        // HR cannot hand out the Administrator role
+        $this->as('hr@school.test');
+        $this->post('/manage/employees', array_merge($base, ['employee_no' => 'EMP-901', 'login_email' => 'x@school.test', 'login_role' => 'admin']))->assertSessionHasErrors('login_role');
     }
 
     public function test_forced_password_change_and_inactive_block(): void

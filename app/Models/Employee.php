@@ -21,6 +21,17 @@ class Employee extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Shown in the employee form's "Login account" part. */
+    public function getLoginEmailAttribute(): ?string
+    {
+        return $this->user?->email;
+    }
+
+    public function getLoginRoleAttribute(): ?string
+    {
+        return $this->user?->role;
+    }
+
     public function getFullNameAttribute(): string
     {
         return $this->last_name.', '.$this->first_name;
