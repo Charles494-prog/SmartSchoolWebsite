@@ -15,6 +15,10 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
+        if (FirstRunController::needed()) {
+            return redirect()->route('first-run');
+        }
+
         return view('auth.login');
     }
 

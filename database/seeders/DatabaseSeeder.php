@@ -40,7 +40,8 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        if (! User::where('role', Role::ADMIN)->exists()) {
+        // On a real install (production) the person installing creates the Superadmin on the first-run screen (/setup).
+        if (! app()->environment('production') && ! User::where('role', Role::ADMIN)->exists()) {
             User::create(['name' => 'School Administrator', 'email' => 'admin@school.test', 'password' => 'Admin12345', 'role' => Role::ADMIN, 'must_change_password' => true]);
             $this->command?->warn('Admin login: admin@school.test / Admin12345 (you will be asked to change it)');
         }

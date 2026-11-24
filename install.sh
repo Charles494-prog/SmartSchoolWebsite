@@ -147,5 +147,5 @@ printf '      \033[1;32mhttp://%s:%s\033[0m\n' "$LAN_IP" "$PORT"
 echo
 echo "  • Internet is not needed. All devices must be on the same Wi-Fi/network."
 echo "  • We recommend the Brave or Chrome browser."
-echo "  • First login: admin@school.test / Admin12345 (you'll be asked to set a new password)."
+echo "  • First time: the browser asks you to create the Superadmin. Write its email and password down – nobody can recover it."
 echo "  • Next time, start SmartSchool with:  $DIR/smartschool-start.sh"

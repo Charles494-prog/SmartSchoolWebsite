@@ -127,7 +127,7 @@ Add-Label $s 'SmartSchool is running' 20 32 $true | Out-Null
 Add-Label $s 'Open this address on any phone or computer on the same Wi-Fi:' 64 28 | Out-Null
 $a = Add-Label $s $url 98 36 $true
 $a.ForeColor = [System.Drawing.Color]::FromArgb(31, 95, 70)
-Add-Label $s 'First time? Log in and create your Superadmin. Write its email and password down - nobody can recover it for you. Keep this window open; closing it stops SmartSchool.' 140 70 | Out-Null
+Add-Label $s 'First time? The browser asks you to create the Superadmin. Write its email and password down - nobody can recover it for you. Keep this window open; closing it stops SmartSchool.' 140 70 | Out-Null
 $s.Add_FormClosed({
     Get-CimInstance Win32_Process -Filter "Name='php.exe'" -ErrorAction SilentlyContinue |
         Where-Object { $_.ExecutablePath -eq $Php } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }

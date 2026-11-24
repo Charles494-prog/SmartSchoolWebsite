@@ -10,6 +10,7 @@ use App\Http\Controllers\CommunicationController;
 use App\Http\Controllers\CrudController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
+use App\Http\Controllers\FirstRunController;
 use App\Http\Controllers\GradebookController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HelpController;
@@ -32,6 +33,8 @@ Route::get('/apply/done', [ApplicationController::class, 'done'])->name('apply.d
 Route::get('/apply/status', [ApplicationController::class, 'status'])->middleware('throttle:30,1')->name('apply.status');
 
 Route::middleware('guest')->group(function () {
+    Route::get('/setup', [FirstRunController::class, 'show'])->name('first-run');
+    Route::post('/setup', [FirstRunController::class, 'store'])->middleware('throttle:10,1')->name('first-run.store');
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
 });

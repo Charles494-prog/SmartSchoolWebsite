@@ -426,6 +426,20 @@ class SchoolTest extends TestCase
         $this->assertSame('public', Setting::get('school_type'));
     }
 
+    public function test_first_run_creates_superadmin_only_once(): void
+    {
+        User::query()->delete();
+        $this->get('/login')->assertRedirect('/setup');
+        $data = ['school_name' => 'Rizal High', 'name' => 'Ana Cruz', 'email' => 'ana@school.test', 'password' => 'Secret12345', 'password_confirmation' => 'Secret12345'];
+        $this->post('/setup', $data)->assertSessionHasErrors('written_down');
+        $this->post('/setup', $data + ['written_down' => 1])->assertRedirect(route('dashboard'));
+        $this->assertSame('admin', User::where('email', 'ana@school.test')->value('role'));
+        $this->assertSame('Rizal High', Setting::get('school_name'));
+        auth()->logout();
+        $this->get('/setup')->assertNotFound();
+        $this->get('/login')->assertOk();
+    }
+
     public function test_forced_password_change_and_inactive_block(): void
     {
         $u = User::where('email', 'registrar@school.test')->first();

@@ -15,6 +15,7 @@ class FoundationTest extends TestCase
 
     public function test_security_headers_and_request_id(): void
     {
+        User::create(['name' => 'A', 'email' => 'a@x.test', 'password' => 'Secret12345', 'role' => 'admin']);
         $r = $this->get('/login')->assertOk();
         $csp = $r->headers->get('Content-Security-Policy');
         $this->assertStringContainsString("frame-ancestors 'none'", $csp);
