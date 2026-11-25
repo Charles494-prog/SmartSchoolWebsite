@@ -9,6 +9,12 @@ class PaymentProof extends Model
 {
     protected $guarded = ['id'];
 
+    /** Purpose can list several items – keep it within the column (120). */
+    public function setPurposeAttribute($v): void
+    {
+        $this->attributes['purpose'] = $v === null ? null : \Illuminate\Support\Str::limit((string) $v, 117);
+    }
+
     protected $casts = ['paid_on' => 'date', 'amount' => 'float'];
 
     public function account(): BelongsTo

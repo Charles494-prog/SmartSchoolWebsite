@@ -109,6 +109,19 @@ class Billing
         $account = $payment->account;
         $amount = (float) $payment->amount;
         $charges = $account->charges()->orderBy('created_at')->get()->filter(fn ($c) => $c->remaining() > 0)->values();
+        $keys = array_values(array_filter(explode(',', (string) $key)));
+        if (count($keys) > 1) {   // several items picked: each picked order gets its share, the rest is tuition
+            $left = $amount;
+            foreach ($charges->filter(fn ($c) => in_array('order:'.$c->id, $keys, true)) as $c) {
+                $take = min($left, $c->remaining());
+                if ($take > 0) {
+                    \App\Models\PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
+                    $left = round($left - $take, 2);
+                }
+            }
+
+            return;
+        }
         if ($key && str_starts_with($key, 'order:')) {
             $first = (int) substr($key, 6);
             $charges = $charges->sortBy(fn ($c) => $c->id === $first ? 0 : 1)->values();

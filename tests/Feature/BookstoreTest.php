@@ -70,4 +70,19 @@ class BookstoreTest extends TestCase
         $this->actingAs($store)->post("/bookstore/orders/{$o2->id}", ['status' => 'approved']);
         $this->post("/bookstore/orders/{$o2->id}", ['status' => 'released'])->assertStatus(422);
     }
+
+    public function test_paying_several_items_at_once_splits_between_them(): void
+    {
+        $account = StudentAccount::with('enrollment.student')->get()->first(fn ($a) => $a->tuitionBalance() > 500);
+        $c1 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'TOR', 'amount' => 150]);
+        $c2 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Good moral', 'amount' => 50]);
+        $c3 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Uniform', 'amount' => 600]);
+        $tuition = $account->tuitionBalance();
+        $this->actingAs(User::where('role', 'cashier')->first())->post("/finance/accounts/{$account->enrollment_id}/pay",
+            ['amount' => 300, 'method' => 'cash', 'paid_on' => today()->toDateString(), 'pay_key' => "order:{$c1->id},order:{$c2->id},fee:1", 'purpose' => 'TOR + Good moral + ID'])->assertSessionHasNoErrors();
+        $this->assertEqualsWithDelta(0, $c1->fresh()->remaining(), 0.01);
+        $this->assertEqualsWithDelta(0, $c2->fresh()->remaining(), 0.01);
+        $this->assertEqualsWithDelta(600, $c3->fresh()->remaining(), 0.01, 'the uniform was not picked');
+        $this->assertEqualsWithDelta($tuition - 100, $account->fresh()->tuitionBalance(), 0.01);
+    }
 }

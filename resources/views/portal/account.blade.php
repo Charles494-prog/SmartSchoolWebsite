@@ -61,22 +61,28 @@
             @if($a->balance() > 0 && $channels->isNotEmpty())
                 @php $opts = \App\Support\PayOptions::for($a); @endphp
                 <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, pick: @js($opts[0]['key'] ?? 'other'), other: '', ch: {{ $channels->first()->id }}, preview: null,
+                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js($opts[0]['key'] ?? 'other')], other: '', ch: {{ $channels->first()->id }}, preview: null,
                                opts: @js($opts), max: {{ $a->balance() }},
-                               get chosen() { return this.opts.find((o) => o.key === this.pick) },
-                               get amount() { return this.pick === 'other' ? Number(this.other || 0) : (this.chosen?.amount || 0) },
-                               get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label },
+                               // Full balance, the overdue amount and another amount stand alone; everything else can be combined.
+                               solo(k) { return ['full', 'overdue', 'other'].includes(k) },
+                               toggle(k) { if (this.solo(k)) { this.sel = [k]; return } this.sel = this.sel.filter((x) => !this.solo(x)); this.sel.includes(k) ? this.sel = this.sel.filter((x) => x !== k) : this.sel.push(k) },
+                               on(k) { return this.sel.includes(k) },
+                               get pick() { return this.sel.join(',') },
+                               get chosen() { return this.opts.filter((o) => this.sel.includes(o.key)) },
+                               get amount() { return this.on('other') ? Number(this.other || 0) : Math.round(this.chosen.reduce((t, o) => t + o.amount, 0) * 100) / 100 },
+                               get purpose() { return this.on('other') ? 'Partial payment' : this.chosen.map((o) => o.label).join(' + ') },
                                peso(v) { return '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
                                charges: @js($a->charges()->orderBy('created_at')->get()->map(fn ($c) => ['key' => 'order:'.$c->id, 'label' => $c->description, 'left' => $c->remaining()])->filter(fn ($c) => $c['left'] > 0)->values()), tuition: {{ $a->tuitionBalance() }},
                                // Same rule the school uses when it records the payment.
                                split() {
-                                   let left = this.amount, out = [], list = [...this.charges];
-                                   if (this.pick.startsWith('order:')) list.sort((x) => x.key === this.pick ? -1 : 1);
-                                   const tuitionFirst = ['down', 'overdue', 'next'].includes(this.pick) || this.pick.startsWith('fee:');
+                                   let left = this.amount, out = [];
                                    const take = (label, cap) => { const t = Math.min(left, cap); if (t > 0) { out.push({ label, amount: t }); left = Math.round((left - t) * 100) / 100 } };
-                                   if (tuitionFirst) take('Tuition & school fees', this.tuition);
-                                   list.forEach((c) => take(c.label, c.left));
-                                   if (!tuitionFirst) take('Tuition & school fees', this.tuition);
+                                   const picked = this.charges.filter((c) => this.on(c.key));
+                                   const multi = !this.solo(this.sel[0] || '');
+                                   if (multi) { picked.forEach((c) => take(c.label, c.left)); take('Tuition & school fees', this.tuition); return out }
+                                   if (this.on('overdue')) take('Tuition & school fees', this.tuition);
+                                   this.charges.forEach((c) => take(c.label, c.left));
+                                   take('Tuition & school fees', this.tuition);
                                    return out;
                                } }">
                     <div class="flex flex-wrap items-center gap-3 p-5">
@@ -98,22 +104,22 @@
                             <div class="p-5">
                                 {{-- 1: what for --}}
                                 <div x-show="step === 1" class="space-y-2">
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">Tick one or more. Full balance, overdue amount and another amount are chosen on their own.</p>
                                     <template x-for="o in opts" :key="o.key">
-                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="pick === o.key ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
-                                            <input type="radio" class="sr-only" :value="o.key" x-model="pick">
+                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="on(o.key) ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
+                                            <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key)" x-on:change="toggle(o.key)">
                                             <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.hint"></span></span>
                                             <span class="font-semibold tabular-nums" x-text="peso(o.amount)"></span>
                                         </label>
                                     </template>
-                                    <label class="block cursor-pointer rounded-xl border-2 p-3.5" :class="pick === 'other' ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="pick = 'other'; $nextTick(() => $refs.oth.focus())">
-                                        <input type="radio" class="sr-only" value="other" x-model="pick">
+                                    <label class="block cursor-pointer rounded-xl border-2 p-3.5" :class="on('other') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="if (!on('other')) { toggle('other'); $nextTick(() => $refs.oth.focus()) }">
                                         <span class="block font-medium">Another amount</span>
                                         <span class="text-xs text-slate-600 dark:text-slate-400">Pay any part of the balance (up to <span x-text="peso(max)"></span>)</span>
-                                        <span x-show="pick === 'other'" x-cloak class="mt-3 flex items-center rounded-xl border border-slate-300 bg-white px-4 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900">
+                                        <span x-show="on('other')" x-cloak class="mt-3 flex items-center rounded-xl border border-slate-300 bg-white px-4 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900">
                                             <span class="text-2xl font-semibold text-slate-500">₱</span>
                                             <input x-ref="oth" type="text" inputmode="decimal" x-model="other" class="h-14 w-full border-0 bg-transparent px-2 text-2xl font-bold tabular-nums focus:ring-0" placeholder="0.00" aria-label="Amount to pay">
                                         </span>
-                                        <span x-show="pick === 'other' && other !== '' && (Number(other) <= 0 || Number(other) > max)" class="mt-1 block text-xs font-medium text-rose-700" x-text="Number(other) > max ? 'That is more than the balance.' : 'Enter an amount above ₱0.'"></span>
+                                        <span x-show="on('other') && other !== '' && (Number(other) <= 0 || Number(other) > max)" class="mt-1 block text-xs font-medium text-rose-700" x-text="Number(other) > max ? 'That is more than the balance.' : 'Enter an amount above ₱0.'"></span>
                                     </label>
                                 </div>
                                 {{-- 2: pay --}}

@@ -48,20 +48,27 @@ class Nav
         ];
 
         if ($is(Role::STUDENT, Role::PARENT)) {
-            return ['' => array_values(array_filter([
-                $item('Home', 'portal', 'home', 'Summary and news'),
-                $item('Grades', 'portal.grades', 'award', 'Grades per subject and report card', 'amber'),
-                $item('Attendance', 'portal.attendance', 'check-square', 'Days present, late and absent', 'emerald'),
-                $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
-                School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
-                $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
-                $item('Bookstore', 'portal.shop', 'tag', 'Order books, uniforms and school merch', 'amber'),
-                $item('Request documents', 'portal.services', 'file', 'TOR, certificates and other documents', 'sky', 'portal.services*'),
-                $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
-                $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
-                $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
-                $item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet'),
-            ]))];
+            // Grouped by office, so families know who handles what.
+            return array_filter([
+                '' => [$item('Home', 'portal', 'home', 'Summary and news')],
+                'My classes' => array_values(array_filter([
+                    $item('Grades', 'portal.grades', 'award', 'Grades per subject and report card', 'amber'),
+                    $item('Attendance', 'portal.attendance', 'check-square', 'Days present, late and absent', 'emerald'),
+                    $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
+                    School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
+                ])),
+                'Finance' => [$item('Payments', 'portal.account', 'wallet', 'Balance, pay online, receipts', 'rose')],
+                'Registrar' => [
+                    $item('Request documents', 'portal.services', 'file', 'TOR, certificates and other documents', 'sky', 'portal.services*'),
+                    $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
+                ],
+                'Bookstore' => [$item('Bookstore', 'portal.shop', 'tag', 'Order books, uniforms and school merch', 'amber')],
+                'School news' => [
+                    $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
+                    $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
+                ],
+                'Help' => [$item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet')],
+            ]);
         }
 
         if ($is(Role::BOOKSTORE)) {

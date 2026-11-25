@@ -82,7 +82,7 @@ class OnlinePaymentController extends Controller
             'payment_channel_id' => 'required|exists:payment_channels,id',
             'amount' => 'required|numeric|min:1|max:'.max(1, $account->balance()),
             'reference' => 'required|max:60', 'paid_on' => 'required|date|before_or_equal:today',
-            'screenshot' => 'required|image|max:8192', 'purpose' => 'nullable|max:120', 'pay_key' => 'nullable|max:40',
+            'screenshot' => 'required|image|max:8192', 'purpose' => 'nullable|max:255', 'pay_key' => 'nullable|max:255',
         ], ['amount.max' => 'That is more than the remaining balance ('.Billing::peso($account->balance()).').', 'screenshot.required' => 'Attach a screenshot or photo of your receipt.']);
         $proof = $account->hasMany(PaymentProof::class, 'student_account_id')->create([
             'payment_channel_id' => $d['payment_channel_id'], 'amount' => $d['amount'], 'reference' => $d['reference'], 'paid_on' => $d['paid_on'], 'purpose' => $d['purpose'] ?? null, 'pay_key' => $d['pay_key'] ?? null,

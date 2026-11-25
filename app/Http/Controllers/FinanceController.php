@@ -120,7 +120,7 @@ class FinanceController extends Controller
             'amount' => 'required|numeric|min:1|max:'.max(1, $a->balance()),
             'method' => 'required|in:'.implode(',', array_keys(Payment::METHODS)),
             'reference' => 'nullable|required_unless:method,cash|max:60',
-            'paid_on' => 'required|date|before_or_equal:today', 'purpose' => 'nullable|max:120', 'pay_key' => 'nullable|max:40',
+            'paid_on' => 'required|date|before_or_equal:today', 'purpose' => 'nullable|max:255', 'pay_key' => 'nullable|max:255',
         ], ['amount.max' => 'Amount is more than the remaining balance ('.Billing::peso($a->balance()).').', 'reference.required_unless' => 'Enter the reference/check number.']);
         $payment = DB::transaction(function () use ($a, $data) {
             $p = $a->payments()->create(collect($data)->except('pay_key')->all() + ['or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]);
