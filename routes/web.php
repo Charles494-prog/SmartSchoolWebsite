@@ -236,6 +236,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/books/{book}', [LibraryController::class, 'saveBook'])->name('library.books.update');
         Route::post('/loans', [LibraryController::class, 'borrow'])->name('library.borrow');
         Route::post('/loans/{loan}/return', [LibraryController::class, 'return'])->name('library.return');
+        Route::get('/books/{book}/cover', [LibraryController::class, 'cover'])->name('library.cover');
     });
 
     // HR & payroll
