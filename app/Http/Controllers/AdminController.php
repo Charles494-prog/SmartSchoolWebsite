@@ -51,12 +51,16 @@ class AdminController extends Controller
         $rules = ['school_name' => 'required|max:150', 'passing_grade' => 'required|numeric|between:50,100', 'late_after' => 'required|date_format:H:i', 'use_transmutation' => 'boolean', 'notify_absent' => 'boolean', 'notify_late' => 'boolean',
             'honors_with_highest' => 'required|numeric', 'honors_with_high' => 'required|numeric', 'honors_with' => 'required|numeric', 'honors_top_n' => 'nullable|integer|between:3,100', 'library_loan_days' => 'required|integer|min:1', 'library_fine_per_day' => 'required|numeric|min:0',
             'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
-            'deployment_mode' => 'nullable|in:lan,hosted', 'grading_periods' => 'nullable|in:2,3,4', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
+            'deployment_mode' => 'nullable|in:lan,hosted', 'grading_periods' => 'nullable|in:2,3,4', 'honors_titles_when' => 'nullable|in:each_period,year_end', 'honors_titles_levels' => 'nullable|array', 'honors_titles_levels.*' => 'integer', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
             'tuition_all' => 'nullable|required_if:tuition_mode,same|numeric|min:0|max:10000000', 'tuition' => 'array', 'tuition.*' => 'nullable|numeric|min:0|max:10000000'];
         $data = $request->validate($rules + Admission::rules() + collect(self::SETTINGS)->flatMap(fn ($g) => $g)->map(fn () => 'nullable|max:255')->except(array_keys($rules))->all());
         foreach (collect(self::SETTINGS)->flatMap(fn ($g) => array_keys($g))->push('privacy_notice') as $k) {
             $v = (self::TYPES[$k] ?? '') === 'toggle' ? ($request->boolean($k) ? '1' : '0') : ($data[$k] ?? '');
             Setting::put($k, $v);
+        }
+        if ($request->has('honors_titles_when')) {
+            Setting::put('honors_titles_when', $data['honors_titles_when'] ?? 'each_period');
+            Setting::put('honors_titles_levels', implode(',', $data['honors_titles_levels'] ?? []));
         }
         if (isset($data['grading_periods']) && (int) $data['grading_periods'] !== School::periods()) {
             $n = (int) $data['grading_periods'];

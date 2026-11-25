@@ -214,6 +214,22 @@ class DemoSeeder extends Seeder
             }
         }
 
+        // Perfect attendance: a few students per section came every school day since classes started.
+        foreach (Section::where('school_year_id', $sy->id)->get() as $sec) {
+            $kids = $sec->students()->get();
+            if ($kids->count() < 8) {
+                continue;
+            }
+            foreach ([$kids[1], $kids[6], $kids[7]] as $st) {
+                for ($d = $sy->starts_on->copy(); $d < today(); $d->addDay()) {
+                    if ($d->isWeekend()) {
+                        continue;
+                    }
+                    AttendanceRecord::updateOrCreate(['student_id' => $st->id, 'date' => $d->toDateString(), 'class_subject_id' => null], ['section_id' => $sec->id, 'status' => 'present', 'time_in' => '07:05:00', 'method' => 'qr']);
+                }
+            }
+        }
+
         // Finance
         foreach (GradeLevel::whereIn('department', ['jhs'])->get() as $gl) {
             FeeItem::firstOrCreate(['school_year_id' => $sy->id, 'grade_level_id' => $gl->id, 'name' => 'Tuition fee'], ['category' => 'tuition', 'amount' => 25000]);

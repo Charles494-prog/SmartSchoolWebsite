@@ -152,6 +152,20 @@
                                         <select name="honors_top_n" class="input">@foreach([10, 15, 20, 30] as $n)<option value="{{ $n }}" @selected((int) (\App\Models\Setting::get('honors_top_n') ?: 10) === $n)>Top {{ $n }}</option>@endforeach</select>
                                     </label>
                                 </div>
+                                <div class="border-t border-slate-100 pt-4 dark:border-white/10">
+                                    <span class="label">When do honor titles (With Honors, High, Highest) appear?</span>
+                                    <select name="honors_titles_when" class="input">
+                                        <option value="each_period" @selected(\App\Models\Setting::get('honors_titles_when') !== 'year_end')>Every grading period</option>
+                                        <option value="year_end" @selected(\App\Models\Setting::get('honors_titles_when') === 'year_end')>End of school year only</option>
+                                    </select>
+                                    @php $hl = array_filter(explode(',', (string) \App\Models\Setting::get('honors_titles_levels'))); @endphp
+                                    <p class="mt-2 text-xs text-slate-500">Only for some grade levels (e.g. graduating)? Tick them – leave all unticked for every level.</p>
+                                    <div class="mt-1 flex flex-wrap gap-2">
+                                        @foreach(\App\Models\GradeLevel::orderBy('sort_order')->get() as $gl)
+                                            <label class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-sm"><input type="checkbox" name="honors_titles_levels[]" value="{{ $gl->id }}" @checked(in_array((string) $gl->id, $hl, true))> {{ $gl->name }}</label>
+                                        @endforeach
+                                    </div>
+                                </div>
                                 <p class="text-xs text-slate-500">Want to add or rename subjects? Use <a class="link" href="{{ route('crud.index', 'subjects') }}" target="_blank">Subjects</a> after setup.</p>
                             </div>
                             @break

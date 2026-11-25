@@ -20,10 +20,28 @@ class Honors
         return max(3, (int) (Setting::get('honors_top_n') ?: 10));
     }
 
+    /**
+     * Do honor titles (With Honors / High / Highest) apply here? The admin decides in setup/settings:
+     * every grading period or only the whole year, and for all grade levels or only some (e.g. graduating).
+     */
+    public static function titlesApply(Section $section, ?int $term): bool
+    {
+        if (Setting::get('honors_titles_when') === 'year_end' && $term !== null) {
+            return false;
+        }
+        $levels = array_filter(array_map('intval', explode(',', (string) Setting::get('honors_titles_levels'))));
+
+        return $levels === [] || in_array((int) $section->grade_level_id, $levels, true);
+    }
+
     /** @param Collection<int, Section> $sections */
     public static function rows(Collection $sections, ?int $term): Collection
     {
-        return $sections->flatMap(fn ($s) => collect(Grading::rankSection($s, $term))->map(fn ($r) => $r + ['section' => $s]));
+        return $sections->flatMap(function ($s) use ($term) {
+            $titles = self::titlesApply($s, $term);
+
+            return collect(Grading::rankSection($s, $term))->map(fn ($r) => array_merge($r, ['section' => $s], $titles ? [] : ['honor' => null]));
+        });
     }
 
     /** Ranked list (ties share a rank), passing students only, cut at the configured top N. */

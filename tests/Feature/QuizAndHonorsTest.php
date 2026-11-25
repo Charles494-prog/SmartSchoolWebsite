@@ -139,4 +139,20 @@ GIFT);
         $cs = ClassSubject::where('teacher_id', $teacher->id)->first();
         $this->get("/gradebook/{$cs->id}?term=1")->assertOk()->assertSee('grade is computed')->assertSee('Initial grade')->assertSee('Consultation mode');
     }
+
+    public function test_play_awardees_perfect_attendance_and_honor_title_settings(): void
+    {
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $section = \App\Models\Section::where('adviser_id', $teacher->id)->first();
+        $r = $this->get("/honors?section_id={$section->id}&term=1")->assertOk()->assertSee('Play awardees')->assertSee('1st place only');
+        $this->assertGreaterThanOrEqual(3, $r->viewData('perfect')->count(), 'demo has perfect attendance');
+        $this->assertNotNull($r->viewData('top')->first()['honor']);
+
+        \App\Models\Setting::put('honors_titles_when', 'year_end');
+        $this->assertNull($this->get("/honors?section_id={$section->id}&term=1")->viewData('top')->first()['honor'], 'no titles on a quarter list');
+        \App\Models\Setting::put('honors_titles_when', 'each_period');
+        \App\Models\Setting::put('honors_titles_levels', (string) \App\Models\GradeLevel::where('name', 'Grade 12')->value('id'));
+        $this->assertNull($this->get("/honors?section_id={$section->id}&term=1")->viewData('top')->first()['honor'], 'only Grade 12 gets titles');
+    }
 }

@@ -7,6 +7,28 @@
         $honorStyle = ['With Highest Honors' => 'bg-amber-100 text-amber-800 ring-amber-300', 'With High Honors' => 'bg-slate-100 text-slate-700 ring-slate-300', 'With Honors' => 'bg-orange-100 text-orange-800 ring-orange-300'];
         $counts = $top->groupBy('honor')->map->count();
         $n = \App\Services\Honors::topN();
+        // "Play awardees": from the least intense award to the top 1.
+        $slides = [];
+        $intro = fn ($title, $sub) => ['intro' => true, 'title' => $title, 'sub' => $sub];
+        if ($perfect->isNotEmpty()) {
+            $slides[] = $intro('Perfect attendance', 'Never absent, never late');
+            foreach ($perfect as $p) { $slides[] = ['icon' => '🏅', 'kind' => 'Perfect attendance', 'name' => $p['student']->full_name, 'detail' => $p['days'].' school days', 'section' => $p['section']->name]; }
+        }
+        if ($approved->isNotEmpty()) {
+            $slides[] = $intro('Special awards', 'For character, talent and service');
+            foreach ($approved as $a) { $slides[] = ['icon' => '🏆', 'kind' => $a->award->name, 'name' => $a->student->full_name, 'detail' => (string) $a->reason, 'section' => '']; }
+        }
+        if ($bestSubject->isNotEmpty()) {
+            $slides[] = $intro('Best in each subject', 'The highest grade in every subject');
+            foreach ($bestSubject as $sub => $list) { foreach ($list->where('place', 1) as $w) { $slides[] = ['icon' => $scope === 'level' ? '🏆' : '⭐', 'kind' => 'Best in '.$sub, 'name' => $w['enrollment']->student->full_name, 'detail' => 'Grade '.$w['grade'], 'section' => $scope === 'level' ? $w['section']->name : '']; } }
+        }
+        if ($top->isNotEmpty()) {
+            $slides[] = $intro('Top '.$n.' achievers', $period);
+            foreach ($top->reverse() as $r) {
+                $icon = match ((int) $r['rank']) { 1 => $scope === 'level' ? '🏆' : '🥇', 2 => '🥈', 3 => '🥉', default => '🎖️' };
+                $slides[] = ['icon' => $icon, 'kind' => 'Rank #'.$r['rank'], 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $scope === 'level' ? $r['section']->name : '', 'top' => (int) $r['rank'] === 1];
+            }
+        }
     @endphp
 
     <div x-data="{ tab: @js(request('tab', 'top')) }">
@@ -27,6 +49,7 @@
                     <option value="final" @selected($term === null)>Whole year – live average</option>
                 </select></label>
             <button type="button" x-on:click="window.print()" class="btn h-11">Print</button>
+            @if($slides)<button type="button" class="btn btn-primary h-11" x-on:click="$dispatch('play-awardees')">▶ Play awardees</button>@endif
         </form>
         <h1 class="mb-4 hidden text-2xl font-bold print:block">Top achievers – {{ $where }} · {{ $period }}</h1>
 
@@ -93,7 +116,11 @@
         </div>
 
         {{-- BEST IN SUBJECT --}}
-        <div x-show="tab === 'subjects'" x-cloak>
+        <div x-show="tab === 'subjects'" x-cloak x-data="{ podium: localStorage.getItem('ss.bestTop3') !== '0' }">
+            <div class="mb-4 inline-flex rounded-xl bg-slate-100 p-1 text-sm dark:bg-slate-800">
+                <button type="button" class="rounded-lg px-3 py-1.5 font-medium" :class="!podium ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500'" x-on:click="podium = false; localStorage.setItem('ss.bestTop3', '0')">1st place only</button>
+                <button type="button" class="rounded-lg px-3 py-1.5 font-medium" :class="podium ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500'" x-on:click="podium = true; localStorage.setItem('ss.bestTop3', '1')">1st, 2nd and 3rd</button>
+            </div>
                         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 @forelse($bestSubject as $sub => $list)
                     @php $win = $list->where('place', 1); $rest = $list->where('place', '>', 1); @endphp
@@ -111,7 +138,7 @@
                                 </a>
                             @endforeach
                             @if($rest->isNotEmpty())
-                                <div class="mt-4 space-y-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                <div x-show="podium" class="mt-4 space-y-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
                                     @foreach($rest as $r)
                                         <a href="{{ route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']) }}" class="flex items-center gap-2 text-sm hover:underline">
                                             <span>{{ $r['place'] === 2 ? '🥈' : '🥉' }}</span><span class="min-w-0 flex-1 truncate">{{ $r['enrollment']->student->full_name }}</span><span class="font-semibold text-slate-600 dark:text-slate-300">{{ $r['grade'] }}</span>
@@ -212,4 +239,51 @@
             </div>
         </div>
     </div>
+
+    {{-- Play awardees: full-screen, one student at a time --}}
+    <div x-data="awardShow(@js($slides))" x-on:play-awardees.window="start()" x-show="on" x-cloak
+         x-on:keydown.window="if (on) { if (['ArrowRight', ' ', 'Enter'].includes($event.key)) { $event.preventDefault(); next() } if ($event.key === 'ArrowLeft') prev(); if ($event.key === 'Escape') stop() }"
+         class="fixed inset-0 z-[100] flex flex-col bg-slate-950 text-white" role="dialog" aria-modal="true" aria-label="Awardees">
+        <div class="flex items-center gap-3 px-6 py-4 text-sm text-white/60">
+            <span class="mr-auto">{{ $where }} · {{ $period }}</span>
+            <span x-text="(i + 1) + ' / ' + slides.length"></span>
+            <button type="button" class="rounded-full bg-white/10 px-3 py-1.5 hover:bg-white/20" x-on:click="auto = !auto; tick()" x-text="auto ? 'Pause' : 'Auto-play'"></button>
+            <button type="button" class="rounded-full bg-white/10 px-3 py-1.5 hover:bg-white/20" x-on:click="stop()">Exit</button>
+        </div>
+        <div class="relative flex flex-1 items-center justify-center overflow-hidden px-6" x-on:click="next()">
+            <template x-for="(s, k) in slides" :key="k">
+                <div x-show="i === k" x-transition:enter="transition duration-700 ease-out" x-transition:enter-start="opacity-0 translate-y-8 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute text-center">
+                    <template x-if="s.intro">
+                        <div><p class="text-sm font-semibold uppercase tracking-[.3em] text-amber-400">Next</p><h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.title"></h2><p class="mt-4 text-xl text-white/60" x-text="s.sub"></p></div>
+                    </template>
+                    <template x-if="!s.intro">
+                        <div>
+                            <div class="text-7xl sm:text-9xl" :class="s.top && 'animate-bounce'" x-text="s.icon"></div>
+                            <p class="mt-6 text-lg font-semibold uppercase tracking-[.25em] text-amber-400" x-text="s.kind"></p>
+                            <h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.name"></h2>
+                            <p class="mt-4 text-2xl text-white/70" x-text="s.detail"></p>
+                            <p class="mt-1 text-lg text-white/40" x-text="s.section"></p>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+        <div class="flex justify-center gap-3 pb-8">
+            <button type="button" class="rounded-full bg-white/10 px-5 py-2 hover:bg-white/20" x-on:click="prev()">← Back</button>
+            <button type="button" class="rounded-full bg-white px-6 py-2 font-semibold text-slate-900 hover:bg-white/90" x-on:click="next()" x-text="i === slides.length - 1 ? 'Finish' : 'Next →'"></button>
+        </div>
+    </div>
+    <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
+        function awardShow(slides) {
+            return {
+                slides, i: 0, on: false, auto: false, timer: null,
+                async start() { this.i = 0; this.on = true; try { await document.documentElement.requestFullscreen?.() } catch (e) {} },
+                async stop() { this.on = false; this.auto = false; clearTimeout(this.timer); if (document.fullscreenElement) { try { await document.exitFullscreen() } catch (e) {} } },
+                next() { if (this.i < this.slides.length - 1) { this.i++; this.tick() } else this.stop() },
+                prev() { if (this.i > 0) this.i-- },
+                tick() { clearTimeout(this.timer); if (this.auto && this.on) this.timer = setTimeout(() => this.next(), this.slides[this.i]?.intro ? 2500 : 4500) },
+            };
+        }
+    </script>
 </x-layouts.app>

@@ -197,7 +197,8 @@ class SetupWizardController extends Controller
     private function saveSubjects(Request $r): string
     {
         $d = $r->validate(['ww' => 'required|integer|between:0,100', 'pt' => 'required|integer|between:0,100', 'qa' => 'required|integer|between:0,100',
-            'grading_periods' => 'nullable|in:2,3,4', 'honors_top_n' => 'nullable|integer|between:3,100']);
+            'grading_periods' => 'nullable|in:2,3,4', 'honors_top_n' => 'nullable|integer|between:3,100',
+            'honors_titles_when' => 'nullable|in:each_period,year_end', 'honors_titles_levels' => 'nullable|array', 'honors_titles_levels.*' => 'integer']);
         if ($d['ww'] + $d['pt'] + $d['qa'] !== 100) {
             throw ValidationException::withMessages(['ww' => 'The three weights must add up to 100%.']);
         }
@@ -205,6 +206,8 @@ class SetupWizardController extends Controller
         if (! empty($d['grading_periods']) && ! \App\Models\Assessment::where('term', '>', (int) $d['grading_periods'])->exists()) {
             \App\Models\GradeLevel::query()->update(['terms' => (int) $d['grading_periods']]);
         }
+        Setting::put('honors_titles_when', $d['honors_titles_when'] ?? 'each_period');
+        Setting::put('honors_titles_levels', implode(',', $d['honors_titles_levels'] ?? []));
         if (! empty($d['honors_top_n'])) {
             Setting::put('honors_top_n', (string) $d['honors_top_n']);
         }
