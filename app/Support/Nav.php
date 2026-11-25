@@ -13,7 +13,7 @@ class Nav
     {
         $r = $u->role;
         $is = fn (string ...$roles) => in_array($r, $roles, true);
-        $item = fn (string $label, string $route, string $icon, string $desc, string $color = 'indigo', string $pattern = '') => [
+        $item = fn (string $label, string $route, string $icon, string $desc, string $color = 'indigo', string|array $pattern = '') => [
             'label' => $label, 'url' => route($route), 'active' => request()->routeIs($pattern ?: $route), 'icon' => $icon, 'desc' => $desc, 'color' => $color,
         ];
         $crud = fn (string $label, string $slug, string $icon, string $desc, string $color = 'slate') => [
@@ -26,7 +26,7 @@ class Nav
                 $item('Grades', 'portal.grades', 'award', 'Grades per subject and report card', 'amber'),
                 $item('Attendance', 'portal.attendance', 'check-square', 'Days present, late and absent', 'emerald'),
                 $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
-                School::allows('classwork') ? $item('Assignments', 'portal.assignments', 'clipboard', 'Homework and projects', 'violet', 'portal.assignments*') : null,
+                School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
                 $item('Messages', 'messages.index', 'message', 'Talk to teachers and the school', 'indigo', 'messages.*'),
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
@@ -65,9 +65,14 @@ class Nav
 
         $acad = [];
         if ($is(Role::TEACHER, Role::ADMIN, Role::REGISTRAR)) {
-            $acad[] = $item($r === Role::TEACHER ? 'My classes & grades' : 'Grades', 'gradebook.index', 'book-open', 'Enter scores and compute grades', 'amber', 'gradebook.*');
-            if (School::allows('classwork')) {
-                $acad[] = $item('Class cards', 'assignments.index', 'clipboard', 'Each class: assignments, projects and submissions', 'violet', 'assignments.*');
+            if ($r === Role::TEACHER && School::allows('classwork')) {
+                // Online: one place per class – posts, classwork and its gradebook.
+                $acad[] = $item('My classes', 'assignments.index', 'book-open', 'Class cards: posts, classwork and grades', 'amber', ['assignments.*', 'gradebook.*']);
+            } else {
+                $acad[] = $item($r === Role::TEACHER ? 'My classes & grades' : 'Grades', 'gradebook.index', 'book-open', 'Enter scores and compute grades', 'amber', 'gradebook.*');
+                if (School::allows('classwork')) {
+                    $acad[] = $item('Class cards', 'assignments.index', 'clipboard', 'Each class: posts, classwork and submissions', 'violet', 'assignments.*');
+                }
             }
             $acad[] = $item('Honor roll', 'honors', 'award', 'Ranking and honors per section', 'amber');
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
@@ -150,7 +155,7 @@ class Nav
         $pick = match ($u->role) {
             Role::ADMIN => ['Home', 'Students', 'Classes & sections', 'Grades', 'Student balances', 'School settings'],
             Role::REGISTRAR => ['Home', 'Applications', 'Students', 'Classes & sections', 'Grades', 'Messages'],
-            Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'Class cards', 'Messages'],
+            Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'My classes', 'Class cards', 'Messages'],
             Role::GUARD => ['Gate scanner', 'Messages'],
             Role::CASHIER => ['Home', 'Student balances', 'Receipts', 'Overdue', 'Students', 'Messages'],
             Role::STUDENT, Role::PARENT => ['Home', 'Grades', 'Attendance', 'Class schedule', 'Payments', 'Messages'],

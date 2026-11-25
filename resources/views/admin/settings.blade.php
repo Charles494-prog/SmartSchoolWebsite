@@ -35,7 +35,7 @@
             {{-- Section nav --}}
             <nav class="hidden lg:block">
                 <ul class="sticky top-24 space-y-0.5 text-sm">
-                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'email' => ['Email (SMTP)'], 'security' => ['Sign-in security'], 'admission' => ['Admission documents'], 'privacy' => ['Privacy notice']] as $id => [$title])
+                    @foreach($sections + ['tuition' => ['Tuition'], 'periods' => ['Grading periods'], 'mode' => ['How SmartSchool runs'], 'email' => ['Email (SMTP)'], 'security' => ['Sign-in security'], 'admission' => ['Admission documents'], 'privacy' => ['Privacy notice']] as $id => [$title])
                         <li><a href="#{{ $id }}" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5">{{ $title }}</a></li>
                     @endforeach
                     <li class="pt-3"><a href="{{ route('crud.index', 'school-years') }}" class="block rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">School years →</a></li>
@@ -144,6 +144,22 @@
                             </div>
                         </div>
                         <p class="text-xs text-slate-500">Changing tuition updates every student's balance for this school year right away.</p>
+                    </div>
+                </section>
+
+                @php $periods = \App\Support\School::periods(); @endphp
+                <section id="periods" class="card scroll-mt-24 p-0">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">Grading periods</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">How the school year is split for grades. Applies to every grade level (you can still change one level in Grade levels).</p>
+                    </div>
+                    <div class="grid gap-3 px-6 py-5 sm:grid-cols-3">
+                        @foreach([4 => ['Quarters', 'Q1 – Q4 · DepEd default'], 3 => ['Trimesters', 'T1 – T3'], 2 => ['Semesters', 'S1 – S2']] as $n => [$t, $d])
+                            <label class="flex min-h-11 cursor-pointer gap-3 rounded-xl border border-slate-200 p-4 has-[:checked]:border-brand-600 has-[:checked]:ring-1 has-[:checked]:ring-brand-600">
+                                <input type="radio" name="grading_periods" value="{{ $n }}" class="mt-1" @checked((int) old('grading_periods', $periods) === $n)>
+                                <span><span class="block text-sm font-semibold">{{ $t }}</span><span class="block text-xs text-slate-500">{{ $d }}</span></span>
+                            </label>
+                        @endforeach
                     </div>
                 </section>
 

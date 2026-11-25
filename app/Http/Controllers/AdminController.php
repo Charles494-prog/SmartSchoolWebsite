@@ -51,12 +51,20 @@ class AdminController extends Controller
         $rules = ['school_name' => 'required|max:150', 'passing_grade' => 'required|numeric|between:50,100', 'late_after' => 'required|date_format:H:i', 'use_transmutation' => 'boolean', 'notify_absent' => 'boolean', 'notify_late' => 'boolean',
             'honors_with_highest' => 'required|numeric', 'honors_with_high' => 'required|numeric', 'honors_with' => 'required|numeric', 'library_loan_days' => 'required|integer|min:1', 'library_fine_per_day' => 'required|numeric|min:0',
             'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
-            'deployment_mode' => 'nullable|in:lan,hosted', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
+            'deployment_mode' => 'nullable|in:lan,hosted', 'grading_periods' => 'nullable|in:2,3,4', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
             'tuition_all' => 'nullable|required_if:tuition_mode,same|numeric|min:0|max:10000000', 'tuition' => 'array', 'tuition.*' => 'nullable|numeric|min:0|max:10000000'];
         $data = $request->validate($rules + Admission::rules() + collect(self::SETTINGS)->flatMap(fn ($g) => $g)->map(fn () => 'nullable|max:255')->except(array_keys($rules))->all());
         foreach (collect(self::SETTINGS)->flatMap(fn ($g) => array_keys($g))->push('privacy_notice') as $k) {
             $v = (self::TYPES[$k] ?? '') === 'toggle' ? ($request->boolean($k) ? '1' : '0') : ($data[$k] ?? '');
             Setting::put($k, $v);
+        }
+        if (isset($data['grading_periods']) && (int) $data['grading_periods'] !== School::periods()) {
+            $n = (int) $data['grading_periods'];
+            $used = \App\Models\Assessment::where('term', '>', $n)->exists();
+            if ($used) {
+                return back()->withInput()->with('error', 'Some classes already have scores in '.School::term($n + 1, School::periods()).' or later. Remove those first, or keep the current grading periods.');
+            }
+            GradeLevel::query()->update(['terms' => $n]);
         }
         if (isset($data['deployment_mode']) && $data['deployment_mode'] !== School::mode()) {
             Setting::put('deployment_mode', $data['deployment_mode']);

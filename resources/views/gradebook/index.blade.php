@@ -73,7 +73,7 @@
                 <span class="text-sm text-slate-500">{{ $group->count() }} subjects</span>
             </div>
             <table class="table">
-                <thead><tr><th>Subject</th><th>Teacher</th>@foreach(range(1, $sec->gradeLevel->terms) as $t)<th class="text-center">Q{{ $t }}</th>@endforeach<th></th></tr></thead>
+                <thead><tr><th>Subject</th><th>Teacher</th>@foreach(range(1, $sec->gradeLevel->terms) as $t)<th class="text-center">{{ \App\Support\School::term($t, $sec->gradeLevel->terms) }}</th>@endforeach<th></th></tr></thead>
                 <tbody>
                 @foreach($group as $c)
                     <tr x-data class="cursor-pointer" x-on:click="location='{{ route('gradebook.show', $c) }}'">
@@ -81,7 +81,7 @@
                         <td class="{{ $c->teacher ? '' : 'text-slate-400' }}">{{ $c->teacher?->name ?? 'No teacher' }}</td>
                         @foreach(range(1, $sec->gradeLevel->terms) as $t)
                             @php [$label, $dot, $txt] = $state($c, $t); @endphp
-                            <td class="text-center"><span class="inline-flex items-center gap-1.5 text-xs {{ $txt }}" title="Q{{ $t }}: {{ $label }}"><span class="h-2 w-2 rounded-full {{ $dot }}"></span><span class="hidden xl:inline">{{ $label }}</span></span></td>
+                            <td class="text-center"><span class="inline-flex items-center gap-1.5 text-xs {{ $txt }}" title="{{ \App\Support\School::term($t, $sec->gradeLevel->terms) }}: {{ $label }}"><span class="h-2 w-2 rounded-full {{ $dot }}"></span><span class="hidden xl:inline">{{ $label }}</span></span></td>
                         @endforeach
                         <td class="text-right"><a href="{{ route('gradebook.show', $c) }}" class="link text-sm">Open</a></td>
                     </tr>

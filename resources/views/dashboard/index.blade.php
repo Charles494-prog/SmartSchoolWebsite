@@ -139,7 +139,7 @@
                     @forelse($failing as $f)
                         <a href="{{ route('students.show', $f['student']) }}" class="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-50">
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-sm font-bold text-rose-600">{{ $f['grade'] }}</span>
-                            <span class="min-w-0"><span class="block truncate text-sm font-semibold">{{ $f['student']->full_name }}</span><span class="block truncate text-xs text-slate-500">{{ $f['subject'] }} · Q{{ $f['term'] }} · {{ $f['section'] }}</span></span>
+                            <span class="min-w-0"><span class="block truncate text-sm font-semibold">{{ $f['student']->full_name }}</span><span class="block truncate text-xs text-slate-500">{{ $f['subject'] }} · {{ \App\Support\School::term($f['term'], \App\Support\School::periods()) }} · {{ $f['section'] }}</span></span>
                         </a>
                     @empty <p class="muted">Nobody is failing right now.</p> @endforelse
                 </div>

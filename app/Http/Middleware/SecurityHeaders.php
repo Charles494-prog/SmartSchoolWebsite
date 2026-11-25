@@ -33,6 +33,17 @@ class SecurityHeaders
             "object-src 'none'",
         ]);
         $h = $response->headers;
+        if ($h->get('X-SmartSchool-Sandbox')) {
+            // Teacher-made class content: runs in a unique, empty origin (no cookies, no access to the app),
+            // may only be framed by SmartSchool itself, and may load media/embeds (e.g. H5P, YouTube) from anywhere.
+            $h->remove('X-SmartSchool-Sandbox');
+            $h->set('Content-Security-Policy', "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; form-action 'none'; base-uri 'none'");
+            $h->set('X-Frame-Options', 'SAMEORIGIN');
+            $h->set('X-Content-Type-Options', 'nosniff');
+            $h->set('Referrer-Policy', 'no-referrer');
+
+            return $response;
+        }
         $h->set('Content-Security-Policy', $csp);
         $h->set('X-Content-Type-Options', 'nosniff');
         $h->set('X-Frame-Options', 'DENY');

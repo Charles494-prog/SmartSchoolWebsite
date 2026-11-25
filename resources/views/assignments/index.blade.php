@@ -1,8 +1,8 @@
-<x-layouts.app title="Class cards">
+<x-layouts.app title="My classes">
     <div class="mb-6 flex flex-wrap items-end gap-3">
         <div class="mr-auto">
-            <h1 class="h1">Class cards</h1>
-            <p class="muted">One card per subject you teach. Open a card to post assignments, projects and activities and check your students' work.</p>
+            <h1 class="h1">My classes</h1>
+            <p class="muted">One card per subject you teach. Open a card to post announcements, documents and classwork, check work, and see the gradebook.</p>
         </div>
     </div>
 
@@ -34,7 +34,7 @@
                         @endif
                     </div>
                     <div class="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm text-slate-500 dark:border-slate-800">
-                        <span>{{ $cs->assignments_count }} {{ \Illuminate\Support\Str::plural('post', $cs->assignments_count) }}</span>
+                        <span>{{ $cs->assignments_count }} classwork</span>
                         <span class="font-medium text-brand-600 dark:text-brand-400">Open →</span>
                     </div>
                 </a>

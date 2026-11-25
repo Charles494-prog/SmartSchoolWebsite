@@ -8,7 +8,7 @@
         @if($report && count($report['subjects']))
             <div class="card overflow-x-auto p-0">
                 <table class="table">
-                    <thead><tr><th>Subject</th>@foreach(range(1, $enrollment->gradeLevel->terms) as $t)<th class="text-center">Q{{ $t }}</th>@endforeach<th class="text-center">Final</th><th>Remarks</th></tr></thead>
+                    <thead><tr><th>Subject</th>@foreach(range(1, $enrollment->gradeLevel->terms) as $t)<th class="text-center">{{ \App\Support\School::term($t, $enrollment->gradeLevel->terms) }}</th>@endforeach<th class="text-center">Final</th><th>Remarks</th></tr></thead>
                     <tbody>
                     @foreach($report['subjects'] as $s)
                         <tr><td>{{ $s['name'] }}</td>@foreach($s['terms'] as $g)<td class="text-center {{ $g !== null && $g < 75 ? 'text-red-600 font-semibold' : '' }}">{{ $g ?? '' }}</td>@endforeach<td class="text-center font-bold">{{ $s['final'] }}</td><td>{{ $s['remark'] }}</td></tr>

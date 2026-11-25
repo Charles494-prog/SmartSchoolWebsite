@@ -122,28 +122,47 @@ class DemoSeeder extends Seeder
             $cs->submissions()->create(['term' => 1, 'status' => 'approved', 'submitted_by' => $cs->teacher_id]);
         }
 
-        // Class cards (Online mode): assignments, projects and activities with some student work
+        // Class cards (Online mode): announcements, documents and classwork. Graded classwork counts toward Q2.
         $posts = [
-            ['assignment', 'Reading log – Week 3', "Read the assigned chapter and write 5 sentences about the main idea.", -6, 20],
-            ['activity', 'Group activity: concept map', "With your group, make a concept map of today's lesson. Upload a photo.", -1, 30],
-            ['assignment', 'Worksheet 4', "Answer items 1–15. Show your solution.", 3, 25],
-            ['project', 'Quarter project', "Make a poster or short video about a real-life use of this subject. Rubric attached in class.", 14, 100],
+            ['announcement', 'Welcome to class!', "Hi everyone! This is where I'll post announcements, lessons and your work. Check it every day.", null, null, null],
+            ['material', 'Lesson 3 notes', "Read these notes before our next meeting.", null, null, null],
+            ['assignment', 'Reading log – Week 3', "Read the assigned chapter and write 5 sentences about the main idea.", -6, 20, 'ww'],
+            ['activity', 'Group activity: concept map', "With your group, make a concept map of today's lesson. Upload a photo.", -1, 30, 'pt'],
+            ['assignment', 'Practice worksheet', "Practice only – this is not included in your grade.", 3, 25, null],
+            ['quiz', 'Quiz 2', "Short quiz on lessons 1–3.", 2, 20, 'ww'],
+            ['project', 'Quarter project', "Make a poster or short video about a real-life use of this subject.", 14, 100, 'pt'],
         ];
+        $design = ['<div class="hero"><h2>Let\'s learn!</h2><p>Tap the star ⭐</p><button id="star">⭐</button><p id="msg"></p></div>',
+            '.hero{padding:24px;border-radius:16px;text-align:center;background:linear-gradient(135deg,#eef2ff,#ecfeff);animation:rise .8s ease-out}h2{margin:0 0 6px}#star{font-size:40px;border:0;background:none;cursor:pointer;transition:transform .2s}#star:hover{transform:scale(1.3) rotate(15deg)}@keyframes rise{from{opacity:0;transform:translateY(20px)}}',
+            'document.getElementById("star").onclick=()=>{document.getElementById("msg").textContent="Great job! 🎉"}'];
         foreach (ClassSubject::whereHas('section', fn ($q) => $q->where('school_year_id', $sy->id))->with('subject')->get() as $cs) {
             if ($cs->assignments()->exists()) {
                 continue;
             }
             $students = $cs->section->students()->get();
-            foreach ($posts as $pi => [$type, $title, $text, $days, $max]) {
-                $a = Assignment::create(['class_subject_id' => $cs->id, 'type' => $type, 'title' => $cs->subject->name.': '.$title, 'instructions' => $text, 'due_at' => today()->addDays($days)->setTime(17, 0), 'max_score' => $max]);
+            foreach ($posts as $pi => [$type, $title, $text, $days, $max, $component]) {
+                $a = Assignment::create(['class_subject_id' => $cs->id, 'type' => $type, 'title' => $title, 'instructions' => $text,
+                    'due_at' => $days === null ? null : today()->addDays($days)->setTime(17, 0), 'max_score' => $max, 'component' => $component, 'term' => $component ? 2 : null,
+                    'body_html' => $pi === 0 ? $design[0] : null, 'body_css' => $pi === 0 ? $design[1] : null, 'body_js' => $pi === 0 ? $design[2] : null,
+                    'created_at' => now()->subDays(10 - $pi)]);
+                if ($component) {
+                    $as = Assessment::create(['class_subject_id' => $cs->id, 'term' => 2, 'component' => $component, 'title' => $title, 'max_score' => $max, 'given_on' => $a->due_at->toDateString()]);
+                    $a->update(['assessment_id' => $as->id]);
+                }
+                if ($days === null) {
+                    continue;
+                }
                 foreach ($students as $si => $st) {
                     $turnIn = $days < 0 ? ($si * 7 + $cs->id) % 10 < 8 : ($days < 7 ? ($si + $cs->id) % 3 === 0 : false);
                     if (! $turnIn) {
                         continue;
                     }
                     $graded = $days < -3 && $si % 4 !== 0;
-                    $a->submissions()->create(['student_id' => $st->id, 'body' => 'Here is my work for '.$title.'.', 'submitted_at' => $a->due_at->copy()->subHours(($si % 5) * 6 - 4),
-                        'score' => $graded ? round($max * (0.7 + (($si * 13 + $pi) % 30) / 100)) : null, 'feedback' => $graded ? 'Good job! Keep it up.' : null]);
+                    $score = $graded ? round($max * (0.7 + (($si * 13 + $pi) % 30) / 100)) : null;
+                    $a->submissions()->create(['student_id' => $st->id, 'body' => 'Here is my work for '.$title.'.', 'submitted_at' => $a->due_at->copy()->subHours(($si % 5) * 6 - 4), 'score' => $score, 'feedback' => $graded ? 'Good job! Keep it up.' : null]);
+                    if ($graded && $a->assessment_id) {
+                        Score::create(['assessment_id' => $a->assessment_id, 'student_id' => $st->id, 'score' => $score]);
+                    }
                 }
             }
         }

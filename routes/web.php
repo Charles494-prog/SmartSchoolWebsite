@@ -82,6 +82,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/account', [PortalController::class, 'account'])->name('portal.account');
         Route::get('/assignments', [PortalController::class, 'assignments'])->name('portal.assignments');
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
+        Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
+        Route::get('/classes/{class}', [PortalController::class, 'classroom'])->name('portal.class');
+        Route::post('/classes/{class}/color', [PortalController::class, 'color'])->name('portal.color');
     });
 
     // Students (view rules are checked per student inside the controller)
@@ -108,6 +111,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/finance/receipt/{payment}', [FinanceController::class, 'receipt'])->name('finance.receipt');
     Route::get('/finance/soa/{enrollment}', [FinanceController::class, 'soa'])->name('finance.soa');
     Route::get('/assignments/{assignment}/attachment', [AssignmentController::class, 'attachment'])->name('assignments.attachment');
+    Route::get('/assignments/{assignment}/content', [AssignmentController::class, 'content'])->name('assignments.content');
 
     // Registrar & admin
     Route::middleware('role:admin,registrar')->group(function () {
@@ -164,6 +168,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/assignments', [AssignmentController::class, 'index'])->name('assignments.index');
         Route::post('/assignments', [AssignmentController::class, 'store'])->name('assignments.store');
         Route::get('/assignments/class/{class}', [AssignmentController::class, 'classroom'])->name('assignments.class');
+        Route::post('/assignments/class/{class}/color', [AssignmentController::class, 'color'])->name('assignments.color');
+        Route::delete('/assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
         Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])->name('assignments.show');
         Route::post('/submissions/{submission}/grade', [AssignmentController::class, 'grade'])->name('assignments.grade');
         Route::get('/submissions/{submission}/file', [AssignmentController::class, 'file'])->name('assignments.file');

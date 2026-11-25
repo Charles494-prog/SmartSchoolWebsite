@@ -82,7 +82,7 @@ class PortalController extends Controller
     {
         abort_unless(\App\Support\School::allows('classwork'), 404);
         return $this->view($request, 'portal.assignments', fn ($c, $e) => [
-            'assignments' => $e?->section_id ? Assignment::with('classSubject.subject')->whereHas('classSubject', fn ($q) => $q->where('section_id', $e->section_id))->latest('due_at')->get() : collect(),
+            'assignments' => $e?->section_id ? Assignment::with('classSubject.subject')->whereNotNull('due_at')->whereHas('classSubject', fn ($q) => $q->where('section_id', $e->section_id))->latest('due_at')->get() : collect(),
             'submissions' => Submission::where('student_id', $c->id)->get()->keyBy('assignment_id'),
         ]);
     }
@@ -92,6 +92,7 @@ class PortalController extends Controller
         abort_unless(\App\Support\School::allows('classwork'), 404);
         $u = $request->user();
         abort_unless($u->role === 'student', 403, 'Only the student can submit.');
+        abort_unless(\App\Support\Classwork::gradable($assignment->type), 422, 'Nothing to turn in for this post.');
         $student = Student::where('user_id', $u->id)->firstOrFail();
         abort_unless($student->currentEnrollment()?->section_id === $assignment->classSubject->section_id, 403);
         $data = $request->validate(['body' => 'nullable|max:20000|required_without:file', 'file' => 'nullable|file|max:10240|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx,jpg,jpeg,png,zip,txt']);
@@ -106,6 +107,43 @@ class PortalController extends Controller
         $sub->submitted_at = now();
         $sub->save();
 
-        return back()->with('ok', 'Submitted'.($assignment->due_at->isPast() ? ' (late)' : '').'.');
+        return back()->with('ok', 'Turned in'.($assignment->due_at?->isPast() ? ' (late)' : '').'.');
+    }
+
+    /** Online mode: the student's class cards. */
+    public function classes(Request $request)
+    {
+        abort_unless(\App\Support\School::allows('classwork'), 404);
+
+        return $this->view($request, 'portal.classes', fn ($c, $e) => [
+            'classes' => $e?->section_id ? \App\Models\ClassSubject::with('subject', 'teacher', 'slots')->where('section_id', $e->section_id)->get() : collect(),
+            'todo' => $e?->section_id ? Assignment::whereHas('classSubject', fn ($q) => $q->where('section_id', $e->section_id))->whereNotNull('due_at')->where('due_at', '>=', now())
+                ->whereDoesntHave('submissions', fn ($q) => $q->where('student_id', $c->id))->get()->groupBy('class_subject_id') : collect(),
+        ]);
+    }
+
+    public function classroom(Request $request, \App\Models\ClassSubject $class)
+    {
+        abort_unless(\App\Support\School::allows('classwork'), 404);
+
+        return $this->view($request, 'portal.class', function ($c, $e) use ($class) {
+            abort_unless($e?->section_id === $class->section_id, 403);
+
+            return [
+                'class' => $class->load('subject', 'teacher', 'section.gradeLevel', 'slots'),
+                'posts' => $class->assignments()->with('classSubject.section.gradeLevel', 'classSubject.subject')->latest()->get(),
+                'submissions' => Submission::where('student_id', $c->id)->whereIn('assignment_id', $class->assignments()->select('id'))->get()->keyBy('assignment_id'),
+            ];
+        });
+    }
+
+    /** A student (or parent) can recolour a class card for themselves only. */
+    public function color(Request $request, \App\Models\ClassSubject $class)
+    {
+        abort_unless(\App\Support\School::allows('classwork'), 404);
+        $color = $request->validate(['color' => ['nullable', \Illuminate\Validation\Rule::in(array_keys(\App\Support\Classwork::COLORS))]])['color'] ?? null;
+        \Illuminate\Support\Facades\DB::table('class_card_prefs')->updateOrInsert(['user_id' => $request->user()->id, 'class_subject_id' => $class->id], ['color' => $color, 'updated_at' => now(), 'created_at' => now()]);
+
+        return back()->with('ok', $color ? 'Card colour changed (only you see this).' : 'Back to your teacher\'s colour.');
     }
 }

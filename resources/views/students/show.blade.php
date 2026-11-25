@@ -123,7 +123,7 @@
                 <div class="card overflow-x-auto">
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 class="h2">Grades this school year</h2>@if($canEdit)<a href="{{ route('students.sf10', $s) }}" target="_blank" class="btn btn-sm"><x-icon name="download" class="h-4 w-4" /> Transcript – all grade levels</a>@endif</div>
                     <table class="table">
-                        <thead><tr><th>Subject</th>@foreach(range(1, $current->gradeLevel->terms) as $t)<th>Q{{ $t }}</th>@endforeach<th>Final</th><th>Remarks</th></tr></thead>
+                        <thead><tr><th>Subject</th>@foreach(range(1, $current->gradeLevel->terms) as $t)<th>{{ \App\Support\School::term($t, $current->gradeLevel->terms) }}</th>@endforeach<th>Final</th><th>Remarks</th></tr></thead>
                         <tbody>
                         @forelse($report['subjects'] as $sub)
                             <tr><td>{{ $sub['name'] }}</td>@foreach($sub['terms'] as $g)<td>{{ $g ?? '' }}</td>@endforeach<td class="font-semibold">{{ $sub['final'] ?? '' }}</td><td>{{ $sub['remark'] }}</td></tr>

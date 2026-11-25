@@ -1,12 +1,17 @@
 @php $locked = in_array($submission?->status, ['submitted', 'approved']); $w = $cs->weights(); $labels = ['ww' => 'Quizzes', 'pt' => 'Projects', 'qa' => 'Exams / summative', 'at' => 'Attendance']; $isAdmin = auth()->user()->isAdmin(); @endphp
 <x-layouts.app :title="$cs->subject->name.' · '.$cs->section->label()" :hideErrorSummary="true">
-    <a href="{{ route('gradebook.index') }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />Classes</a>
+    @php $online = \App\Support\School::allows('classwork') && auth()->user()->role === 'teacher'; @endphp
+    @if($online)
+        <a href="{{ route('assignments.class', $cs) }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />{{ $cs->subject->name }} class card</a>
+    @else
+        <a href="{{ route('gradebook.index') }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />Classes</a>
+    @endif
     <div class="mt-2 mb-4 flex flex-wrap items-center gap-3">
         <div class="flex-1">
             <h1 class="h1">{{ $cs->subject->name }}</h1>
             <p class="muted">{{ $cs->section->label() }} · {{ \App\Models\Setting::get('use_transmutation') === '1' ? 'transmuted grades' : 'plain weighted average' }}</p>
         </div>
-        <div class="flex gap-1">@foreach(range(1, $terms) as $t)<a href="{{ route('gradebook.show', [$cs, 'term' => $t]) }}" class="btn btn-sm {{ $t === $term ? 'btn-primary' : '' }}">Q{{ $t }}</a>@endforeach</div>
+        <div class="flex gap-1">@foreach(range(1, $terms) as $t)<a href="{{ route('gradebook.show', [$cs, 'term' => $t]) }}" class="btn btn-sm {{ $t === $term ? 'btn-primary' : '' }}">{{ \App\Support\School::term($t, $terms) }}</a>@endforeach</div>
     </div>
     @if($submission)
         <div class="mb-4 rounded-lg px-4 py-3 text-sm {{ $submission->status === 'returned' ? 'bg-amber-50 text-amber-900' : 'bg-blue-50 text-blue-900' }}">
@@ -56,7 +61,17 @@
         </form>
     </div>
 
-    @unless($locked)
+    @if(! $locked && $online)
+        {{-- Online mode: graded work comes from the class card, so it is also posted to students. --}}
+        <div class="card mb-4 flex flex-wrap items-center gap-3">
+            <div class="mr-auto">
+                <p class="font-semibold">Add quizzes, projects and exams from the class card</p>
+                <p class="text-sm text-slate-500">Create it there and choose where it counts – it appears here as a column and students see it. Scores you give when checking work are saved here automatically.</p>
+            </div>
+            <a href="{{ route('assignments.class', [$cs, 'create' => 1, 'term' => $term, 'component' => 'ww', 'type' => 'quiz']) }}" class="btn btn-primary">+ Create in class card</a>
+        </div>
+    @endif
+    @if(! $locked && ! $online)
         <details class="card mb-4" {{ $assessments->isEmpty() ? 'open' : '' }}>
             <summary class="cursor-pointer font-semibold text-brand-700">+ Add quiz, task or exam</summary>
             <form method="post" action="{{ route('gradebook.assessments.store', $cs) }}" class="mt-3 grid gap-3 sm:grid-cols-5">
@@ -68,7 +83,7 @@
                 <div class="sm:col-span-5"><button class="btn btn-primary">Add</button></div>
             </form>
         </details>
-    @endunless
+    @endif
 
     <form method="post" action="{{ route('gradebook.scores', $cs) }}">
         @csrf <input type="hidden" name="term" value="{{ $term }}">
@@ -86,7 +101,7 @@
                                 @endunless
                             </th>
                         @endforeach
-                        <th class="text-center">Initial</th><th class="text-center">Quarterly grade</th>
+                        <th class="text-center">Initial</th><th class="text-center">{{ \App\Support\School::periodName($terms) }} grade</th>
                     </tr>
                 </thead>
                 <tbody>

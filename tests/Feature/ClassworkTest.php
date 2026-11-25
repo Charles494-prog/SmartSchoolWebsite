@@ -26,8 +26,8 @@ class ClassworkTest extends TestCase
         $this->actingAs($teacher);
         $class = ClassSubject::where('teacher_id', $teacher->id)->first();
 
-        $this->get('/assignments')->assertOk()->assertSee('Class cards')->assertSee($class->subject->name);
-        $this->get('/assignments/class/'.$class->id)->assertOk()->assertSee('Classwork')->assertSee('Quarter project');
+        $this->get('/assignments')->assertOk()->assertSee('My classes')->assertSee($class->subject->name);
+        $this->get('/assignments/class/'.$class->id)->assertOk()->assertSee('Stream')->assertSee('Quarter project')->assertSee('Welcome to class!');
         $this->assertTrue(Assignment::where('class_subject_id', $class->id)->whereHas('submissions')->exists(), 'demo data has student work');
 
         $this->post('/assignments', ['class_subject_id' => $class->id, 'type' => 'project', 'title' => 'Science fair', 'due_at' => now()->addWeek()->format('Y-m-d H:i'), 'max_score' => 50])
@@ -78,5 +78,71 @@ class ClassworkTest extends TestCase
         $this->post('/dev/login', ['user_id' => $student->id])->assertRedirect('/');
         $this->assertAuthenticatedAs($student);
         $this->post('/dev/login', ['user_id' => User::where('email', 'not like', '%@school.test')->value('id') ?? 999999])->assertNotFound();
+    }
+
+    public function test_classwork_feeds_the_gradebook_only_when_it_counts(): void
+    {
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $class = ClassSubject::where('teacher_id', $teacher->id)->first();
+        $base = ['class_subject_id' => $class->id, 'due_at' => now()->addDay()->format('Y-m-d H:i'), 'max_score' => 20];
+
+        $this->post('/assignments', $base + ['type' => 'quiz', 'title' => 'Counted quiz', 'component' => 'ww', 'term' => 3])->assertRedirect();
+        $this->post('/assignments', $base + ['type' => 'quiz', 'title' => 'Practice quiz', 'component' => ''])->assertRedirect();
+        $counted = Assignment::where('title', 'Counted quiz')->first();
+        $this->assertNotNull($counted->assessment_id);
+        $this->assertSame(3, (int) \App\Models\Assessment::find($counted->assessment_id)->term);
+        $this->assertNull(Assignment::where('title', 'Practice quiz')->value('assessment_id'));
+
+        $student = $class->section->students()->first();
+        $sub = $counted->submissions()->create(['student_id' => $student->id, 'body' => 'x', 'submitted_at' => now()]);
+        $this->post("/submissions/{$sub->id}/grade", ['score' => 17])->assertRedirect();
+        $this->assertEquals(17, \App\Models\Score::where('assessment_id', $counted->assessment_id)->where('student_id', $student->id)->value('score'));
+        $this->get("/gradebook/{$class->id}?term=3")->assertOk()->assertSee('Counted quiz')->assertSee('Create in class card');
+
+        // Q1 is approved in the demo data: new work can't count toward it
+        $this->post('/assignments', $base + ['type' => 'quiz', 'title' => 'Late Q1', 'component' => 'ww', 'term' => 1])->assertSessionHas('error');
+        $this->post('/assignments', ['class_subject_id' => $class->id, 'type' => 'announcement', 'title' => 'No class Friday'])->assertRedirect();
+        $this->assertNull(Assignment::where('title', 'No class Friday')->value('due_at'));
+    }
+
+    public function test_student_class_cards_colour_and_sandboxed_teacher_content(): void
+    {
+        $student = User::where('email', 'student@school.test')->first();
+        $this->actingAs($student);
+        $class = ClassSubject::where('section_id', $student->student->currentEnrollment()->section_id)->first();
+        $this->get('/portal/classes')->assertOk()->assertSee($class->subject->name);
+        $this->get("/portal/classes/{$class->id}")->assertOk()->assertSee('Welcome to class!')->assertSee('Counts toward');
+        $teacherColor = \App\Support\Classwork::colorKey($class);
+        $pick = $teacherColor === 'rose' ? 'teal' : 'rose';
+        $this->post("/portal/classes/{$class->id}/color", ['color' => $pick])->assertRedirect();
+        $this->assertSame($pick, \App\Support\Classwork::colorKey($class, $student));
+        $this->assertSame($teacherColor, \App\Support\Classwork::colorKey($class), 'teacher default is unchanged');
+
+        $designed = Assignment::where('class_subject_id', $class->id)->whereNotNull('body_html')->first();
+        $r = $this->get("/assignments/{$designed->id}/content")->assertOk();
+        $this->assertStringContainsString('sandbox allow-scripts', $r->headers->get('Content-Security-Policy'));
+        $this->assertStringNotContainsString('allow-same-origin', $r->headers->get('Content-Security-Policy'));
+        $other = Assignment::whereHas('classSubject', fn ($q) => $q->where('section_id', '!=', $class->section_id))->first();
+        $this->get("/assignments/{$other->id}/content")->assertForbidden();
+    }
+
+    public function test_admin_sets_trimesters_or_semesters(): void
+    {
+        $this->actingAs(User::where('role', 'admin')->first());
+        $this->assertSame(4, \App\Support\School::periods());
+        \App\Models\Assessment::where('term', '>', 2)->delete();
+        $this->put('/settings', $this->settingsPayload(['grading_periods' => 2]))->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(2, \App\Support\School::periods());
+        $this->assertSame('S2', \App\Support\School::term(2, 2));
+        $this->get('/gradebook/'.ClassSubject::first()->id)->assertOk()->assertSee('S2')->assertDontSee('>Q3<', false);
+    }
+
+    private function settingsPayload(array $extra): array
+    {
+        $keys = ['school_name' => 'Test School', 'passing_grade' => 75, 'late_after' => '07:30', 'honors_with_highest' => 98, 'honors_with_high' => 95, 'honors_with' => 90,
+            'library_loan_days' => 7, 'library_fine_per_day' => 5, 'privacy_notice' => 'We protect your data.', 'school_type' => 'public', 'tuition_mode' => 'same', 'tuition_all' => 0];
+
+        return $extra + $keys;
     }
 }

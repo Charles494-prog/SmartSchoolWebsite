@@ -45,6 +45,24 @@ class School
         return self::mode() === self::HOSTED;
     }
 
+    /** Grading period names by how many there are in a year: 4 = quarters, 3 = trimesters, 2 = semesters. */
+    public static function periodName(int $count): string
+    {
+        return match ($count) { 3 => 'Trimester', 2 => 'Semester', default => 'Quarter' };
+    }
+
+    /** Short label for one grading period, e.g. Q1, T2, S1. */
+    public static function term(int $t, int $count = 4): string
+    {
+        return self::periodName($count)[0].$t;
+    }
+
+    /** The period count most grade levels use (what the admin picked in Settings). */
+    public static function periods(): int
+    {
+        return (int) (\App\Models\GradeLevel::selectRaw('terms, count(*) n')->groupBy('terms')->orderByDesc('n')->value('terms') ?: 4);
+    }
+
     /** Is a mode-dependent feature on? Unknown features are off. */
     public static function allows(string $feature): bool
     {
