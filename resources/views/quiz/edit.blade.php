@@ -45,12 +45,17 @@
                                                 <svg x-show="o.weight > 0" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>
                                             </button>
                                             <input x-model="o.text" class="input h-10 flex-1" :placeholder="'Option ' + (j + 1)">
-                                            <input x-show="q.type === 'multi'" x-model.number="o.weight" type="number" class="input h-10 w-20 text-sm" title="Percent of the points (negative = penalty)">
+                                            <input x-show="q.type === 'multi' && !q.data.all_or_nothing" x-model.number="o.weight" type="number" class="input h-10 w-20 text-sm" title="Percent of the points (negative = penalty)">
                                             <button type="button" class="text-slate-400 hover:text-rose-600" x-on:click="q.data.options.splice(j, 1)" aria-label="Remove option">✕</button>
                                         </div>
                                     </template>
                                     <button type="button" class="text-sm font-medium text-brand-600" x-on:click="q.data.options.push({ text: '', weight: 0, feedback: null })">+ Add option</button>
-                                    <p class="text-xs text-slate-500" x-show="q.type === 'multi'">Tick every correct answer. The number is the share of points (e.g. 50 and 50; use −50 to take points off for a wrong tick).</p>
+                                    <label x-show="q.type === 'mc'" class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" x-model="q.data.any_correct" x-on:change="if (!q.data.any_correct) { let f = false; q.data.options.forEach((o) => { if (o.weight > 0 && !f) { f = true } else o.weight = 0 }) }"> More than one answer is right – student picks one, and any right one gets full points</label>
+                                    <div x-show="q.type === 'multi'" class="space-y-1">
+                                        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="radio" :name="'aon' + q._k" :value="false" :checked="!q.data.all_or_nothing" x-on:change="q.data.all_or_nothing = false"> Partial points – each right tick earns its share</label>
+                                        <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="radio" :name="'aon' + q._k" :value="true" :checked="q.data.all_or_nothing" x-on:change="q.data.all_or_nothing = true"> All or nothing – must tick exactly all the right answers</label>
+                                        <p class="text-xs text-slate-500" x-show="!q.data.all_or_nothing">The number is the share of points (e.g. 50 and 50; use −50 to take points off for a wrong tick).</p>
+                                    </div>
                                 </div>
                             </template>
                             {{-- True / false --}}
@@ -170,7 +175,7 @@ Match the planets. { =Earth -> 3rd =Mars -> 4th }"></textarea>
                 add(type) { const q = { type, title: null, text: '', points: 1, data: blank(type), feedback: null, _k: ++k }; this.questions.push(q); this.open = q._k; this.$nextTick(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })) },
                 retype(q) { q.data = blank(q.type) },
                 toggleCorrect(q, j) {
-                    if (q.type === 'mc') { q.data.options.forEach((o, n) => o.weight = n === j ? 100 : 0); return }
+                    if (q.type === 'mc') { if (q.data.any_correct) { const o = q.data.options[j]; o.weight = o.weight > 0 ? 0 : 100 } else q.data.options.forEach((o, n) => o.weight = n === j ? 100 : 0); return }
                     const o = q.data.options[j]; o.weight = o.weight > 0 ? 0 : 100;
                     const right = q.data.options.filter((x) => x.weight > 0); right.forEach((x) => x.weight = Math.round(100 / right.length * 100) / 100);
                 },

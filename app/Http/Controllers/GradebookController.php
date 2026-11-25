@@ -224,36 +224,62 @@ class GradebookController extends Controller
         $u = $request->user();
         $sy = SchoolYear::current();
         $all = Section::where('school_year_id', $sy?->id)->with('gradeLevel', 'schoolYear')->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name])->values();
+        $isAdmin = $u->hasRole(Role::ADMIN, Role::REGISTRAR);
         // Teachers see their advisory class; the admin and registrar supervise every section.
-        $mine = $u->role === Role::TEACHER ? $all->where('adviser_id', $u->id)->values() : $all;
-        $section = $mine->firstWhere('id', (int) $request->query('section_id')) ?? $mine->first();
-        $scope = $request->query('scope') === 'level' ? 'level' : 'section';
-        // Whole grade level: every section of that level (results are public honors, so teachers may see them).
-        $sections = $section ? ($scope === 'level' ? $all->where('grade_level_id', $section->grade_level_id)->values() : collect([$section])) : collect();
+        $mine = $isAdmin ? $all : $all->where('adviser_id', $u->id)->values();
+        // Sections that actually have grades – so the page never opens on an empty class.
+        $graded = $mine->filter(fn ($s) => \App\Models\Assessment::whereIn('class_subject_id', $s->classSubjects()->select('id'))->exists())->values();
+        $scope = in_array($request->query('scope'), ['section', 'level', 'school'], true) ? $request->query('scope') : ($isAdmin ? 'level' : 'section');
+        if (! $isAdmin && $scope === 'school') {
+            $scope = 'level';
+        }
+        $section = $mine->firstWhere('id', (int) $request->query('section_id'));
+        $levelId = (int) $request->query('level_id') ?: ($section?->grade_level_id ?? ($graded->first() ?? $mine->first())?->grade_level_id);
+        if (! $isAdmin) {
+            $section = $mine->first();                        // a teacher's advisory
+            $levelId = $section?->grade_level_id;
+        } elseif ($scope === 'section' && ! $section) {
+            $section = $graded->firstWhere('grade_level_id', $levelId) ?? $mine->firstWhere('grade_level_id', $levelId);
+        }
+        $sections = match ($scope) {
+            'school' => $graded->isNotEmpty() ? $graded : $all,
+            'level' => $all->where('grade_level_id', $levelId)->values(),
+            default => $section ? collect([$section]) : collect(),
+        };
+        $section ??= $sections->first();
         $terms = $section?->gradeLevel->terms ?: 4;
         if ($request->query('term') === 'final') {
             $term = null;
         } elseif ($request->filled('term')) {
             $term = min(max((int) $request->query('term'), 1), $terms);
         } else {
-            // Default: the latest grading period every class in the section already submitted, else Q1.
-            $done = $section ? collect(range($terms, 1))->first(fn ($t) => $section->classSubjects()->get()->every(fn ($cs) => $cs->isLocked($t))) : null;
+            // Default: the latest grading period whose classes are all submitted, else the first.
+            $classes = \App\Models\ClassSubject::whereIn('section_id', $sections->pluck('id'))->get();
+            $done = $classes->isEmpty() ? null : collect(range($terms, 1))->first(fn ($t) => $classes->every(fn ($cs) => $cs->isLocked($t)));
             $term = $done ?? 1;
         }
         $rows = \App\Services\Honors::rows($sections, $term);
-        $own = $section ? collect([$section]) : collect();   // perfect attendance and special awards: the section only
+        // Perfect attendance and special awards: the section only (or everything the admin is looking at).
+        $own = $scope === 'section' ? collect([$section])->filter() : $sections;
 
         $n = $scope === 'section' ? \App\Services\Honors::topN($section) : \App\Services\Honors::topN();
-        // Grade-level standing, for the "also Top 2 in the whole grade level" surprises in the show.
-        $levelRows = $scope === 'level' ? $rows : ($section ? \App\Services\Honors::rows($all->where('grade_level_id', $section->grade_level_id)->values(), $term) : collect());
-        $levelRank = \App\Services\Honors::top($levelRows, \App\Services\Honors::topN())->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['rank']]);
-        $levelSubject = \App\Services\Honors::bestPerSubject($levelRows)->map(fn ($list) => $list->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['place']]));
+        // One level up, for the "also Top 2 in the whole grade level / school" surprises in the show.
+        $upRows = match ($scope) {
+            'section' => $section ? \App\Services\Honors::rows($all->where('grade_level_id', $section->grade_level_id)->values(), $term) : collect(),
+            'level' => $isAdmin ? \App\Services\Honors::rows($graded, $term) : collect(),
+            default => collect(),
+        };
+        $levelRank = \App\Services\Honors::top($upRows, \App\Services\Honors::topN())->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['rank']]);
+        $levelSubject = \App\Services\Honors::bestPerSubject($upRows)->map(fn ($list) => $list->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['place']]));
+        // Overall show: each grade level's top 3, then the school's top N.
+        $byLevel = $scope === 'school' ? $rows->groupBy(fn ($r) => $r['section']->grade_level_id)->map(fn ($g) => ['level' => $g->first()['section']->gradeLevel, 'top' => \App\Services\Honors::top($g, 3)])->sortBy(fn ($x) => $x['level']->sort_order)->values() : collect();
+        $levels = \App\Models\GradeLevel::whereIn('id', $mine->pluck('grade_level_id'))->orderBy('sort_order')->get();
 
         return view('gradebook.honors', [
-            'sections' => $mine->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
-            'section' => $section, 'scope' => $scope, 'terms' => $terms, 'term' => $term, 'n' => $n,
-            'levelRank' => $levelRank, 'levelSubject' => $levelSubject, 'levelN' => \App\Services\Honors::topN(),
-            'canPlay' => $scope === 'section' || $u->hasRole(Role::ADMIN, Role::REGISTRAR),
+            'sections' => $mine->where('grade_level_id', $levelId)->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
+            'section' => $section, 'scope' => $scope, 'terms' => $terms, 'term' => $term, 'n' => $n, 'levels' => $levels, 'levelId' => $levelId, 'isAdmin' => $isAdmin,
+            'levelRank' => $levelRank, 'levelSubject' => $levelSubject, 'levelN' => \App\Services\Honors::topN(), 'byLevel' => $byLevel,
+            'canPlay' => $scope === 'section' || $isAdmin,
             'canSetN' => $section && ($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $section->adviser_id === $u->id),
             'top' => \App\Services\Honors::top($rows, $n),
             'ranked' => $rows->whereNotNull('average')->where('failed', false)->count(),

@@ -58,6 +58,8 @@ class DemoSeeder extends Seeder
         $mk('Mang Jun Dela Rosa', 'guard@school.test', Role::GUARD);
         $teachers = collect([
             ['Ana Villanueva', 'teacher@school.test'], ['Mark Bautista', 'teacher2@school.test'], ['Grace Mendoza', 'teacher3@school.test'], ['Paolo Navarro', 'teacher4@school.test'],
+            ['Liza Soriano', 'teacher5@school.test'], ['Ramon Dizon', 'teacher6@school.test'], ['Joy Pascual', 'teacher7@school.test'], ['Edwin Salazar', 'teacher8@school.test'],
+            ['Cecilia Manalo', 'teacher9@school.test'], ['Arnel Ocampo', 'teacher10@school.test'], ['Rhea Bernardo', 'teacher11@school.test'], ['Victor Lim', 'teacher12@school.test'],
         ])->map(fn ($t) => $mk($t[0], $t[1], Role::TEACHER));
         foreach ($teachers as $i => $t) {
             Employee::firstOrCreate(['employee_no' => 'EMP-'.str_pad($i + 1, 3, '0', STR_PAD_LEFT)], ['user_id' => $t->id, 'first_name' => explode(' ', $t->name)[0], 'last_name' => explode(' ', $t->name)[1], 'position' => 'Teacher I', 'department' => 'Academics', 'monthly_salary' => 27000 + $i * 1500, 'date_hired' => now()->subYears($i + 1)]);
@@ -69,14 +71,26 @@ class DemoSeeder extends Seeder
         foreach (range(101, 106) as $no) {
             Room::firstOrCreate(['name' => 'Room '.$no], ['building' => 'Main building', 'capacity' => $no <= 104 ? 40 : 30]);
         }
+        // Two sections in every grade level (Grade 1 – 12) so the overall awards have lots to show.
         $plan = [['Grade 7', 'Rizal', 0], ['Grade 7', 'Bonifacio', 1], ['Grade 8', 'Mabini', 2]];
+        if (! app()->runningUnitTests()) {
+            $plan[] = ['Grade 8', 'Luna', 3];
+        }
+        $names = ['Sampaguita', 'Ilang-Ilang', 'Rosal', 'Camia', 'Dama de Noche', 'Gumamela', 'Orchid', 'Jasmine', 'Narra', 'Molave', 'Acacia', 'Mahogany',
+            'Diamond', 'Emerald', 'Ruby', 'Sapphire', 'Jade', 'Pearl', 'Aguinaldo', 'Del Pilar', 'Jacinto', 'Silang'];
+        $ni = 0;
+        foreach (app()->runningUnitTests() ? [] : [1, 2, 3, 4, 5, 6, 9, 10, 11, 12] as $g) {   // tests stay fast
+            foreach ([0, 1] as $k) {
+                $plan[] = ['Grade '.$g, $names[$ni++ % count($names)], ($g + $k) % 12];
+            }
+        }
         $n = 0;
         foreach ($plan as [$levelName, $secName, $adv]) {
             $level = GradeLevel::where('name', $levelName)->first();
-            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'room' => 'Room '.(101 + $adv), 'capacity' => 40]);
+            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'room' => 'Room '.(101 + $adv % 6), 'capacity' => 40]);
             $times = [['07:30', '08:30'], ['08:30', '09:30'], ['09:45', '10:45'], ['10:45', '11:45'], ['13:00', '14:00'], ['14:00', '15:00'], ['15:00', '16:00'], ['16:00', '17:00']];
             foreach ($level->subjects as $i => $sub) {
-                $cs = ClassSubject::firstOrCreate(['section_id' => $section->id, 'subject_id' => $sub->id], ['teacher_id' => $teachers[($i + $adv) % 4]->id]);
+                $cs = ClassSubject::firstOrCreate(['section_id' => $section->id, 'subject_id' => $sub->id], ['teacher_id' => $teachers[($i + $adv) % count($teachers)]->id]);
                 if ($cs->slots()->doesntExist()) {
                     foreach ([1, 2, 3, 4, 5] as $d) {
                         $cs->slots()->create(['day_of_week' => $d, 'starts_at' => $times[$i % 8][0], 'ends_at' => $times[$i % 8][1], 'room' => $section->room]);
@@ -86,7 +100,7 @@ class DemoSeeder extends Seeder
             for ($k = 0; $k < 12; $k++, $n++) {
                 $sex = $n % 2 ? 'Female' : 'Male';
                 $st = Student::firstOrCreate(['lrn' => '1'.str_pad((string) (40000000000 + $n), 11, '0', STR_PAD_LEFT)], [
-                    'first_name' => $first[$n % count($first)], 'middle_name' => $last[($n + 3) % count($last)], 'last_name' => $last[$n % count($last)],
+                    'first_name' => $first[($n < 36 ? $n : $n * 7 + 3) % count($first)], 'middle_name' => $last[($n + 3) % count($last)], 'last_name' => $last[($n < 36 ? $n : $n * 11 + 5) % count($last)],
                     'sex' => $sex, 'birthdate' => Carbon::create(2013 - ($level->sort_order - 7), ($n % 12) + 1, ($n % 27) + 1),
                     'address' => ($n + 10).' Mabuhay St., Quezon City', 'religion' => 'Roman Catholic',
                 ]);
@@ -135,7 +149,7 @@ class DemoSeeder extends Seeder
         $design = ['<div class="hero"><h2>Let\'s learn!</h2><p>Tap the star ⭐</p><button id="star">⭐</button><p id="msg"></p></div>',
             '.hero{padding:24px;border-radius:16px;text-align:center;background:linear-gradient(135deg,#eef2ff,#ecfeff);animation:rise .8s ease-out}h2{margin:0 0 6px}#star{font-size:40px;border:0;background:none;cursor:pointer;transition:transform .2s}#star:hover{transform:scale(1.3) rotate(15deg)}@keyframes rise{from{opacity:0;transform:translateY(20px)}}',
             'document.getElementById("star").onclick=()=>{document.getElementById("msg").textContent="Great job! 🎉"}'];
-        foreach (ClassSubject::whereHas('section', fn ($q) => $q->where('school_year_id', $sy->id))->with('subject')->get() as $cs) {
+        foreach (ClassSubject::whereHas('section', fn ($q) => $q->where('school_year_id', $sy->id)->whereIn('name', ['Rizal', 'Bonifacio', 'Mabini', 'Luna']))->with('subject')->get() as $cs) {
             if ($cs->assignments()->exists()) {
                 continue;
             }

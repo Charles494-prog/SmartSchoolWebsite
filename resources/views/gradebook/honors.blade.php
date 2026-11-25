@@ -1,15 +1,29 @@
 <x-layouts.app title="Top achievers & awards">
     @php
         $S = \App\Models\Setting::class;
-        $isAdmin = auth()->user()->hasRole('admin', 'registrar');
         $period = $term ? \App\Support\School::periodName($terms).' '.$term : 'Whole school year (so far)';
-        $where = $scope === 'level' ? ($section?->gradeLevel->name.' – all sections') : $section?->label();
+        $levelName = $levels->firstWhere('id', $levelId)?->name ?? $section?->gradeLevel->name;
+        $where = match ($scope) { 'school' => 'Whole school', 'level' => $levelName.' – all sections', default => $section?->label() };
+        $up = $scope === 'section' ? 'the entire '.$section?->gradeLevel->name : 'the whole school';
         $honorStyle = ['With Highest Honors' => 'bg-amber-100 text-amber-800 ring-amber-300', 'With High Honors' => 'bg-slate-100 text-slate-700 ring-slate-300', 'With Honors' => 'bg-orange-100 text-orange-800 ring-orange-300'];
         $counts = $top->groupBy('honor')->map->count();
         // "Play awardees": from the least intense award to the top 1.
         $slides = [];
         $intro = fn ($title, $sub) => ['intro' => true, 'title' => $title, 'sub' => $sub];
-        $slides[] = ['cover' => true, 'title' => ($scope === 'level' ? $section?->gradeLevel->name : $section?->label()).' Awarding Ceremony', 'sub' => $period, 'school' => (string) \App\Models\Setting::get('school_name')];
+        $grand = $scope === 'school';
+        $slides[] = ['cover' => true, 'grand' => $grand, 'title' => ($grand ? 'Overall' : ($scope === 'level' ? $levelName : $section?->label())).' Awarding Ceremony', 'sub' => $period, 'school' => (string) \App\Models\Setting::get('school_name')];
+        if ($grand) {
+            // Superadmin's overall show: each grade level's top 3, then the school's top N with a crown for #1.
+            foreach ($byLevel as $lv) {
+                if ($lv['top']->isEmpty()) { continue; }
+                $slides[] = $intro($lv['level']->name, 'Top 3 of the grade level');
+                foreach ($lv['top']->reverse()->values() as $r) {
+                    $rk = (int) $r['rank'];
+                    $slides[] = ['icon' => [1 => '🏆', 2 => '🥈', 3 => '🥉'][$rk] ?? '🎖️', 'kind' => $lv['level']->name.' · Rank #'.$rk, 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $r['section']->name, 'tier' => $rk];
+                }
+            }
+            $perfect = collect(); $approved = collect(); $bestSubject = collect();   // the overall show focuses on the top achievers
+        }
         if ($perfect->isNotEmpty()) {
             $slides[] = $intro('Perfect attendance', 'Never absent, never late');
             foreach ($perfect as $p) { $slides[] = ['icon' => '🏅', 'kind' => 'Perfect attendance', 'name' => $p['student']->full_name, 'detail' => $p['days'].' school days', 'section' => $p['section']->name]; }
@@ -23,24 +37,24 @@
             foreach ($bestSubject as $sub => $list) {
                 foreach ($list->where('place', 1) as $w) {
                     $sid = $w['enrollment']->student_id;
-                    $lp = $scope === 'section' ? ($levelSubject[$sub][$sid] ?? null) : null;
-                    $also = $lp ? ['Also '.($lp === 1 ? '#1' : 'Top '.$lp).' in '.$sub.' in the whole '.$section->gradeLevel->name] : [];
+                    $lp = $scope !== 'school' ? ($levelSubject[$sub][$sid] ?? null) : null;
+                    $also = $lp ? ['Also '.($lp === 1 ? '#1' : 'Top '.$lp).' in '.$sub.' in '.$up] : [];
                     $slides[] = ['icon' => $scope === 'level' ? '🏆' : '⭐', 'kind' => 'Best in '.$sub.($scope === 'section' ? ' in the section' : ''), 'name' => $w['enrollment']->student->full_name, 'detail' => 'Grade '.$w['grade'], 'section' => $scope === 'level' ? $w['section']->name : '', 'also' => $also];
                 }
             }
         }
         if ($top->isNotEmpty()) {
-            $slides[] = $intro('Top '.$n.' achievers', $period);
+            $slides[] = $intro($grand ? 'Overall Top '.$n : 'Top '.$n.' achievers', $grand ? 'The best of the whole school · '.$period : $period);
             foreach ($top->reverse()->values() as $r) {
                 $rank = (int) $r['rank'];
                 $sid = $r['enrollment']->student_id;
-                $lr = $scope === 'section' ? ($levelRank[$sid] ?? null) : null;
-                $also = $lr ? [($lr === 1 ? 'Also #1 in the entire ' : 'Also Top '.$lr.' in the entire ').$section->gradeLevel->name.'!'] : [];
+                $lr = $scope !== 'school' ? ($levelRank[$sid] ?? null) : null;
+                $also = $lr ? [($lr === 1 ? 'Also #1 in ' : 'Also Top '.$lr.' in ').$up.'!'] : [];
                 if ($rank === 1) {
-                    $slides[] = ['countdown' => true, 'title' => 'And the Top 1 is…'];
+                    $slides[] = ['countdown' => true, 'title' => $grand ? 'And the Top 1 of the whole school is…' : 'And the Top 1 is…'];
                 }
-                $icon = match ($rank) { 1 => $scope === 'level' ? '🏆' : '🥇', 2 => '🥈', 3 => '🥉', default => '🎖️' };
-                $slides[] = ['icon' => $icon, 'kind' => 'Rank #'.$rank, 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $scope === 'level' ? $r['section']->name : '', 'tier' => $rank <= 3 ? $rank : 0, 'also' => $also];
+                $icon = match ($rank) { 1 => $grand ? '👑' : ($scope === 'level' ? '🏆' : '🥇'), 2 => '🥈', 3 => '🥉', default => '🎖️' };
+                $slides[] = ['grand' => $grand && $rank === 1, 'icon' => $icon, 'kind' => 'Rank #'.$rank, 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $scope !== 'section' ? $r['section']->gradeLevel->name.' – '.$r['section']->name : '', 'tier' => $rank <= 3 ? $rank : 0, 'also' => $also];
             }
         }
     @endphp
@@ -53,10 +67,11 @@
                 <p class="muted">{{ $where }} · {{ $period }}</p>
             </div>
             <input type="hidden" name="tab" :value="tab">
-            <label><span class="mb-1 block text-xs font-medium text-slate-500">{{ $isAdmin ? 'Section' : 'My advisory class' }}</span>
-                <select name="section_id" class="input h-11" x-on:change="$refs.f.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select></label>
-            <label><span class="mb-1 block text-xs font-medium text-slate-500">Show</span>
-                <select name="scope" class="input h-11" x-on:change="$refs.f.submit()"><option value="section" @selected($scope === 'section')>{{ $isAdmin ? 'This section' : 'My advisory' }}</option><option value="level" @selected($scope === 'level')>Whole grade level</option></select></label>
+            <input type="hidden" name="scope" value="{{ $scope }}"><input type="hidden" name="level_id" value="{{ $levelId }}">
+            @if($isAdmin && $scope === 'section')
+                <label><span class="mb-1 block text-xs font-medium text-slate-500">Section</span>
+                    <select name="section_id" class="input h-11" x-on:change="$refs.f.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select></label>
+            @endif
             <label><span class="mb-1 block text-xs font-medium text-slate-500">Period</span>
                 <select name="term" class="input h-11" x-on:change="$refs.f.submit()">
                     @foreach(range(1, $terms) as $t)<option value="{{ $t }}" @selected($term === $t)>{{ \App\Support\School::periodName($terms) }} {{ $t }}</option>@endforeach
@@ -65,6 +80,19 @@
             <button type="button" x-on:click="window.print()" class="btn h-11">Print</button>
             @if($slides && $canPlay)<button type="button" class="btn btn-primary h-11" x-on:click="$dispatch('play-awardees')">▶ Play awardees</button>@endif
         </form>
+        @php $q = fn ($extra) => route('honors', array_merge(['tab' => request('tab', 'top'), 'term' => $term ?? 'final'], $extra)); @endphp
+        <div class="-mt-2 mb-5 flex flex-wrap gap-2 print:hidden">
+            @if($isAdmin)
+                @foreach($levels as $lv)
+                    <a href="{{ $q(['scope' => 'level', 'level_id' => $lv->id]) }}" class="rounded-full border px-3 py-1.5 text-sm font-medium {{ $scope === 'level' && $levelId == $lv->id ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:text-slate-300' }}">{{ $lv->name }}</a>
+                @endforeach
+                <a href="{{ $q(['scope' => 'school']) }}" class="rounded-full border px-3 py-1.5 text-sm font-semibold {{ $scope === 'school' ? 'border-amber-500 bg-amber-500 text-white' : 'border-amber-300 text-amber-700 hover:bg-amber-50 dark:text-amber-300' }}">👑 Overall</a>
+                <a href="{{ $q(['scope' => 'section', 'level_id' => $levelId]) }}" class="ml-auto rounded-full border px-3 py-1.5 text-sm {{ $scope === 'section' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300' }}">One section…</a>
+            @elseif($section)
+                <a href="{{ $q(['scope' => 'section']) }}" class="rounded-full border px-3 py-1.5 text-sm font-medium {{ $scope === 'section' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300' }}">My advisory · {{ $section->name }}</a>
+                <a href="{{ $q(['scope' => 'level']) }}" class="rounded-full border px-3 py-1.5 text-sm font-medium {{ $scope === 'level' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300' }}">{{ $section->gradeLevel->name }} – all sections</a>
+            @endif
+        </div>
         <h1 class="mb-4 hidden text-2xl font-bold print:block">Top achievers – {{ $where }} · {{ $period }}</h1>
 
         {{-- Tabs --}}
@@ -98,7 +126,7 @@
                     @foreach([1, 0, 2] as $pos)
                         @php
                             $r = $top[$pos];
-                            $step = [['h-40 sm:h-48', 'border-amber-400 bg-amber-50 dark:bg-amber-500/10', $scope === 'level' ? '🏆' : '🥇', 'text-amber-600'], ['h-28 sm:h-36', 'border-slate-400 bg-slate-100 dark:bg-slate-800', '🥈', 'text-slate-500'], ['h-20 sm:h-24', 'border-orange-400 bg-orange-50 dark:bg-orange-500/10', '🥉', 'text-orange-600']][$pos];
+                            $step = [['h-40 sm:h-48', 'border-amber-400 bg-amber-50 dark:bg-amber-500/10', $scope === 'school' ? '👑' : ($scope === 'level' ? '🏆' : '🥇'), 'text-amber-600'], ['h-28 sm:h-36', 'border-slate-400 bg-slate-100 dark:bg-slate-800', '🥈', 'text-slate-500'], ['h-20 sm:h-24', 'border-orange-400 bg-orange-50 dark:bg-orange-500/10', '🥉', 'text-orange-600']][$pos];
                             $url = route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']);
                         @endphp
                         <a href="{{ $url }}" class="group flex flex-col items-center text-center">
@@ -282,7 +310,7 @@
                     <template x-if="s.cover">
                         <div>
                             <p class="text-sm font-semibold uppercase tracking-[.35em] text-white/50" x-text="s.school"></p>
-                            <div class="mt-6 text-7xl">🏆</div>
+                            <div class="mt-6" :class="s.grand ? 'text-8xl' : 'text-7xl'" x-text="s.grand ? '👑' : '🏆'"></div>
                             <h2 class="mt-6 text-5xl font-bold leading-tight sm:text-7xl" x-text="s.title"></h2>
                             <p class="mt-4 text-2xl text-amber-300" x-text="s.sub"></p>
                             <p class="mx-auto mt-14 flex w-fit items-center gap-3 rounded-full border border-white/20 px-5 py-2.5 text-base text-white/70">
@@ -308,9 +336,10 @@
                     {{-- a student --}}
                     <template x-if="!s.intro && !s.countdown && !s.cover">
                         <div :class="s.tier === 1 && 'reveal-one'">
+                            <p x-show="s.grand" class="mb-2 text-sm font-bold uppercase tracking-[.4em] text-yellow-300">Top of the whole school</p>
                             <div class="relative mx-auto flex h-48 w-48 items-center justify-center sm:h-60 sm:w-60">
                                 <template x-if="s.tier"><span class="absolute inset-0 animate-ping rounded-full" :class="{ 'border-8 border-amber-400/70': s.tier === 1, 'border-4 border-slate-300/40': s.tier === 2, 'border-4 border-orange-400/40': s.tier === 3 }"></span></template>
-                                <span :class="s.tier === 1 ? 'text-9xl sm:text-[11rem] animate-bounce' : (s.tier ? 'text-8xl sm:text-9xl' : 'text-7xl sm:text-8xl')" x-text="s.icon"></span>
+                                <span :class="s.grand ? 'text-[9rem] sm:text-[13rem] animate-bounce drop-shadow-[0_0_40px_rgba(250,204,21,.7)]' : s.tier === 1 ? 'text-9xl sm:text-[11rem] animate-bounce' : (s.tier ? 'text-8xl sm:text-9xl' : 'text-7xl sm:text-8xl')" x-text="s.icon"></span>
                             </div>
                             <p class="mt-4 font-semibold uppercase tracking-[.25em]" :class="s.tier === 1 ? 'text-2xl text-amber-300' : 'text-lg text-amber-400'" x-text="s.kind"></p>
                             <h2 class="mt-3 font-bold" :class="s.tier === 1 ? 'text-6xl sm:text-8xl' : 'text-5xl sm:text-7xl'" x-text="s.name"></h2>
@@ -344,7 +373,7 @@
                 next() { if (this.slides[this.i]?.countdown && this.count > 0) return; if (this.i < this.slides.length - 1) { this.i++; this.enter() } else this.stop() },
                 prev() { if (this.i > 0) { this.i--; this.enter() } },
                 // Background darkens and warms up as we get closer to #1.
-                bg() { const s = this.slides[this.i] || {}; return s.countdown ? 'bg-black' : ({ 1: 'bg-amber-950', 2: 'bg-slate-900', 3: 'bg-orange-950' }[s.tier] || 'bg-slate-950') },
+                bg() { const s = this.slides[this.i] || {}; return s.countdown ? 'bg-black' : (s.grand ? 'bg-yellow-950' : ({ 1: 'bg-amber-950', 2: 'bg-slate-900', 3: 'bg-orange-950' }[s.tier] || 'bg-slate-950')) },
                 enter() {
                     clearInterval(this.cd); this.showAlso = false;
                     const s = this.slides[this.i] || {};
@@ -354,7 +383,8 @@
                         return;
                     }
                     setTimeout(() => this.showAlso = true, s.tier === 1 ? 2200 : 1300);   // the surprise comes after the name
-                    if (s.tier === 1) setTimeout(() => this.confetti(6000), 600);
+                    if (s.grand && s.tier === 1) { setTimeout(() => this.confetti(12000, 450), 400); setTimeout(() => this.confetti(9000, 300), 3000) }
+                    else if (s.tier === 1) setTimeout(() => this.confetti(6000), 600);
                     else if (s.tier) setTimeout(() => this.confetti(1200, 60), 400);
                     this.tick();
                 },

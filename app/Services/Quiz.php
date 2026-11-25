@@ -107,8 +107,12 @@ class Quiz
         $options = array_map(fn ($t) => ['text' => self::unescape(trim($t[2])), 'weight' => $t[1], 'feedback' => $t[3] !== null ? self::unescape(trim($t[3])) : null], $tokens);
         $full = collect($options)->where('weight', 100)->count();
         $partial = collect($options)->contains(fn ($o) => $o['weight'] > 0 && $o['weight'] < 100);
+        if (! $partial && $full >= 1) {
+            // Like Moodle: several "=" answers means any one of them is right (still pick one).
+            return $q + ['type' => 'mc', 'data' => ['options' => $options, 'any_correct' => $full > 1]];
+        }
 
-        return $q + ['type' => ($full === 1 && ! $partial) ? 'mc' : 'multi', 'data' => ['options' => $options]];
+        return $q + ['type' => 'multi', 'data' => ['options' => $options]];
     }
 
     /** Split "=a ~b ~%50%c#fb" into [mark, weight, body, feedback]. */
@@ -234,7 +238,10 @@ class Quiz
         $pts = (float) $q->points;
         $frac = match ($q->type) {
             'mc' => (float) (($d['options'][(int) $answer]['weight'] ?? 0) / 100),
-            'multi' => max(0, array_sum(array_map(fn ($i) => (float) ($d['options'][(int) $i]['weight'] ?? 0), (array) $answer)) / 100),
+            'multi' => ! empty($d['all_or_nothing'])
+                // All-or-nothing: full points only when exactly the right boxes are ticked.
+                ? (collect((array) $answer)->map(fn ($i) => (int) $i)->sort()->values()->all() === collect($d['options'] ?? [])->filter(fn ($o) => $o['weight'] > 0)->keys()->sort()->values()->all() ? 1 : 0)
+                : max(0, array_sum(array_map(fn ($i) => (float) ($d['options'][(int) $i]['weight'] ?? 0), (array) $answer)) / 100),
             'tf' => $answer === null || $answer === '' ? 0 : ((filter_var($answer, FILTER_VALIDATE_BOOLEAN) === (bool) $d['answer']) ? 1 : 0),
             'short' => (float) (collect($d['answers'] ?? [])->filter(fn ($x) => Str::lower(trim((string) $x['text'])) === Str::lower(trim((string) $answer)))->max('weight') ?? 0) / 100,
             'numeric' => is_numeric($answer) ? (float) (collect($d['answers'] ?? [])->filter(fn ($x) => abs((float) $answer - (float) $x['value']) <= (float) $x['tolerance'] + 1e-9)->max('weight') ?? 0) / 100 : 0,
