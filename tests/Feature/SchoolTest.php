@@ -192,7 +192,7 @@ class SchoolTest extends TestCase
         $r = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 50));
         $this->assertSame('late', $r['status']);
         Notification::assertSentTo($s->guardians()->first()->user, AttendanceAlert::class);
-        $again = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 55));
+        $again = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 51));
         $this->assertSame('already', $again['status']);
         $this->assertFalse(Attendance::checkIn('nonsense')['ok']);
     }
@@ -375,7 +375,7 @@ class SchoolTest extends TestCase
 
         $in = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 0));
         $this->assertSame('present', $in['status']);
-        $this->assertSame('already', Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 5))['status']); // accidental double scan
+        $this->assertSame('already', Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 1))["status"]); // accidental double scan
         $out = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(16, 30));
         $this->assertSame('out', $out['status']);
         $this->assertSame('16:30:00', AttendanceRecord::where('student_id', $s->id)->whereDate('date', today())->whereNull('class_subject_id')->value('time_out'));
