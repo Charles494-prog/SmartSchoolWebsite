@@ -166,6 +166,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/honors', [GradebookController::class, 'honors'])->name('honors');
         Route::get('/honors/student/{student}', [GradebookController::class, 'journey'])->name('honors.journey');
         Route::post('/honors/awards', [GradebookController::class, 'saveAward'])->name('honors.awards.store');
+        Route::post('/honors/sections/{section}/top', [GradebookController::class, 'setTopN'])->name('honors.top');
         Route::post('/honors/awards/{award}/toggle', [GradebookController::class, 'toggleAward'])->name('honors.awards.toggle');
         Route::post('/honors/nominations', [GradebookController::class, 'nominate'])->name('honors.nominate');
         Route::post('/honors/nominations/{nomination}', [GradebookController::class, 'reviewNomination'])->name('honors.nominations.review');

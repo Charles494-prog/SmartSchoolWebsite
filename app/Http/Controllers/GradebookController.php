@@ -243,10 +243,19 @@ class GradebookController extends Controller
         $rows = \App\Services\Honors::rows($sections, $term);
         $own = $section ? collect([$section]) : collect();   // perfect attendance and special awards: the section only
 
+        $n = $scope === 'section' ? \App\Services\Honors::topN($section) : \App\Services\Honors::topN();
+        // Grade-level standing, for the "also Top 2 in the whole grade level" surprises in the show.
+        $levelRows = $scope === 'level' ? $rows : ($section ? \App\Services\Honors::rows($all->where('grade_level_id', $section->grade_level_id)->values(), $term) : collect());
+        $levelRank = \App\Services\Honors::top($levelRows, \App\Services\Honors::topN())->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['rank']]);
+        $levelSubject = \App\Services\Honors::bestPerSubject($levelRows)->map(fn ($list) => $list->mapWithKeys(fn ($r) => [$r['enrollment']->student_id => $r['place']]));
+
         return view('gradebook.honors', [
             'sections' => $mine->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
-            'section' => $section, 'scope' => $scope, 'terms' => $terms, 'term' => $term,
-            'top' => \App\Services\Honors::top($rows),
+            'section' => $section, 'scope' => $scope, 'terms' => $terms, 'term' => $term, 'n' => $n,
+            'levelRank' => $levelRank, 'levelSubject' => $levelSubject, 'levelN' => \App\Services\Honors::topN(),
+            'canPlay' => $scope === 'section' || $u->hasRole(Role::ADMIN, Role::REGISTRAR),
+            'canSetN' => $section && ($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $section->adviser_id === $u->id),
+            'top' => \App\Services\Honors::top($rows, $n),
             'ranked' => $rows->whereNotNull('average')->where('failed', false)->count(),
             'private' => $rows->where('failed', true)->count(),
             'bestSubject' => \App\Services\Honors::bestPerSubject($rows),
@@ -284,6 +293,17 @@ class GradebookController extends Controller
         });
 
         return view('gradebook.journey', compact('student', 'e', 'terms', 'term', 'subjects', 'avgByTerm', 'rc', 'lockedTerms'));
+    }
+
+    /** Advisers set their own section's list length (Top 10, 15, 20…) – no approval needed. */
+    public function setTopN(Request $request, Section $section)
+    {
+        $u = $request->user();
+        abort_unless($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $section->adviser_id === $u->id, 403);
+        $n = $request->validate(['n' => 'nullable|integer|between:3,100'])['n'] ?? null;
+        \App\Models\Setting::put('honors_top_n_section_'.$section->id, $n ? (string) $n : '');
+
+        return back()->with('ok', $n ? "This section now shows the top {$n}." : 'Using the school\'s setting again.');
     }
 
     /** Admins and advisers can add awards to the list (e.g. "Best in Science Fair"). */

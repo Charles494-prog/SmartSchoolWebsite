@@ -15,9 +15,12 @@ use Illuminate\Support\Collection;
  */
 class Honors
 {
-    public static function topN(): int
+    /** How many to list: the adviser's choice for their section, else the school's (setup/settings). */
+    public static function topN(?Section $section = null): int
     {
-        return max(3, (int) (Setting::get('honors_top_n') ?: 10));
+        $own = $section ? Setting::get('honors_top_n_section_'.$section->id) : null;
+
+        return max(3, (int) ($own ?: Setting::get('honors_top_n') ?: 10));
     }
 
     /**
@@ -45,8 +48,9 @@ class Honors
     }
 
     /** Ranked list (ties share a rank), passing students only, cut at the configured top N. */
-    public static function top(Collection $rows): Collection
+    public static function top(Collection $rows, ?int $n = null): Collection
     {
+        $n ??= self::topN();
         $list = $rows->whereNotNull('average')->where('failed', false)->sortByDesc('average')->values();
         $rank = 0;
         $prev = null;
@@ -56,7 +60,7 @@ class Honors
                 $rank = $i + 1;
                 $prev = $r['average'];
             }
-            if ($rank > self::topN()) {
+            if ($rank > $n) {
                 break;
             }
             $out->push($r + ['rank' => $rank]);

@@ -6,7 +6,6 @@
         $where = $scope === 'level' ? ($section?->gradeLevel->name.' – all sections') : $section?->label();
         $honorStyle = ['With Highest Honors' => 'bg-amber-100 text-amber-800 ring-amber-300', 'With High Honors' => 'bg-slate-100 text-slate-700 ring-slate-300', 'With Honors' => 'bg-orange-100 text-orange-800 ring-orange-300'];
         $counts = $top->groupBy('honor')->map->count();
-        $n = \App\Services\Honors::topN();
         // "Play awardees": from the least intense award to the top 1.
         $slides = [];
         $intro = fn ($title, $sub) => ['intro' => true, 'title' => $title, 'sub' => $sub];
@@ -20,13 +19,27 @@
         }
         if ($bestSubject->isNotEmpty()) {
             $slides[] = $intro('Best in each subject', 'The highest grade in every subject');
-            foreach ($bestSubject as $sub => $list) { foreach ($list->where('place', 1) as $w) { $slides[] = ['icon' => $scope === 'level' ? '🏆' : '⭐', 'kind' => 'Best in '.$sub, 'name' => $w['enrollment']->student->full_name, 'detail' => 'Grade '.$w['grade'], 'section' => $scope === 'level' ? $w['section']->name : '']; } }
+            foreach ($bestSubject as $sub => $list) {
+                foreach ($list->where('place', 1) as $w) {
+                    $sid = $w['enrollment']->student_id;
+                    $lp = $scope === 'section' ? ($levelSubject[$sub][$sid] ?? null) : null;
+                    $also = $lp ? ['Also '.($lp === 1 ? '#1' : 'Top '.$lp).' in '.$sub.' in the whole '.$section->gradeLevel->name] : [];
+                    $slides[] = ['icon' => $scope === 'level' ? '🏆' : '⭐', 'kind' => 'Best in '.$sub.($scope === 'section' ? ' in the section' : ''), 'name' => $w['enrollment']->student->full_name, 'detail' => 'Grade '.$w['grade'], 'section' => $scope === 'level' ? $w['section']->name : '', 'also' => $also];
+                }
+            }
         }
         if ($top->isNotEmpty()) {
             $slides[] = $intro('Top '.$n.' achievers', $period);
-            foreach ($top->reverse() as $r) {
-                $icon = match ((int) $r['rank']) { 1 => $scope === 'level' ? '🏆' : '🥇', 2 => '🥈', 3 => '🥉', default => '🎖️' };
-                $slides[] = ['icon' => $icon, 'kind' => 'Rank #'.$r['rank'], 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $scope === 'level' ? $r['section']->name : '', 'top' => (int) $r['rank'] === 1];
+            foreach ($top->reverse()->values() as $r) {
+                $rank = (int) $r['rank'];
+                $sid = $r['enrollment']->student_id;
+                $lr = $scope === 'section' ? ($levelRank[$sid] ?? null) : null;
+                $also = $lr ? [($lr === 1 ? 'Also #1 in the entire ' : 'Also Top '.$lr.' in the entire ').$section->gradeLevel->name.'!'] : [];
+                if ($rank === 1) {
+                    $slides[] = ['countdown' => true, 'title' => 'And the Top 1 is…'];
+                }
+                $icon = match ($rank) { 1 => $scope === 'level' ? '🏆' : '🥇', 2 => '🥈', 3 => '🥉', default => '🎖️' };
+                $slides[] = ['icon' => $icon, 'kind' => 'Rank #'.$rank, 'name' => $r['enrollment']->student->full_name, 'detail' => 'Average '.$r['average'].($r['honor'] ? ' · '.$r['honor'] : ''), 'section' => $scope === 'level' ? $r['section']->name : '', 'tier' => $rank <= 3 ? $rank : 0, 'also' => $also];
             }
         }
     @endphp
@@ -49,7 +62,7 @@
                     <option value="final" @selected($term === null)>Whole year – live average</option>
                 </select></label>
             <button type="button" x-on:click="window.print()" class="btn h-11">Print</button>
-            @if($slides)<button type="button" class="btn btn-primary h-11" x-on:click="$dispatch('play-awardees')">▶ Play awardees</button>@endif
+            @if($slides && $canPlay)<button type="button" class="btn btn-primary h-11" x-on:click="$dispatch('play-awardees')">▶ Play awardees</button>@endif
         </form>
         <h1 class="mb-4 hidden text-2xl font-bold print:block">Top achievers – {{ $where }} · {{ $period }}</h1>
 
@@ -62,6 +75,15 @@
 
         {{-- TOP N --}}
         <div x-show="tab === 'top'">
+            @if($canSetN && $scope === 'section')
+                <form method="post" action="{{ route('honors.top', $section) }}" class="mb-4 flex flex-wrap items-center gap-2 text-sm print:hidden" x-data>@csrf
+                    <span class="text-slate-500">List length for {{ $section->name }}:</span>
+                    <select name="n" class="input h-9 w-auto py-0" x-on:change="$el.form.submit()">
+                        <option value="">School setting (Top {{ $levelN }})</option>
+                        @foreach([3, 5, 10, 15, 20, 30] as $opt)<option value="{{ $opt }}" @selected((int) \App\Models\Setting::get('honors_top_n_section_'.$section->id) === $opt)>Top {{ $opt }}</option>@endforeach
+                    </select>
+                </form>
+            @endif
             <div class="mb-6 grid gap-3 sm:grid-cols-4">
                 @foreach(['With Highest Honors' => $S::get('honors_with_highest'), 'With High Honors' => $S::get('honors_with_high'), 'With Honors' => $S::get('honors_with')] as $h => $min)
                     <div class="rounded-2xl p-4 ring-1 {{ $honorStyle[$h] }}"><div class="text-3xl font-bold">{{ $counts[$h] ?? 0 }}</div><div class="text-sm font-semibold">{{ $h }}</div><div class="text-xs opacity-75">average {{ $min }} and up</div></div>
@@ -240,49 +262,101 @@
         </div>
     </div>
 
-    {{-- Play awardees: full-screen, one student at a time --}}
+    {{-- Play awardees: full-screen, one student at a time; builds up to a countdown and the Top 1 reveal --}}
     <div x-data="awardShow(@js($slides))" x-on:play-awardees.window="start()" x-show="on" x-cloak
          x-on:keydown.window="if (on) { if (['ArrowRight', ' ', 'Enter'].includes($event.key)) { $event.preventDefault(); next() } if ($event.key === 'ArrowLeft') prev(); if ($event.key === 'Escape') stop() }"
-         class="fixed inset-0 z-[100] flex flex-col bg-slate-950 text-white" role="dialog" aria-modal="true" aria-label="Awardees">
-        <div class="flex items-center gap-3 px-6 py-4 text-sm text-white/60">
+         class="fixed inset-0 z-[100] flex flex-col overflow-hidden text-white transition-colors duration-1000" :class="bg()" role="dialog" aria-modal="true" aria-label="Awardees">
+        <canvas x-ref="confetti" class="pointer-events-none absolute inset-0 h-full w-full"></canvas>
+        <div class="relative z-10 flex items-center gap-3 px-6 py-4 text-sm text-white/60">
             <span class="mr-auto">{{ $where }} · {{ $period }}</span>
             <span x-text="(i + 1) + ' / ' + slides.length"></span>
             <button type="button" class="rounded-full bg-white/10 px-3 py-1.5 hover:bg-white/20" x-on:click="auto = !auto; tick()" x-text="auto ? 'Pause' : 'Auto-play'"></button>
             <button type="button" class="rounded-full bg-white/10 px-3 py-1.5 hover:bg-white/20" x-on:click="stop()">Exit</button>
         </div>
-        <div class="relative flex flex-1 items-center justify-center overflow-hidden px-6" x-on:click="next()">
+        <div class="relative z-10 flex flex-1 items-center justify-center px-6" x-on:click="next()">
             <template x-for="(s, k) in slides" :key="k">
-                <div x-show="i === k" x-transition:enter="transition duration-700 ease-out" x-transition:enter-start="opacity-0 translate-y-8 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                     x-transition:leave="transition duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute text-center">
-                    <template x-if="s.intro">
-                        <div><p class="text-sm font-semibold uppercase tracking-[.3em] text-amber-400">Next</p><h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.title"></h2><p class="mt-4 text-xl text-white/60" x-text="s.sub"></p></div>
-                    </template>
-                    <template x-if="!s.intro">
+                <div x-show="i === k" x-transition:enter="transition duration-700 ease-out" x-transition:enter-start="opacity-0 translate-y-10 scale-90" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute w-full max-w-5xl text-center">
+                    {{-- group title --}}
+                    <template x-if="s.intro"><div><p class="text-sm font-semibold uppercase tracking-[.3em] text-amber-400">Next</p><h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.title"></h2><p class="mt-4 text-xl text-white/60" x-text="s.sub"></p></div></template>
+                    {{-- drumroll countdown before #1 --}}
+                    <template x-if="s.countdown">
                         <div>
-                            <div class="text-7xl sm:text-9xl" :class="s.top && 'animate-bounce'" x-text="s.icon"></div>
-                            <p class="mt-6 text-lg font-semibold uppercase tracking-[.25em] text-amber-400" x-text="s.kind"></p>
-                            <h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.name"></h2>
-                            <p class="mt-4 text-2xl text-white/70" x-text="s.detail"></p>
+                            <p class="text-3xl font-semibold text-amber-300 sm:text-5xl" x-text="s.title"></p>
+                            <div class="relative mx-auto mt-10 flex h-56 w-56 items-center justify-center">
+                                <span class="absolute inset-0 animate-ping rounded-full border-4 border-amber-400/60"></span>
+                                <span class="absolute inset-6 animate-ping rounded-full border-4 border-amber-300/40 [animation-delay:.3s]"></span>
+                                <span class="text-9xl font-black tabular-nums text-white" x-text="count" :key="count"></span>
+                            </div>
+                        </div>
+                    </template>
+                    {{-- a student --}}
+                    <template x-if="!s.intro && !s.countdown">
+                        <div :class="s.tier === 1 && 'reveal-one'">
+                            <div class="relative mx-auto flex h-48 w-48 items-center justify-center sm:h-60 sm:w-60">
+                                <template x-if="s.tier"><span class="absolute inset-0 animate-ping rounded-full" :class="{ 'border-8 border-amber-400/70': s.tier === 1, 'border-4 border-slate-300/40': s.tier === 2, 'border-4 border-orange-400/40': s.tier === 3 }"></span></template>
+                                <span :class="s.tier === 1 ? 'text-9xl sm:text-[11rem] animate-bounce' : (s.tier ? 'text-8xl sm:text-9xl' : 'text-7xl sm:text-8xl')" x-text="s.icon"></span>
+                            </div>
+                            <p class="mt-4 font-semibold uppercase tracking-[.25em]" :class="s.tier === 1 ? 'text-2xl text-amber-300' : 'text-lg text-amber-400'" x-text="s.kind"></p>
+                            <h2 class="mt-3 font-bold" :class="s.tier === 1 ? 'text-6xl sm:text-8xl' : 'text-5xl sm:text-7xl'" x-text="s.name"></h2>
+                            <p class="mt-4 text-2xl text-white/75" x-text="s.detail"></p>
                             <p class="mt-1 text-lg text-white/40" x-text="s.section"></p>
+                            <template x-for="(a, n) in (s.also || [])" :key="n">
+                                <p x-show="showAlso" x-transition:enter="transition duration-700 ease-out" x-transition:enter-start="opacity-0 scale-50" x-transition:enter-end="opacity-100 scale-100"
+                                   class="mx-auto mt-6 w-fit rounded-full border-2 border-amber-400 bg-amber-400/15 px-6 py-2 text-xl font-bold text-amber-200 sm:text-2xl">✨ <span x-text="a"></span></p>
+                            </template>
                         </div>
                     </template>
                 </div>
             </template>
         </div>
-        <div class="flex justify-center gap-3 pb-8">
+        <div class="relative z-10 flex justify-center gap-3 pb-8">
             <button type="button" class="rounded-full bg-white/10 px-5 py-2 hover:bg-white/20" x-on:click="prev()">← Back</button>
             <button type="button" class="rounded-full bg-white px-6 py-2 font-semibold text-slate-900 hover:bg-white/90" x-on:click="next()" x-text="i === slides.length - 1 ? 'Finish' : 'Next →'"></button>
         </div>
     </div>
+    <style>
+        @keyframes reveal-one { 0% { transform: scale(.3) rotate(-8deg); filter: blur(12px); opacity: 0 } 60% { transform: scale(1.12) rotate(2deg); filter: blur(0); opacity: 1 } 80% { transform: scale(.97) } 100% { transform: scale(1) } }
+        .reveal-one { animation: reveal-one 1.4s cubic-bezier(.2,.8,.2,1) both }
+        @media (prefers-reduced-motion: reduce) { .reveal-one { animation: none } }
+    </style>
     <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         function awardShow(slides) {
             return {
-                slides, i: 0, on: false, auto: false, timer: null,
-                async start() { this.i = 0; this.on = true; try { await document.documentElement.requestFullscreen?.() } catch (e) {} },
-                async stop() { this.on = false; this.auto = false; clearTimeout(this.timer); if (document.fullscreenElement) { try { await document.exitFullscreen() } catch (e) {} } },
-                next() { if (this.i < this.slides.length - 1) { this.i++; this.tick() } else this.stop() },
-                prev() { if (this.i > 0) this.i-- },
-                tick() { clearTimeout(this.timer); if (this.auto && this.on) this.timer = setTimeout(() => this.next(), this.slides[this.i]?.intro ? 2500 : 4500) },
+                slides, i: 0, on: false, auto: false, timer: null, count: 3, showAlso: false, cd: null,
+                async start() { this.i = 0; this.on = true; this.enter(); try { await document.documentElement.requestFullscreen?.() } catch (e) {} },
+                async stop() { this.on = false; this.auto = false; clearTimeout(this.timer); clearInterval(this.cd); if (document.fullscreenElement) { try { await document.exitFullscreen() } catch (e) {} } },
+                next() { if (this.slides[this.i]?.countdown && this.count > 0) return; if (this.i < this.slides.length - 1) { this.i++; this.enter() } else this.stop() },
+                prev() { if (this.i > 0) { this.i--; this.enter() } },
+                // Background darkens and warms up as we get closer to #1.
+                bg() { const s = this.slides[this.i] || {}; return s.countdown ? 'bg-black' : ({ 1: 'bg-amber-950', 2: 'bg-slate-900', 3: 'bg-orange-950' }[s.tier] || 'bg-slate-950') },
+                enter() {
+                    clearInterval(this.cd); this.showAlso = false;
+                    const s = this.slides[this.i] || {};
+                    if (s.countdown) {
+                        this.count = 3;
+                        this.cd = setInterval(() => { this.count--; if (this.count <= 0) { clearInterval(this.cd); setTimeout(() => this.next(), 500) } }, 1000);
+                        return;
+                    }
+                    setTimeout(() => this.showAlso = true, s.tier === 1 ? 2200 : 1300);   // the surprise comes after the name
+                    if (s.tier === 1) setTimeout(() => this.confetti(6000), 600);
+                    else if (s.tier) setTimeout(() => this.confetti(1200, 60), 400);
+                    this.tick();
+                },
+                tick() { clearTimeout(this.timer); const s = this.slides[this.i] || {}; if (this.auto && this.on && !s.countdown) this.timer = setTimeout(() => this.next(), s.intro ? 2500 : (s.tier === 1 ? 9000 : (s.also?.length ? 6500 : 4500))) },
+                confetti(ms, n = 220) {
+                    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                    const c = this.$refs.confetti, x = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+                    const colors = ['#fbbf24', '#f59e0b', '#ffffff', '#f472b6', '#60a5fa', '#34d399'];
+                    const p = Array.from({ length: n }, () => ({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * .5, r: 4 + Math.random() * 6, v: 2 + Math.random() * 4, s: Math.random() * 6 - 3, a: Math.random() * 6, col: colors[Math.floor(Math.random() * colors.length)] }));
+                    const end = performance.now() + ms;
+                    const draw = (t) => {
+                        x.clearRect(0, 0, c.width, c.height);
+                        p.forEach((q) => { q.y += q.v; q.x += q.s * .5; q.a += .1; if (q.y > c.height && t < end - 1500) q.y = -10; x.save(); x.translate(q.x, q.y); x.rotate(q.a); x.fillStyle = q.col; x.fillRect(-q.r / 2, -q.r / 4, q.r, q.r / 2); x.restore() });
+                        if (t < end && this.on) requestAnimationFrame(draw); else x.clearRect(0, 0, c.width, c.height);
+                    };
+                    requestAnimationFrame(draw);
+                },
             };
         }
     </script>

@@ -145,7 +145,12 @@ GIFT);
         $teacher = User::where('email', 'teacher@school.test')->first();
         $this->actingAs($teacher);
         $section = \App\Models\Section::where('adviser_id', $teacher->id)->first();
-        $r = $this->get("/honors?section_id={$section->id}&term=1")->assertOk()->assertSee('Play awardees')->assertSee('1st place only');
+        $r = $this->get("/honors?section_id={$section->id}&term=1")->assertOk()->assertSee('Play awardees')->assertSee('1st place only')->assertSee('And the Top 1 is');
+        $this->get("/honors?section_id={$section->id}&scope=level&term=1")->assertOk()->assertDontSee('▶ Play awardees');
+        $this->post("/honors/sections/{$section->id}/top", ['n' => 5])->assertRedirect();
+        $this->assertSame(5, $this->get("/honors?section_id={$section->id}&term=1")->viewData('n'));
+        $other = \App\Models\Section::where('adviser_id', '!=', $teacher->id)->first();
+        $this->post("/honors/sections/{$other->id}/top", ['n' => 5])->assertForbidden();
         $this->assertGreaterThanOrEqual(3, $r->viewData('perfect')->count(), 'demo has perfect attendance');
         $this->assertNotNull($r->viewData('top')->first()['honor']);
 

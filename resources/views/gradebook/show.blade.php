@@ -89,18 +89,27 @@
         @csrf <input type="hidden" name="term" value="{{ $term }}">
         {{-- Consultation (privacy) mode: show one student only, so they can see their own grade with the teacher. --}}
         <div class="mb-3 flex flex-wrap items-center gap-3">
-            <button type="button" class="btn" x-show="!consult" x-on:click="consult = true; who = ''"><x-icon name="shield" class="h-4 w-4" /> Consultation mode</button>
+            <button type="button" class="btn" x-show="!consult" x-on:click="consult = true; who = ''; $nextTick(() => $root.querySelector('[role=combobox]')?.focus())"><x-icon name="shield" class="h-4 w-4" /> Consultation mode</button>
             <div x-show="consult" x-cloak class="flex w-full flex-wrap items-center gap-3 rounded-2xl border-2 border-brand-500 bg-brand-50 p-3 dark:bg-brand-500/10">
                 <x-icon name="shield" class="h-5 w-5 text-brand-700" />
                 <span class="text-sm font-semibold text-brand-900 dark:text-brand-200">Consultation mode – only one student is shown</span>
-                <select x-model="who" class="input h-10 w-auto min-w-56">
-                    <option value="">Choose a student…</option>
-                    @foreach($sheet as $sid => $row)<option value="{{ $sid }}">{{ $row['student']->full_name }}</option>@endforeach
-                </select>
+                {{-- Type to find: names appear only as you type, so the class list isn't shown to the student. --}}
+                <div class="relative w-72" x-data="{ q: '', list: @js(collect($sheet)->map(fn ($r, $sid) => ['id' => (string) $sid, 'name' => $r['student']->full_name, 'alt' => $r['student']->first_name.' '.$r['student']->last_name])->values()), hi: 0,
+                        get hits() { const t = this.q.trim().toLowerCase(); return t ? this.list.filter((s) => s.name.toLowerCase().includes(t) || s.alt.toLowerCase().includes(t)).slice(0, 8) : [] },
+                        pick(s) { who = s.id; this.q = s.name; this.hi = 0; $refs.box.blur() } }">
+                    <input x-ref="box" x-model="q" x-on:input="who = ''; hi = 0" x-on:keydown.arrow-down.prevent="hi = Math.min(hi + 1, hits.length - 1)" x-on:keydown.arrow-up.prevent="hi = Math.max(hi - 1, 0)"
+                           x-on:keydown.enter.prevent="hits[hi] && pick(hits[hi])" class="input h-10 w-full" placeholder="Type a name, e.g. Reyes" autocomplete="off" role="combobox" :aria-expanded="hits.length > 0 && !who">
+                    <ul x-show="hits.length && !who" x-cloak class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900" role="listbox">
+                        <template x-for="(s, k) in hits" :key="s.id">
+                            <li><button type="button" class="block w-full px-3 py-2 text-left text-sm" :class="k === hi ? 'bg-brand-50 text-brand-800 dark:bg-brand-500/10 dark:text-brand-200' : 'hover:bg-slate-50 dark:hover:bg-white/5'" x-on:mouseenter="hi = k" x-on:click="pick(s)" x-text="s.name"></button></li>
+                        </template>
+                    </ul>
+                    <p x-show="q.trim() && !hits.length" x-cloak class="absolute mt-1 text-xs text-slate-500">No student with that name.</p>
+                </div>
                 <button type="button" class="btn btn-sm ml-auto" x-on:click="consult = false; who = ''">Exit</button>
             </div>
         </div>
-        <p x-show="consult && !who" x-cloak class="card py-10 text-center text-slate-500">Choose the student you're talking with. Other students' grades stay hidden.</p>
+        <p x-show="consult && !who" x-cloak class="card py-10 text-center text-slate-500">Type the name of the student you're talking with. Other students' grades stay hidden.</p>
         <div class="card overflow-x-auto p-0" x-show="!consult || who">
             <table class="table">
                 <thead>
