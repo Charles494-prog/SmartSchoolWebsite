@@ -91,6 +91,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
         Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
+        Route::post('/pay/{student}', [\App\Http\Controllers\OnlinePaymentController::class, 'submit'])->name('portal.pay');
         Route::get('/quiz/{assignment}', [\App\Http\Controllers\QuizController::class, 'take'])->name('quiz.take');
         Route::post('/quiz/{assignment}/start', [\App\Http\Controllers\QuizController::class, 'start'])->name('quiz.start');
         Route::post('/quiz-attempts/{attempt}', [\App\Http\Controllers\QuizController::class, 'submit'])->name('quiz.submit');
@@ -123,6 +124,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Finance documents (parents can open their own child's receipts/SOA)
     Route::get('/finance/receipt/{payment}', [FinanceController::class, 'receipt'])->name('finance.receipt');
+    Route::get('/payment-methods/{channel}/qr', [\App\Http\Controllers\OnlinePaymentController::class, 'qr'])->name('channels.qr');
+    Route::get('/payment-proofs/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'screenshot'])->name('proofs.screenshot');
     Route::get('/finance/soa/{enrollment}', [FinanceController::class, 'soa'])->name('finance.soa');
     Route::get('/assignments/{assignment}/attachment', [AssignmentController::class, 'attachment'])->name('assignments.attachment');
     Route::get('/assignments/{assignment}/content', [AssignmentController::class, 'content'])->name('assignments.content');
@@ -214,6 +217,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/accounts/{enrollment}/schedule', [FinanceController::class, 'schedule'])->name('finance.schedule');
         Route::post('/accounts/{enrollment}/pay', [FinanceController::class, 'pay'])->name('finance.pay');
         Route::post('/payments/{payment}/void', [FinanceController::class, 'void'])->name('finance.void');
+        Route::get('/online', [\App\Http\Controllers\OnlinePaymentController::class, 'proofs'])->name('finance.proofs');
+        Route::post('/online/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'review'])->name('finance.proofs.review');
     });
 
     // Library
@@ -241,6 +246,10 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Administration
     Route::middleware('role:admin')->group(function () {
+        Route::get('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'channels'])->name('channels.index');
+        Route::post('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'saveChannel'])->name('channels.store');
+        Route::post('/payment-methods/{channel}', [\App\Http\Controllers\OnlinePaymentController::class, 'saveChannel'])->name('channels.update');
+        Route::delete('/payment-methods/{channel}', [\App\Http\Controllers\OnlinePaymentController::class, 'deleteChannel'])->name('channels.destroy');
         Route::get('/setup-wizard/{step?}', [SetupWizardController::class, 'show'])->name('setup.wizard');
         Route::post('/setup-wizard/finish', [SetupWizardController::class, 'finish'])->name('setup.finish');
         Route::post('/setup-wizard/staff/{user}/reset', [SetupWizardController::class, 'resetPassword'])->name('setup.reset');

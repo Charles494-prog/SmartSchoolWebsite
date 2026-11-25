@@ -123,6 +123,7 @@ class Nav
         if ($is(Role::CASHIER, Role::ADMIN)) {
             $g['Payments'] = [
                 $item('Student balances', 'finance.index', 'wallet', 'Fees, balances and collecting payments', 'rose', 'finance.index'),
+                ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => \App\Models\PaymentProof::where('status', 'pending')->count()]] : []),
                 $item('Receipts', 'finance.payments', 'receipt', 'All payments received', 'rose'),
                 $item('Overdue', 'finance.overdue', 'alert', 'Late payments and reminders', 'rose'),
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
@@ -163,6 +164,7 @@ class Nav
         if ($is(Role::ADMIN)) {
             $g['School setup'] = [
                 $item('School settings', 'settings.edit', 'settings', 'Name, logo, grading and rules'),
+                $item('Payment methods', 'channels.index', 'banknote', 'GCash / bank accounts and QR codes for online payments', 'emerald', 'channels.*'),
                 $crud('School years', 'school-years', 'calendar', 'Start a new school year'),
                 $crud('Grade levels', 'grade-levels', 'cap', 'Kinder to Grade 12'),
                 $crud('Rooms', 'rooms', 'home', 'Classrooms and how many seats each has'),
