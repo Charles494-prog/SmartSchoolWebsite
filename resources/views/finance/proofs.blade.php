@@ -11,7 +11,7 @@
             <div class="flex flex-wrap gap-5 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
                 <a href="{{ route('proofs.screenshot', $p) }}" target="_blank" class="block"><img src="{{ route('proofs.screenshot', $p) }}" alt="Payment screenshot" class="h-40 w-32 rounded-lg border border-slate-200 object-cover"></a>
                 <div class="min-w-0 flex-1 basis-64">
-                    <p class="text-2xl font-bold tabular-nums">{{ \App\Services\Billing::peso($p->amount) }}</p>
+                    <p class="text-2xl font-bold tabular-nums">{{ \App\Services\Billing::peso($p->amount) }} @if($p->purpose)<span class="text-sm font-normal text-slate-500">· {{ $p->purpose }}</span>@endif</p>
                     <p class="font-medium">{{ $st->full_name }} <span class="text-sm text-slate-500">{{ $p->account->enrollment->section?->label() }}</span></p>
                     <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $p->channel?->name ?? 'Payment method removed' }} · ref <span class="font-mono">{{ $p->reference }}</span> · paid {{ $p->paid_on->format('M d, Y') }}</p>
                     <p class="text-sm text-slate-500">Sent by {{ $p->submitter?->name }} · {{ $p->created_at->diffForHumans() }} · balance now {{ \App\Services\Billing::peso($p->account->balance()) }}</p>

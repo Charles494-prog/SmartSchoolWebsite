@@ -119,13 +119,30 @@
                     @if($a->balance() <= 0)
                         <div class="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"><x-icon name="check-circle" class="mb-1 h-6 w-6" /> Fully paid.</div>
                     @else
-                        @php $suggest = $overdue > 0 ? $overdue : (optional($a->installments->first(fn ($i) => true))->amount ?? $a->balance()); @endphp
-                        <form method="post" action="{{ route('finance.pay', $e) }}" class="space-y-4" x-data="{ method: '{{ old('method', 'cash') }}' }">
+                        @php $opts = \App\Support\PayOptions::for($a); @endphp
+                        <form method="post" action="{{ route('finance.pay', $e) }}" class="space-y-4"
+                              x-data="{ method: '{{ old('method', 'cash') }}', pick: @js($opts[0]['key'] ?? 'other'), other: '{{ old('amount') }}', opts: @js($opts),
+                                        get chosen() { return this.opts.find((o) => o.key === this.pick) }, get amount() { return this.pick === 'other' ? this.other : (this.chosen?.amount ?? '') },
+                                        get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label } }">
                             @csrf
-                            <x-field name="amount" label="Amount (₱)" type="number" step="0.01" :value="min($a->balance(), $suggest)" required />
-                            <div class="flex flex-wrap gap-2 text-xs">
-                                @if($overdue > 0)<button x-data type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" x-on:click="document.getElementById('f_amount').value='{{ $overdue }}'">Overdue {{ $peso($overdue) }}</button>@endif
-                                <button x-data type="button" class="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200" x-on:click="document.getElementById('f_amount').value='{{ $a->balance() }}'">Full balance</button>
+                            <input type="hidden" name="amount" :value="amount"><input type="hidden" name="purpose" :value="purpose">
+                            <div>
+                                <div class="label">Paying for</div>
+                                <div class="space-y-1.5">
+                                    <template x-for="o in opts" :key="o.key">
+                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1" :class="pick === o.key ? 'bg-brand-50 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
+                                            <input type="radio" class="sr-only" :value="o.key" x-model="pick">
+                                            <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.hint"></span></span>
+                                            <span class="font-semibold tabular-nums" x-text="Number(o.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })"></span>
+                                        </label>
+                                    </template>
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1" :class="pick === 'other' ? 'bg-brand-50 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
+                                        <input type="radio" class="sr-only" value="other" x-model="pick">
+                                        <span class="flex-1 font-medium">Other amount</span>
+                                        <input type="number" step="0.01" min="1" max="{{ $a->balance() }}" x-model="other" x-on:focus="pick = 'other'" class="input h-9 w-28 text-right" placeholder="0.00">
+                                    </label>
+                                </div>
+                                @error('amount')<p class="field-error">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <div class="label">Method</div>

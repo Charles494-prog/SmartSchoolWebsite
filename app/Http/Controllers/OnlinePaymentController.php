@@ -82,10 +82,10 @@ class OnlinePaymentController extends Controller
             'payment_channel_id' => 'required|exists:payment_channels,id',
             'amount' => 'required|numeric|min:1|max:'.max(1, $account->balance()),
             'reference' => 'required|max:60', 'paid_on' => 'required|date|before_or_equal:today',
-            'screenshot' => 'required|image|max:8192',
+            'screenshot' => 'required|image|max:8192', 'purpose' => 'nullable|max:120',
         ], ['amount.max' => 'That is more than the remaining balance ('.Billing::peso($account->balance()).').', 'screenshot.required' => 'Attach a screenshot or photo of your receipt.']);
         $proof = $account->hasMany(PaymentProof::class, 'student_account_id')->create([
-            'payment_channel_id' => $d['payment_channel_id'], 'amount' => $d['amount'], 'reference' => $d['reference'], 'paid_on' => $d['paid_on'],
+            'payment_channel_id' => $d['payment_channel_id'], 'amount' => $d['amount'], 'reference' => $d['reference'], 'paid_on' => $d['paid_on'], 'purpose' => $d['purpose'] ?? null,
             'screenshot_path' => $request->file('screenshot')->store('payment-proofs', 'local'), 'submitted_by' => $u->id,
         ]);
         Notification::send(User::whereIn('role', [Role::CASHIER, Role::ADMIN])->where('is_active', true)->get(),
@@ -126,7 +126,7 @@ class OnlinePaymentController extends Controller
         if ($d['action'] === 'approve') {
             abort_if($proof->amount > $account->balance() + 0.001, 422, 'This is more than the remaining balance.');
             $payment = DB::transaction(function () use ($proof, $account) {
-                $p = $account->payments()->create(['amount' => $proof->amount, 'method' => $proof->channel?->kind ?? 'bank', 'reference' => $proof->reference, 'paid_on' => $proof->paid_on,
+                $p = $account->payments()->create(['amount' => $proof->amount, 'method' => $proof->channel?->kind ?? 'bank', 'reference' => $proof->reference, 'paid_on' => $proof->paid_on, 'purpose' => $proof->purpose,
                     'or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]);
                 $proof->update(['status' => 'approved', 'payment_id' => $p->id, 'reviewed_by' => auth()->id()]);
 
