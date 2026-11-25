@@ -61,7 +61,7 @@
             @if($a->balance() > 0 && $channels->isNotEmpty())
                 @php $opts = \App\Support\PayOptions::for($a); @endphp
                 <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js($opts[0]['key'] ?? 'other')], other: '', ch: {{ $channels->first()->id }}, preview: null,
+                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js(collect($opts)->firstWhere(fn ($o) => $o['key'] !== 'full')['key'] ?? 'full')], other: '', ch: {{ $channels->first()->id }}, preview: null,
                                opts: @js($opts), max: {{ $a->balance() }},
                                // Full balance and another amount stand alone; everything else can be combined.
                                solo(k) { return ['full', 'other'].includes(k) },
@@ -104,10 +104,16 @@
                             <div class="p-5">
                                 {{-- 1: what for --}}
                                 <div x-show="step === 1" class="space-y-2">
-                                    <p class="text-xs text-slate-600 dark:text-slate-400">Tick as many as you want. Full balance and Another amount are chosen on their own.</p>
-                                    <template x-for="o in opts" :key="o.key">
-                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="on(o.key) ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
-                                            <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key)" x-on:change="toggle(o.key)">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <p class="text-xs text-slate-600 dark:text-slate-400">Tick what you want to pay.</p>
+                                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10">
+                                            <input type="checkbox" class="h-4 w-4 accent-brand-600" :checked="on('full')" x-on:change="sel = on('full') ? [] : ['full']">
+                                            Select all <span class="font-normal text-slate-600 dark:text-slate-400" x-text="'(full balance ' + peso(max) + ')'"></span>
+                                        </label>
+                                    </div>
+                                    <template x-for="o in opts.filter((x) => x.key !== 'full')" :key="o.key">
+                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="on(o.key) || on('full') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
+                                            <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key) || on('full')" x-on:change="toggle(o.key)">
                                             <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.hint"></span></span>
                                             <span class="font-semibold tabular-nums" x-text="peso(o.amount)"></span>
                                         </label>
