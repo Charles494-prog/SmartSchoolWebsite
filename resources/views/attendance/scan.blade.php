@@ -98,7 +98,7 @@
                         @foreach($classes as $id => $label)<option value="{{ $id }}">{{ $canGate ? 'Class: ' : '' }}{{ $label }}</option>@endforeach
                     </select>
                     @if(! $canGate && $classes->isEmpty())<p class="field-error">You have no classes assigned yet.</p>@endif
-                    <p class="mt-1.5 text-xs text-slate-500" x-text="classId ? 'Records who attended this subject today. Late = 15 minutes after the class starts.' : 'First scan = IN. Scan again when leaving (at least 10 minutes later) = OUT.'"></p>
+                    <p class="mt-1.5 text-xs text-slate-500" x-text="classId ? 'Records who attended this subject today. Late = 15 minutes after the class starts.' : 'First scan = IN. Scan again when leaving (at least 2 minutes later) = OUT.'"></p>
                 </div>
             @endif
             <p class="muted mb-3">Scan the student's ID card with a USB QR scanner (it types into the box) or this device's camera.</p>

@@ -33,12 +33,12 @@ class Attendance
         }
         $existing = AttendanceRecord::where('student_id', $student->id)->whereDate('date', $at->toDateString())->whereNull('class_subject_id')->first();
         if ($existing && in_array($existing->status, ['present', 'late'], true)) {
-            // Second scan at the gate = going home. Ignore accidental repeat scans within 10 minutes.
+            // Second scan at the gate = going home. Ignore accidental repeat scans within 2 minutes.
             if ($existing->time_out) {
                 return ['ok' => true, 'status' => 'already', 'message' => 'Already checked out at '.ampm($existing->time_out).'.', 'student' => $student];
             }
-            if ($existing->time_in && Carbon::parse($at->toDateString().' '.$existing->time_in)->diffInMinutes($at) < 10) {
-                $outFrom = Carbon::parse($at->toDateString().' '.$existing->time_in)->addMinutes(10)->format('H:i');
+            if ($existing->time_in && Carbon::parse($at->toDateString().' '.$existing->time_in)->diffInMinutes($at) < 2) {
+                $outFrom = Carbon::parse($at->toDateString().' '.$existing->time_in)->addMinutes(2)->format('H:i');
 
                 return ['ok' => true, 'status' => 'already', 'message' => 'Already checked in at '.ampm($existing->time_in).'. Scan again from '.ampm($outFrom).' to check OUT.', 'student' => $student];
             }
