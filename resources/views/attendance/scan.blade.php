@@ -34,6 +34,24 @@
                 <button class="btn" @click="camera ? stopCam() : startCam()" x-text="camera ? 'Stop camera' : 'Use camera'"></button>
             </div>
             <div id="qr-reader" class="mt-3 overflow-hidden rounded-lg" x-show="camera"></div>
+            <div x-show="camError" x-cloak role="alert" class="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <template x-if="camError === 'insecure'">
+                    <div>
+                        <p class="font-semibold">The camera is blocked on this address</p>
+                        <p class="mt-1">Browsers only allow the camera on secure (https://) addresses or on the server computer itself. You opened <b x-text="location.origin"></b>.</p>
+                        <p class="mt-2 font-semibold">Ways to fix it</p>
+                        <ol class="mt-1 list-decimal space-y-1 pl-5">
+                            <li><b>Use a USB QR scanner</b> – it works on any address, no camera needed. Just scan into the box above.</li>
+                            <li><b>On the server computer</b>, open <code>http://localhost:8000/attendance/scan</code> instead – the camera is allowed there.</li>
+                            <li><b>On this device (Chrome, Brave, Edge):</b> open <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code> (Brave: <code>brave://flags/…</code>), turn it on, type <b x-text="location.origin"></b> in the box, click <b>Relaunch</b>, then try again.</li>
+                            <li><b>When SmartSchool is Online</b> (on a web host with HTTPS) the camera works everywhere.</li>
+                        </ol>
+                    </div>
+                </template>
+                <p x-show="camError === 'denied'">Camera permission was refused. Click the camera icon in the address bar, choose <b>Allow</b>, then press <b>Use camera</b> again.</p>
+                <p x-show="camError === 'none'">No camera was found on this device. Plug in a webcam or use a USB QR scanner.</p>
+                <p x-show="camError === 'other'">The camera could not start. Close other apps using the camera and try again, or use a USB QR scanner.</p>
+            </div>
         </div>
         <div class="space-y-3">
             <div :class="full ? 'min-h-[50vh]' : 'min-h-48'" class="card flex flex-col items-center justify-center text-center transition"
@@ -74,11 +92,19 @@
                     this.beep(this.last.ok); this.recent.unshift({ ...this.last, time: new Date().toLocaleTimeString() }); this.recent = this.recent.slice(0, 15);
                     this.code = ''; this.busy = false;
                 },
+                camError: '',
                 async startCam() {
+                    this.camError = '';
+                    // Browsers only allow the camera on https:// or localhost.
+                    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) { this.camError = 'insecure'; return }
                     this.camera = true; await this.$nextTick();
-                    this.cam = new Html5Qrcode('qr-reader');
-                    try { await this.cam.start({ facingMode: 'environment' }, { fps: 10, qrbox: 230 }, (t) => this.send(t)) }
-                    catch (e) { this.camera = false; alert('Camera not available: ' + e) }
+                    try {
+                        this.cam = new Html5Qrcode('qr-reader');
+                        await this.cam.start({ facingMode: 'environment' }, { fps: 10, qrbox: 230 }, (t) => this.send(t));
+                    } catch (e) {
+                        this.camera = false; this.cam = null;
+                        this.camError = /NotAllowed|Permission/i.test(String(e)) ? 'denied' : /NotFound|no camera|Requested device/i.test(String(e)) ? 'none' : 'other';
+                    }
                 },
                 async stopCam() { if (this.cam) { await this.cam.stop(); } this.camera = false }
             }

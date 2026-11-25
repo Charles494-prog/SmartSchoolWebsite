@@ -22,6 +22,7 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SetupWizardController;
 use App\Http\Controllers\StudentController;
 use App\Http\Middleware\ThrottleWrites;
+use App\Mail\SignInCodeMail;
 use Illuminate\Support\Facades\Route;
 
 // ---------------------------------------------------------------- public
@@ -209,6 +210,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/setup-wizard/{step}', [SetupWizardController::class, 'save'])->name('setup.save');
         Route::get('/settings', [AdminController::class, 'settings'])->name('settings.edit');
         Route::put('/settings', [AdminController::class, 'saveSettings'])->name('settings.update');
+        Route::get('/settings/email-preview', fn () => new SignInCodeMail('482915', explode(' ', auth()->user()->name)[0]))->name('settings.email-preview');
         Route::post('/settings/test-email', [AdminController::class, 'testEmail'])->middleware('throttle:5,1')->name('settings.test-email');
         Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
         Route::get('/go-online', [HelpController::class, 'goOnline'])->name('help.go-online');

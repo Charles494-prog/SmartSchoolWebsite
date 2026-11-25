@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\SignInCodeMail;
 use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\SignInCode;
@@ -95,5 +96,25 @@ class MailAndTwoStepTest extends TestCase
         $this->post('/login', ['email' => $parent->email, 'password' => 'secret-pass-123']);
         $this->assertAuthenticatedAs($parent);
         Notification::assertNothingSent();
+    }
+
+    public function test_sign_in_code_email_is_branded(): void
+    {
+        Setting::put('school_name', 'Mabini High');
+        $html = (new SignInCodeMail('123456', 'Ana'))->render();
+        $this->assertStringContainsString('123456', $html);
+        $this->assertStringContainsString('Mabini High', $html);
+        $this->assertStringContainsString('Hi Ana', $html);
+        $this->assertStringContainsString('#4f46e5', $html);
+    }
+
+    public function test_setup_wizard_asks_for_email_only_when_online(): void
+    {
+        $this->actingAs($this->admin());
+        $this->get('/setup-wizard/email')->assertOk()->assertSee('SMTP server')->assertSee('Two-step sign-in');
+        $this->post('/setup-wizard/email', ['mail_host' => 'smtp.example.com', 'mail_port' => 587, 'mail_encryption' => 'tls', 'mail_from_address' => 'a@example.com', 'two_step' => 'staff'])->assertRedirect();
+        $this->assertSame('staff', Setting::get('two_step'));
+        Setting::put('deployment_mode', School::LAN);
+        $this->get('/setup-wizard/email')->assertNotFound();
     }
 }

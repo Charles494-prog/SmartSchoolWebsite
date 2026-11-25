@@ -12,6 +12,9 @@ use App\Models\User;
 use App\Services\Tuition;
 use App\Support\Admission;
 use App\Support\Role;
+use App\Support\School;
+use App\Support\SchoolMail;
+use App\Support\TwoStep;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -36,16 +39,28 @@ class SetupWizardController extends Controller
         'sections' => ['Sections', "Let's create your sections."],
         'fees' => ['Fees', 'Is your school public or private?'],
         'documents' => ['Admission documents', 'Which documents should families submit?'],
+        'email' => ['Email & sign-in', 'Which email account should SmartSchool send from?'],
         'students' => ['Students & QR IDs', "Almost done! Here's how students get in."],
         'done' => ['Done', "You're all set!"],
     ];
 
+    /** Steps for this school: email/sign-in security only matter when SmartSchool runs Online. */
+    public static function steps(): array
+    {
+        $steps = self::STEPS;
+        if (! School::allows('email_notifications')) {
+            unset($steps['email']);
+        }
+
+        return $steps;
+    }
+
     public function show(string $step = 'welcome')
     {
-        abort_unless(isset(self::STEPS[$step]), 404);
+        abort_unless(isset(self::steps()[$step]), 404);
         $accounts = $step === 'staff' ? session('wizard_accounts') : null;
         session()->forget('wizard_accounts');
-        $keys = array_keys(self::STEPS);
+        $keys = array_keys(self::steps());
         $i = array_search($step, $keys, true);
         $year = SchoolYear::current();
 
@@ -69,9 +84,9 @@ class SetupWizardController extends Controller
 
     public function save(Request $request, string $step)
     {
-        abort_unless(isset(self::STEPS[$step]), 404);
+        abort_unless(isset(self::steps()[$step]), 404);
         $message = $this->{'save'.Str::studly($step)}($request);
-        $keys = array_keys(self::STEPS);
+        $keys = array_keys(self::steps());
         $next = $keys[array_search($step, $keys, true) + 1] ?? 'done';
         if (session('wizard_accounts')) {
             return redirect()->route('setup.wizard', $step)->with('wizard_ok', $message); // show the passwords first
@@ -85,6 +100,19 @@ class SetupWizardController extends Controller
         Setting::put('setup_completed_at', now()->toDateTimeString());
 
         return redirect()->route('dashboard')->with('ok', 'Setup finished. You can change everything later in School settings.');
+    }
+
+    private function saveEmail(Request $r): string
+    {
+        $d = $r->validate(SchoolMail::rules() + ['two_step' => 'nullable|in:'.implode(',', array_keys(TwoStep::OPTIONS))]);
+        SchoolMail::save($d);
+        $two = $d['two_step'] ?? 'off';
+        if ($two !== 'off' && ! TwoStep::available()) {
+            throw ValidationException::withMessages(['two_step' => 'Two-step sign-in needs working email. Fill in the email settings first.']);
+        }
+        Setting::put('two_step', $two);
+
+        return SchoolMail::configured() ? 'Email settings saved. Send a test from School settings any time.' : 'Saved. You can set up email later in School settings.';
     }
 
     private function saveDocuments(Request $r): string

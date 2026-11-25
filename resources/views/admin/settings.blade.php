@@ -225,6 +225,7 @@
                             </label>
                         @endforeach
                         @error('two_step')<p class="field-error">{{ $message }}</p>@enderror
+                        <a href="{{ route('settings.email-preview') }}" target="_blank" rel="noopener" class="link text-sm">Preview the sign-in code email →</a>
                         @unless($twoAvailable)<p class="text-xs text-slate-500">Available after switching to <b>Online</b> and setting up <b>Email (SMTP)</b> above – otherwise nobody could receive their code.</p>@endunless
                     </div>
                 </section>

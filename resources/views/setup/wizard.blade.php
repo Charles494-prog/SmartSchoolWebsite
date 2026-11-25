@@ -1,5 +1,5 @@
 @php
-    $steps = \App\Http\Controllers\SetupWizardController::STEPS;
+    $steps = \App\Http\Controllers\SetupWizardController::steps();
     [$title, $question] = $steps[$step];
     $counted = array_slice(array_keys($steps), 1, -1);
     $pos = array_search($step, $counted, true);
@@ -14,6 +14,7 @@
         'subjects' => 'I already added common subjects for every grade level. Set how grades are weighted – you can still change a single subject later.',
         'staff' => 'Each person gets their own login. Pick what they can open – a teacher only sees their own classes, a guard only sees the gate scanner.',
         'sections' => 'A section is a class of students, like "Grade 7 – Mabini". Give it an adviser and a room. Teachers per subject are assigned afterwards in Classes & sections.',
+        'email' => 'Used for absence alerts, announcements, receipts and sign-in codes. Get these from your email provider – Gmail (with an app password), Brevo, Mailgun or your web host. You can skip this and do it later in School settings.',
         'documents' => 'These show on the online application form. Tick "Required" for documents that must be attached before a family can send the form.',
         'fees' => 'Public schools usually charge no tuition. Private schools can use one amount for everyone or a different amount per grade level.',
     ];
@@ -229,6 +230,35 @@
                                 <p class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Online applications are off while SmartSchool runs on the school network only (LAN). This list is used if you switch to Hosted later.</p>
                             @endunless
                             <x-document-requirements />
+                            @break
+
+                        @case('email')
+                            <div class="grid gap-4 sm:grid-cols-[1fr_7rem]">
+                                <x-field name="mail_host" label="SMTP server" :value="$S('mail_host')" placeholder="smtp.gmail.com" />
+                                <x-field name="mail_port" label="Port" type="number" :value="$S('mail_port') ?: '587'" />
+                            </div>
+                            <x-field name="mail_encryption" label="Security" type="select" :options="['tls' => 'TLS (port 587)', 'ssl' => 'SSL (port 465)', 'none' => 'None']" :value="$S('mail_encryption') ?: 'tls'" />
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <x-field name="mail_username" label="Username" :value="$S('mail_username')" placeholder="usually your email address" />
+                                <div>
+                                    <label class="label" for="w_mail_password">Password</label>
+                                    <input id="w_mail_password" name="mail_password" type="password" autocomplete="new-password" class="input" placeholder="{{ $S('mail_password') ? 'Saved – type to replace' : 'App password' }}">
+                                    <p class="mt-1 text-xs text-slate-500">Stored encrypted.</p>
+                                </div>
+                                <x-field name="mail_from_address" label="Send from (email)" type="email" :value="$S('mail_from_address')" placeholder="noreply@yourschool.edu.ph" />
+                                <x-field name="mail_from_name" label="Send from (name)" :value="$S('mail_from_name')" :placeholder="$S('school_name')" />
+                            </div>
+                            <fieldset class="space-y-2">
+                                <legend class="label">Two-step sign-in (a code sent by email after the password)</legend>
+                                @foreach(\App\Support\TwoStep::OPTIONS as $k => $label)
+                                    <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl p-3 ring-1 ring-slate-200 has-[:checked]:ring-2 has-[:checked]:ring-brand-500">
+                                        <input type="radio" name="two_step" value="{{ $k }}" @checked(old('two_step', $S('two_step') ?: 'off') === $k)>
+                                        <span class="text-sm font-medium text-slate-800">{{ $label }}</span>
+                                    </label>
+                                @endforeach
+                                @error('two_step')<p class="field-error">{{ $message }}</p>@enderror
+                                <p class="text-xs text-slate-500">Turn this on only after email works – otherwise people can't receive their code.</p>
+                            </fieldset>
                             @break
 
                         @case('students')
