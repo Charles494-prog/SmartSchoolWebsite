@@ -3,7 +3,7 @@
         <h1 class="h1 flex-1">Database backups</h1>
         <form method="post" action="{{ route('backups.run') }}">@csrf<button class="btn btn-primary">Back up now</button></form>
     </div>
-    <p class="mb-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-900">A backup runs automatically every day at 1:00 AM (keeps the last 30). Download copies regularly and keep one outside this computer (USB or cloud drive). To restore, give the file to your IT staff: <code>gunzip -c FILE.sql.gz | mysql DATABASE</code>.</p>
+    <p class="mb-4 rounded-lg bg-brand-50 px-4 py-3 text-sm text-brand-900">A backup runs automatically every day at 1:00 AM (keeps the last 30). Download copies regularly and keep one outside this computer (USB or cloud drive). To restore, give the file to your IT staff: <code>.sqlite.gz</code> files are unzipped and put back as the database file; <code>.sql.gz</code> files are loaded with <code>gunzip -c FILE.sql.gz | mysql DATABASE</code>.</p>
     <div class="card overflow-x-auto p-0">
         <table class="table">
             <thead><tr><th>File</th><th>Size</th><th>Created</th><th></th></tr></thead>

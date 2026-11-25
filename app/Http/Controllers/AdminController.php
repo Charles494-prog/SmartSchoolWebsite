@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Console\Commands\BackupDatabase;
 use App\Models\AuditLog;
 use App\Models\GradeLevel;
 use App\Models\SchoolYear;
@@ -110,7 +111,7 @@ class AdminController extends Controller
 
     public function backups()
     {
-        $files = collect(Storage::disk('local')->files('backups'))->filter(fn ($f) => str_ends_with($f, '.sql.gz'))
+        $files = collect(Storage::disk('local')->files('backups'))->filter(fn ($f) => BackupDatabase::isBackup($f))
             ->map(fn ($f) => ['name' => basename($f), 'size' => Storage::disk('local')->size($f), 'time' => Storage::disk('local')->lastModified($f)])->sortByDesc('time');
 
         return view('admin.backups', ['files' => $files]);
@@ -125,7 +126,7 @@ class AdminController extends Controller
 
     public function downloadBackup(string $name)
     {
-        abort_unless(preg_match('/^[\w\-.]+\.sql\.gz$/', $name), 404);
+        abort_unless(BackupDatabase::isBackup($name) && Storage::disk('local')->exists('backups/'.$name), 404);
         AuditLog::record('download', null, [], ['file' => $name], 'Backup downloaded');
 
         return Storage::disk('local')->download('backups/'.$name);

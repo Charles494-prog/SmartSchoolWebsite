@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Payroll;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BulkPayrollEmptyTest extends TestCase
@@ -77,5 +78,22 @@ class BulkPayrollEmptyTest extends TestCase
         $this->get("/sections/{$section->id}")->assertOk()->assertSee('Show me how');
         Subject::query()->delete();
         $this->get('/manage/subjects')->assertOk()->assertSee('No subjects yet')->assertSee('Show me how');
+    }
+
+    public function test_backup_now_shows_in_list_and_downloads(): void
+    {
+        Storage::fake('local');
+        $db = storage_path('framework/testing/backup-source.sqlite');
+        @unlink($db);
+        (new \PDO('sqlite:'.$db))->exec('CREATE TABLE t (x INTEGER); INSERT INTO t VALUES (1);');
+        config(['database.connections.'.config('database.default').'.database' => $db]);
+        $this->post('/backups')->assertSessionHas('ok', fn ($m) => str_starts_with($m, 'Backup saved: backup-'));
+        @unlink($db);
+        $file = collect(Storage::disk('local')->files('backups'))->first();
+        $this->assertMatchesRegularExpression('/backup-\d{8}-\d{6}\.sqlite\.gz$/', $file);
+        $this->assertStringStartsWith('SQLite format 3', gzdecode(Storage::disk('local')->get($file)));
+        $this->get('/backups')->assertOk()->assertSee(basename($file));
+        $this->get('/backups/'.basename($file))->assertOk();
+        $this->get('/backups/..%2F.env')->assertNotFound();
     }
 }
