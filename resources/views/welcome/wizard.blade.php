@@ -97,17 +97,33 @@
                     <h2 class="text-xl font-bold">Your parents or guardian</h2>
                     <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><input type="hidden" name="live_reports" value="0"><input type="checkbox" name="live_reports" value="1" class="mt-1" @checked($u->pref('live_reports', true))>
                         <span><b class="block">Send my grades to my parents live</b><span class="text-sm text-slate-500">They get a notice each time a teacher scores your work.</span></span></label>
-                    @if($parents->isNotEmpty())
-                        <p class="text-sm">Already linked: @foreach($parents as $g)<b>{{ $g->name }}</b>@if($g->user) ({{ $g->user->email }})@endif{{ $loop->last ? '' : ', ' }}@endforeach</p>
-                    @endif
+                    @php $labels = \App\Support\ParentAccess::LABELS; @endphp
+                    @foreach($parents as $g)
+                        @php $acc = $g->pivot->access === null ? array_keys($labels) : (array) json_decode($g->pivot->access, true); @endphp
+                        <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                            <p class="font-semibold">{{ $g->name }} <span class="text-sm font-normal text-slate-500">{{ $g->pivot->relationship }}{{ $g->user ? ' · '.$g->user->email : ' · no account yet' }}</span></p>
+                            <input type="hidden" name="access[{{ $g->id }}][]" value="_">
+                            <div class="mt-2 grid gap-1.5 sm:grid-cols-2">
+                                @foreach($labels as $k => $label)
+                                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="access[{{ $g->id }}][]" value="{{ $k }}" @checked(in_array($k, $acc, true))> {{ $label }}</label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
                     @if(\App\Support\School::allows('parent_accounts'))
                         <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                             <p class="font-semibold">Give a parent their own account <span class="font-normal text-slate-500">(optional)</span></p>
-                            <p class="mb-3 text-sm text-slate-500">They'll see your grades, attendance, class schedule and classes – read only, they can't change anything.</p>
+                            <p class="mb-3 text-sm text-slate-500">You choose what they can see and do. They can never change your grades or records.</p>
                             <div class="grid gap-2 sm:grid-cols-3">
                                 <input name="parent_name" class="input" placeholder="Name">
                                 <input name="parent_email" type="email" class="input" placeholder="Email">
                                 <select name="parent_relationship" class="input"><option>Mother</option><option>Father</option><option>Guardian</option></select>
+                            </div>
+                            <p class="mt-3 text-sm font-medium">What they can do</p>
+                            <div class="mt-1 grid gap-1.5 sm:grid-cols-2">
+                                @foreach(\App\Support\ParentAccess::LABELS as $k => $label)
+                                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="new_access[]" value="{{ $k }}" checked> {{ $label }}</label>
+                                @endforeach
                             </div>
                         </div>
                     @endif

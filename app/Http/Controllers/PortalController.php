@@ -33,9 +33,17 @@ class PortalController extends Controller
         return $kids->firstWhere('id', $id) ?? $kids->first();
     }
 
+    /** Which portal page needs which permission a student gave their parent. */
+    private const ACCESS = ['portal.grades' => 'grades', 'portal.attendance' => 'attendance', 'portal.schedule' => 'schedule', 'portal.account' => 'pay',
+        'portal.assignments' => 'classes', 'portal.classes' => 'classes', 'portal.class' => 'classes'];
+
     private function view(Request $request, string $view, callable $data)
     {
         $child = $this->child($request);
+        $need = self::ACCESS[$view] ?? null;
+        if ($child && $need && $request->user()->role === 'parent' && ! in_array($need, \App\Support\ParentAccess::for($request->user(), $child), true)) {
+            return view('portal.no-access', ['children' => $this->children(), 'child' => $child, 'enrollment' => $child->currentEnrollment(), 'what' => \App\Support\ParentAccess::LABELS[$need]]);
+        }
 
         return view($view, ['children' => $this->children(), 'child' => $child, 'enrollment' => $child?->currentEnrollment()] + ($child ? $data($child, $child->currentEnrollment()) : []));
     }

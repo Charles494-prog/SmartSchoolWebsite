@@ -62,7 +62,8 @@ class Chat
                 return true;
             }
 
-            return $b->role === Role::TEACHER && self::teachersOf($a->children()->get())->contains($b->id);
+            // Teachers only when the student allowed "Teachers can message them" for this parent.
+            return $b->role === Role::TEACHER && self::teachersOf(self::contactableChildren($a))->contains($b->id);
         }
         // Staff ↔ staff is always fine.
         if ($a->isStaff() && $b->isStaff()) {
@@ -70,6 +71,11 @@ class Chat
         }
 
         return false;
+    }
+
+    private static function contactableChildren(User $parent)
+    {
+        return $parent->children()->get()->filter(fn ($c) => \App\Support\ParentAccess::allows($parent, $c, 'contact'))->values();
     }
 
     /** Everyone this user may start a chat with. */
@@ -82,7 +88,7 @@ class Chat
             return $base->where(fn ($q) => $q->whereIn('role', self::STUDENT_STAFF)->orWhereIn('id', $teachers))->orderBy('name')->get();
         }
         if ($u->role === Role::PARENT) {
-            $teachers = self::teachersOf($u->children()->get());
+            $teachers = self::teachersOf(self::contactableChildren($u));
 
             return $base->where(fn ($q) => $q->whereIn('role', self::PARENT_STAFF)->orWhereIn('id', $teachers))->orderBy('name')->get();
         }
@@ -93,7 +99,8 @@ class Chat
         } elseif ($u->role === Role::TEACHER) {
             $studentIds = Enrollment::whereIn('section_id', $u->teacherSectionIds())->where('status', 'enrolled')->pluck('student_id');
             $extra = Student::whereIn('id', $studentIds)->whereNotNull('user_id')->pluck('user_id')
-                ->merge(Guardian::whereHas('students', fn ($s) => $s->whereIn('students.id', $studentIds))->whereNotNull('user_id')->pluck('user_id'));
+                ->merge(Guardian::whereHas('students', fn ($s) => $s->whereIn('students.id', $studentIds))->whereNotNull('user_id')->with('user')->get()
+                    ->filter(fn ($g) => $g->user && self::contactableChildren($g->user)->whereIn('id', $studentIds)->isNotEmpty())->pluck('user_id'));
         } elseif (in_array($u->role, [Role::CASHIER, Role::NURSE], true)) {
             $extra = User::where('is_active', true)->whereIn('role', [Role::STUDENT, Role::PARENT])->pluck('id');
         } elseif ($u->role === Role::LIBRARIAN) {

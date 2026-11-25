@@ -43,7 +43,7 @@ class WelcomeController extends Controller
         $features = collect(Nav::full($u))->flatten(1)->unique('label')->values();
         $locked = Nav::locked($u->role);
         $student = $u->role === Role::STUDENT ? $u->student : null;
-        $parents = $student ? $student->guardians()->with('user')->get() : collect();
+        $parents = $student ? $student->guardians()->withPivot('access')->with('user')->get() : collect();
 
         return view('welcome.wizard', [
             'u' => $u, 'steps' => self::steps($u), 'features' => $features, 'locked' => $locked, 'hidden' => (array) $u->pref('hidden', []),
@@ -62,6 +62,7 @@ class WelcomeController extends Controller
             'hidden' => 'array', 'hidden.*' => 'string',
             'hide_turned_in' => 'boolean', 'todo_home' => 'boolean', 'live_reports' => 'boolean', 'payer' => 'nullable|in:parent,student,in_person',
             'notify_submissions' => 'boolean', 'notify_grades' => 'boolean', 'notify_attendance' => 'boolean',
+            'access' => 'array', 'access.*' => 'array', 'new_access' => 'array',
             'parent_name' => 'nullable|max:120', 'parent_email' => 'nullable|email|max:150', 'parent_relationship' => 'nullable|max:40',
         ]);
         $hidden = array_values(array_diff(array_intersect($d['hidden'] ?? [], $labels), Nav::locked($u->role)));
@@ -73,6 +74,15 @@ class WelcomeController extends Controller
         ]);
         $u->update(['preferences' => $prefs, 'onboarded_at' => now()]);
 
+        $keys = array_keys(\App\Support\ParentAccess::LABELS);
+        $clean = fn ($list) => array_values(array_intersect((array) $list, $keys));
+        if ($u->role === Role::STUDENT && ($student = $u->student)) {
+            foreach ((array) ($d['access'] ?? []) as $gid => $list) {
+                if ($student->guardians()->where('guardians.id', (int) $gid)->exists()) {
+                    $student->guardians()->updateExistingPivot((int) $gid, ['access' => json_encode($clean($list))]);
+                }
+            }
+        }
         // A student invites a parent: the account is made here and linked to the student.
         $msg = 'All set! You can change any of this later in My profile → Personal setup.';
         if ($u->role === Role::STUDENT && ! empty($d['parent_email']) && ($student = $u->student) && School::allows('parent_accounts')) {
@@ -81,7 +91,8 @@ class WelcomeController extends Controller
             $temp = Str::password(10, symbols: false);
             $parent = $existing ?? User::create(['name' => $d['parent_name'] ?: 'Parent of '.$student->first_name, 'email' => $d['parent_email'], 'password' => $temp, 'role' => Role::PARENT, 'must_change_password' => true]);
             $g = Guardian::firstOrCreate(['user_id' => $parent->id], ['name' => $parent->name, 'email' => $parent->email]);
-            $student->guardians()->syncWithoutDetaching([$g->id => ['relationship' => $d['parent_relationship'] ?: 'Parent', 'is_primary' => $student->guardians()->doesntExist()]]);
+            $student->guardians()->syncWithoutDetaching([$g->id => ['relationship' => $d['parent_relationship'] ?: 'Parent', 'is_primary' => $student->guardians()->doesntExist(),
+                'access' => json_encode($clean($d['new_access'] ?? $keys))]]);
             $msg = $existing ? $parent->name.' is now linked to your account.' : 'Parent account made for '.$parent->email.' – temporary password: '.$temp.' (they change it on first sign-in).';
         }
 
