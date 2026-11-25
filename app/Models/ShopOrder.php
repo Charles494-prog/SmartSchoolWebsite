@@ -19,7 +19,19 @@ class ShopOrder extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['total' => 'float'];
+    protected $casts = ['total' => 'float', 'walk_in' => 'boolean'];
+
+    /** Status as people see it: paid orders read "Paid – ready to release"; unpaid walk-ins read "Awaiting payment". */
+    public function shownStatus(): string
+    {
+        if (in_array($this->status, ['approved', 'ready'], true) && $this->isPaid()) {
+            return 'paid';
+        }
+
+        return $this->walk_in && $this->status === 'approved' ? 'awaiting' : $this->status;
+    }
+
+    public const SHOWN = ['placed' => 'New', 'approved' => 'Approved – waiting for payment', 'awaiting' => 'Awaiting payment (walk-in)', 'ready' => 'Prepared', 'paid' => 'Paid – ready to release', 'released' => 'Released', 'cancelled' => 'Not accepted'];
 
     public function lines(): HasMany
     {

@@ -130,34 +130,50 @@
                         <div class="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"><x-icon name="check-circle" class="mb-1 h-6 w-6" /> Fully paid.</div>
                     @else
                         @php $opts = \App\Support\PayOptions::for($a); $bal = $a->balance(); @endphp
+                        @php $first = collect($opts)->firstWhere(fn ($o) => $o['key'] !== 'full')['key'] ?? 'full'; $want = collect($opts)->pluck('key')->contains(request('pay')) ? request('pay') : $first; $oldSel = old('pay_key') ? explode(',', old('pay_key')) : [$want]; @endphp
                         <form method="post" action="{{ route('finance.pay', $e) }}" class="flex flex-col" x-ref="pay"
-                              x-data="{ method: '{{ old('method', 'cash') }}', pick: @js(old('pay_key', $opts[0]['key'] ?? 'other')), other: '{{ old('amount') }}', opts: @js($opts), bal: {{ $bal }}, busy: false, ref: '{{ old('reference') }}',
-                                        get chosen() { return this.opts.find((o) => o.key === this.pick) },
-                                        get amount() { return this.pick === 'other' ? Number(this.other || 0) : (this.chosen?.amount ?? 0) },
-                                        get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label },
-                                        get otherError() { if (this.pick !== 'other' || this.other === '') return ''; const v = Number(this.other); if (!(v > 0)) return 'Enter an amount above ₱0.'; if (v > this.bal + 0.001) return 'That is more than the balance (' + this.peso(this.bal) + ').'; if (!/^\d+(\.\d{1,2})?$/.test(String(this.other))) return 'Use at most 2 decimal places.'; return '' },
+                              x-data="{ method: '{{ old('method', 'cash') }}', sel: @js($oldSel), other: '{{ old('amount') }}', opts: @js($opts), bal: {{ $bal }}, busy: false, ref: '{{ old('reference') }}',
+                                        // Same picker as the family's Pay online: tick several items; Full balance and Other amount stand alone.
+                                        solo(k) { return ['full', 'other'].includes(k) },
+                                        toggle(k) { if (this.solo(k)) { this.sel = [k]; return } this.sel = this.sel.filter((x) => !this.solo(x)); this.sel.includes(k) ? this.sel = this.sel.filter((x) => x !== k) : this.sel.push(k) },
+                                        on(k) { return this.sel.includes(k) },
+                                        get pick() { return this.sel.join(',') },
+                                        get chosen() { return this.opts.filter((o) => this.sel.includes(o.key)) },
+                                        get amount() { return this.on('other') ? Number(this.other || 0) : Math.round(this.chosen.reduce((t, o) => t + o.amount, 0) * 100) / 100 },
+                                        get purpose() { return this.on('other') ? 'Partial payment' : this.chosen.map((o) => o.label).join(' + ') },
+                                        get otherError() { if (!this.on('other') || this.other === '') return ''; const v = Number(this.other); if (!(v > 0)) return 'Enter an amount above ₱0.'; if (v > this.bal + 0.001) return 'That is more than the balance (' + this.peso(this.bal) + ').'; if (!/^\d+(\.\d{1,2})?$/.test(String(this.other))) return 'Use at most 2 decimal places.'; return '' },
                                         get refNeeded() { return this.method !== 'cash' },
-                                        get ok() { return this.amount > 0 && !this.otherError && (!this.refNeeded || this.ref.trim() !== '') },
+                                        get ok() { return this.amount > 0 && this.amount <= this.bal + 0.001 && !this.otherError && (!this.refNeeded || this.ref.trim() !== '') },
                                         peso(v) { return '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
                                         submit() { if (!this.ok || this.busy) return; const m = { cash: 'Cash', gcash: 'GCash', bank: 'Bank transfer', check: 'Check' }[this.method] || this.method;
                                             if (!confirm('Record ' + this.peso(this.amount) + ' by ' + m + ' for {{ addslashes($e->student->full_name) }}?')) return; this.busy = true; $refs.pay.submit() } }"
                               x-on:submit.prevent="submit()">
                             @csrf
                             <input type="hidden" name="amount" :value="amount.toFixed(2)"><input type="hidden" name="purpose" :value="purpose"><input type="hidden" name="pay_key" :value="pick">
-                            <fieldset class="space-y-1.5">
-                                <legend class="label">Paying for</legend>
-                                @foreach($opts as $o)
-                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 focus-within:ring-2 focus-within:ring-brand-500" :class="pick === @js($o['key']) ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
-                                        <input type="radio" name="pick_ui" class="h-4 w-4 shrink-0 accent-brand-600" value="{{ $o['key'] }}" x-model="pick">
-                                        <span class="min-w-0 flex-1"><span class="block font-medium">{{ $o['label'] }}</span><span class="block text-xs text-slate-600 dark:text-slate-400">{{ $o['hint'] }}</span></span>
-                                        <span class="font-semibold tabular-nums">{{ $peso($o['amount']) }}</span>
+                            <fieldset class="space-y-2">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <legend class="label mb-0">Paying for</legend>
+                                    <label class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10">
+                                        <input type="checkbox" class="h-4 w-4 accent-brand-600" :checked="on('full')" x-on:change="sel = on('full') ? [] : ['full']">
+                                        Select all <span class="font-normal text-slate-600 dark:text-slate-400" x-text="'(' + peso(bal) + ')'"></span>
                                     </label>
-                                @endforeach
-                                <label class="flex cursor-pointer flex-wrap items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 focus-within:ring-2 focus-within:ring-brand-500" :class="pick === 'other' ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
-                                    <input type="radio" name="pick_ui" class="h-4 w-4 shrink-0 accent-brand-600" value="other" x-model="pick">
-                                    <span class="flex-1 font-medium">Other amount</span>
-                                    <span class="flex items-center gap-1">₱<input type="text" inputmode="decimal" x-model="other" x-on:focus="pick = 'other'" class="input h-9 w-28 text-right placeholder:text-slate-500" placeholder="0.00" aria-label="Other amount" :aria-invalid="!!otherError" aria-describedby="other-err"></span>
-                                    <p id="other-err" x-show="otherError" x-text="otherError" class="w-full text-xs font-medium text-rose-700" role="alert"></p>
+                                </div>
+                                <p class="text-xs text-slate-600 dark:text-slate-400">Tick one or more items.</p>
+                                <template x-for="o in opts.filter((x) => x.key !== 'full')" :key="o.key">
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 text-sm" :class="on(o.key) || on('full') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
+                                        <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key) || on('full')" x-on:change="toggle(o.key)">
+                                        <span class="min-w-0 flex-1"><span class="block font-medium" x-text="o.label"></span><span class="block text-xs text-slate-600 dark:text-slate-400" x-text="o.hint"></span></span>
+                                        <span class="font-semibold tabular-nums" x-text="peso(o.amount)"></span>
+                                    </label>
+                                </template>
+                                <label class="block cursor-pointer rounded-xl border-2 p-3 text-sm" :class="on('other') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="if (!on('other')) { toggle('other'); $nextTick(() => $refs.oth.focus()) }">
+                                    <span class="block font-medium">Another amount</span>
+                                    <span class="block text-xs text-slate-600 dark:text-slate-400">Any part of the balance (up to <span x-text="peso(bal)"></span>)</span>
+                                    <span x-show="on('other')" x-cloak class="mt-2 flex items-center rounded-xl border border-slate-300 bg-white px-3 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900">
+                                        <span class="text-xl font-semibold text-slate-500">₱</span>
+                                        <input x-ref="oth" type="text" inputmode="decimal" x-model="other" class="h-12 w-full border-0 bg-transparent px-2 text-xl font-bold tabular-nums focus:ring-0" placeholder="0.00" aria-label="Other amount" :aria-invalid="!!otherError" aria-describedby="other-err">
+                                    </span>
+                                    <p id="other-err" x-show="otherError" x-text="otherError" class="mt-1 text-xs font-medium text-rose-700" role="alert"></p>
                                 </label>
                                 @error('amount')<p class="field-error">{{ $message }}</p>@enderror
                             </fieldset>
@@ -173,8 +189,9 @@
                             <label class="mt-4 block" x-show="refNeeded" x-cloak><span class="label">Reference / check no. <span class="text-rose-600">*</span></span>
                                 <input name="reference" x-model="ref" class="input" :required="refNeeded" placeholder="From the GCash / bank slip / check">
                                 @error('reference')<span class="field-error">{{ $message }}</span>@enderror</label>
-                            <div class="mt-4"><x-field name="paid_on" label="Date" type="date" :value="now()->toDateString()" required /></div>
+                            <p class="mt-4 text-sm text-slate-600 dark:text-slate-400">Date: <b class="text-slate-900 dark:text-white">{{ now()->format('M j, Y') }}</b> <span class="text-xs">(today – set automatically)</span></p>
                             <div class="sticky bottom-0 -mx-6 mt-5 border-t border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+                                <p class="mb-1 truncate text-xs text-slate-600 dark:text-slate-400" x-text="purpose"></p>
                                 <div class="mb-2 flex items-baseline justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">Amount to receive</span><span class="text-2xl font-bold tabular-nums" x-text="peso(amount)"></span></div>
                                 <button class="btn btn-primary min-h-12 w-full text-base" :disabled="!ok || busy" x-text="busy ? 'Recording…' : 'Record payment'">Record payment</button>
                                 <p x-show="refNeeded && !ref.trim()" class="mt-1.5 text-xs text-slate-600">Enter the reference number to continue.</p>

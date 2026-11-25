@@ -6,6 +6,7 @@ use App\Models\Discount;
 use App\Models\Enrollment;
 use App\Models\FeeItem;
 use App\Models\Payment;
+use App\Models\PaymentAllocation;
 use App\Models\PaymentPlan;
 use App\Models\StudentAccount;
 use Carbon\Carbon;
@@ -30,6 +31,7 @@ class Billing
         $plan = (string) $planModel?->id;
         $fees = FeeItem::where('school_year_id', $e->school_year_id)
             ->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $e->grade_level_id))
+            ->where('amount', '>', 0)   // a ₱0 fee (e.g. tuition at a public school) is not billed
             ->get();
         $gross = round($fees->sum('amount'), 2);
         $tuition = round($fees->where('category', 'tuition')->sum('amount'), 2);
@@ -104,7 +106,7 @@ class Billing
      * "order:<charge id>" pays that order first; tuition choices (down payment, installment, overdue, a fee) pay tuition first;
      * anything else (full balance, another amount) clears orders first, oldest first, and the rest goes to tuition.
      */
-    public static function allocate(\App\Models\Payment $payment, ?string $key = null): void
+    public static function allocate(Payment $payment, ?string $key = null): void
     {
         $account = $payment->account;
         $amount = (float) $payment->amount;
@@ -115,7 +117,7 @@ class Billing
             foreach ($charges->filter(fn ($c) => in_array('order:'.$c->id, $keys, true)) as $c) {
                 $take = min($left, $c->remaining());
                 if ($take > 0) {
-                    \App\Models\PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
+                    PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
                     $left = round($left - $take, 2);
                 }
             }
@@ -137,7 +139,7 @@ class Billing
                 break;
             }
             $take = min($left, $c->remaining());
-            \App\Models\PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
+            PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
             $left = round($left - $take, 2);
         }
     }

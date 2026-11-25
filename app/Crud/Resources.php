@@ -49,11 +49,14 @@ class Resources
             'rooms' => [
                 'model' => Models\Room::class, 'title' => 'Rooms', 'singular' => 'room',
                 'roles' => [Role::ADMIN, Role::REGISTRAR], 'order' => ['name', 'asc'], 'search' => ['name', 'building'],
-                'help' => 'List every classroom once. Sections and class schedules then pick a room from a dropdown, and a section cannot have more students than its room holds.',
-                'columns' => ['name' => 'Room', 'building' => 'Building / floor', 'capacity' => 'Seats', 'is_active' => 'In use'],
+                'help' => 'Each grade level has its own block of rooms: Grade 1 uses Room 101–110, Grade 2 uses 201–210, and so on. Sections pick their home room from their grade\'s block.',
+                'panel' => 'crud._rooms-generate', 'with' => ['gradeLevel'],
+                'filters' => ['grade_level_id' => ['label' => 'Grade level', 'options' => $levels]],
+                'columns' => ['name' => 'Room', 'gradeLevel.name' => 'Grade level', 'building' => 'Building / floor', 'capacity' => 'Seats', 'is_active' => 'In use'],
                 'fields' => [
                     ['name' => 'name', 'label' => 'Room name', 'rules' => fn ($m) => ['required', 'max:40', Rule::unique('rooms', 'name')->ignore($m?->id)], 'placeholder' => 'Room 101'],
                     ['name' => 'building', 'label' => 'Building / floor (optional)', 'rules' => 'nullable|max:80', 'placeholder' => 'Main building, 1st floor'],
+                    ['name' => 'grade_level_id', 'label' => 'Grade level (whose block this room is in)', 'type' => 'select', 'options' => $levels, 'rules' => 'nullable|exists:grade_levels,id'],
                     ['name' => 'capacity', 'label' => 'Seats (capacity)', 'type' => 'number', 'rules' => 'required|integer|min:1|max:500', 'default' => fn () => 40],
                     ['name' => 'is_active', 'label' => 'In use (untick to hide it from dropdowns)', 'type' => 'checkbox', 'rules' => 'boolean'],
                 ],
@@ -79,6 +82,7 @@ class Resources
                 'filters' => ['grade_level_id' => ['label' => 'Grade level', 'options' => $levels]],
                 'columns' => ['name' => 'Subject', 'gradeLevel.name' => 'Grade level', 'ww_weight' => 'Quizzes %', 'pt_weight' => 'Projects %', 'qa_weight' => 'Exams %', 'at_weight' => 'Attendance %'],
                 'fields' => [
+                    ['name' => 'hours_per_week', 'label' => 'Hours per week (blank = DepEd default for the grade)', 'type' => 'number', 'rules' => 'nullable|integer|min:1|max:10', 'help' => 'How many 1-hour classes a week. The timetable spreads them over different days.'],
                     ['group' => 'Subject', 'name' => 'code', 'label' => 'Code', 'rules' => 'required|max:30', 'placeholder' => 'MATH7'],
                     ['group' => 'Subject', 'name' => 'name', 'label' => 'Subject name', 'rules' => 'required|max:120'],
                     ['group' => 'Subject', 'name' => 'grade_level_id', 'label' => 'Grade level', 'type' => 'select', 'options' => $levels, 'rules' => 'nullable|exists:grade_levels,id'],

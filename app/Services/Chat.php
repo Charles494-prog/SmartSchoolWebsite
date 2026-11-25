@@ -6,6 +6,7 @@ use App\Models\Enrollment;
 use App\Models\Guardian;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\ParentAccess;
 use App\Support\Role;
 use Illuminate\Support\Collection;
 
@@ -75,7 +76,7 @@ class Chat
 
     private static function contactableChildren(User $parent)
     {
-        return $parent->children()->get()->filter(fn ($c) => \App\Support\ParentAccess::allows($parent, $c, 'contact'))->values();
+        return $parent->children()->get()->filter(fn ($c) => ParentAccess::allows($parent, $c, 'contact'))->values();
     }
 
     /** Everyone this user may start a chat with. */

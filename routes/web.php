@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AllocationController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AttendanceController;
@@ -9,18 +10,25 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CommunicationController;
 use App\Http\Controllers\CrudController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DevController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FirstRunController;
+use App\Http\Controllers\GradeApprovalController;
 use App\Http\Controllers\GradebookController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HelpController;
 use App\Http\Controllers\LibraryController;
+use App\Http\Controllers\OnlinePaymentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuizController;
 use App\Http\Controllers\SectionController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SetupWizardController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\WelcomeController;
 use App\Http\Middleware\ThrottleWrites;
 use App\Mail\SignInCodeMail;
 use Illuminate\Support\Facades\Route;
@@ -47,12 +55,13 @@ Route::middleware('guest')->group(function () {
 
 // ---------------------------------------------------------------- signed-in
 Route::middleware(['auth', ThrottleWrites::class])->group(function () {
-    Route::get('/welcome', [\App\Http\Controllers\WelcomeController::class, 'show'])->name('welcome');
-    Route::post('/welcome', [\App\Http\Controllers\WelcomeController::class, 'save'])->name('welcome.save');
-    Route::post('/dev/unlock', [\App\Http\Controllers\DevController::class, 'unlock'])->middleware('throttle:5,1')->name('dev.unlock');
-    Route::post('/dev/mode', [\App\Http\Controllers\DevController::class, 'mode'])->name('dev.mode');
-    Route::post('/dev/login', [\App\Http\Controllers\DevController::class, 'login'])->name('dev.login');
-    Route::post('/dev/setup', [\App\Http\Controllers\DevController::class, 'setup'])->name('dev.setup');
+    Route::get('/welcome', [WelcomeController::class, 'show'])->name('welcome');
+    Route::post('/welcome', [WelcomeController::class, 'save'])->name('welcome.save');
+    Route::post('/dev/unlock', [DevController::class, 'unlock'])->middleware('throttle:5,1')->name('dev.unlock');
+    Route::post('/dev/mode', [DevController::class, 'mode'])->name('dev.mode');
+    Route::post('/dev/login', [DevController::class, 'login'])->name('dev.login');
+    Route::post('/dev/back', [DevController::class, 'back'])->name('dev.back');
+    Route::post('/dev/setup', [DevController::class, 'setup'])->name('dev.setup');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -63,6 +72,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/how-it-works', [HelpController::class, 'guide'])->name('guide');
     Route::get('/notifications', [CommunicationController::class, 'notifications'])->name('notifications');
+    Route::post('/notifications', [CommunicationController::class, 'updateNotifications'])->middleware('throttle:120,1')->name('notifications.update');
+    Route::get('/notifications/{id}/open', [CommunicationController::class, 'openNotification'])->name('notifications.open');
 
     // Communication (everyone)
     Route::get('/announcements', [CommunicationController::class, 'announcements'])->name('announcements.index');
@@ -86,19 +97,21 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/grades', [PortalController::class, 'grades'])->name('portal.grades');
         Route::get('/attendance', [PortalController::class, 'attendance'])->name('portal.attendance');
         Route::get('/schedule', [PortalController::class, 'schedule'])->name('portal.schedule');
+        Route::get('/section-choice', [AllocationController::class, 'choice'])->middleware('role:student')->name('portal.section-choice');
+        Route::post('/section-choice', [AllocationController::class, 'choose'])->middleware(['role:student', 'throttle:20,1'])->name('portal.section-choose');
         Route::get('/account', [PortalController::class, 'account'])->name('portal.account');
         Route::get('/assignments', [PortalController::class, 'assignments'])->name('portal.assignments');
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
         Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
-        Route::get('/services', [\App\Http\Controllers\ServiceController::class, 'index'])->name('portal.services');
-        Route::post('/services/{student}', [\App\Http\Controllers\ServiceController::class, 'request'])->name('portal.services.request');
-        Route::get('/shop', [\App\Http\Controllers\ShopController::class, 'store'])->name('portal.shop');
-        Route::post('/shop/{student}', [\App\Http\Controllers\ShopController::class, 'checkout'])->name('portal.shop.checkout');
-        Route::post('/pay/{student}', [\App\Http\Controllers\OnlinePaymentController::class, 'submit'])->name('portal.pay');
-        Route::get('/quiz/{assignment}', [\App\Http\Controllers\QuizController::class, 'take'])->name('quiz.take');
-        Route::post('/quiz/{assignment}/start', [\App\Http\Controllers\QuizController::class, 'start'])->name('quiz.start');
-        Route::post('/quiz-attempts/{attempt}', [\App\Http\Controllers\QuizController::class, 'submit'])->name('quiz.submit');
+        Route::get('/services', [ServiceController::class, 'index'])->name('portal.services');
+        Route::post('/services/{student}', [ServiceController::class, 'request'])->name('portal.services.request');
+        Route::get('/shop', [ShopController::class, 'store'])->name('portal.shop');
+        Route::post('/shop/{student}', [ShopController::class, 'checkout'])->name('portal.shop.checkout');
+        Route::post('/pay/{student}', [OnlinePaymentController::class, 'submit'])->name('portal.pay');
+        Route::get('/quiz/{assignment}', [QuizController::class, 'take'])->name('quiz.take');
+        Route::post('/quiz/{assignment}/start', [QuizController::class, 'start'])->name('quiz.start');
+        Route::post('/quiz-attempts/{attempt}', [QuizController::class, 'submit'])->name('quiz.submit');
         Route::get('/classes/{class}', [PortalController::class, 'classroom'])->name('portal.class');
         Route::post('/classes/{class}/color', [PortalController::class, 'color'])->name('portal.color');
     });
@@ -128,9 +141,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Finance documents (parents can open their own child's receipts/SOA)
     Route::get('/finance/receipt/{payment}', [FinanceController::class, 'receipt'])->name('finance.receipt');
-    Route::get('/bookstore-items/{item}/image', [\App\Http\Controllers\ShopController::class, 'image'])->name('shop.image');
-    Route::get('/payment-methods/{channel}/qr', [\App\Http\Controllers\OnlinePaymentController::class, 'qr'])->name('channels.qr');
-    Route::get('/payment-proofs/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'screenshot'])->name('proofs.screenshot');
+    Route::get('/bookstore-items/{item}/image', [ShopController::class, 'image'])->name('shop.image');
+    Route::get('/payment-methods/{channel}/qr', [OnlinePaymentController::class, 'qr'])->name('channels.qr');
+    Route::get('/payment-proofs/{proof}', [OnlinePaymentController::class, 'screenshot'])->name('proofs.screenshot');
     Route::get('/finance/soa/{enrollment}', [FinanceController::class, 'soa'])->name('finance.soa');
     Route::get('/assignments/{assignment}/attachment', [AssignmentController::class, 'attachment'])->name('assignments.attachment');
     Route::get('/assignments/{assignment}/content', [AssignmentController::class, 'content'])->name('assignments.content');
@@ -144,6 +157,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
         Route::get('/sections', [SectionController::class, 'index'])->name('sections.index');
         Route::post('/sections', [SectionController::class, 'store'])->name('sections.store');
+        Route::post('/rooms/generate', [SectionController::class, 'generateRooms'])->name('rooms.generate');
+        Route::get('/sections/unsectioned', [SectionController::class, 'unsectioned'])->name('sections.unsectioned');
+        Route::post('/sections/unsectioned', [SectionController::class, 'placeUnsectioned'])->name('sections.unsectioned.place');
         Route::get('/sections/{section}', [SectionController::class, 'show'])->name('sections.show');
         Route::put('/sections/{section}', [SectionController::class, 'update'])->name('sections.update');
         Route::delete('/sections/{section}', [SectionController::class, 'destroy'])->name('sections.destroy');
@@ -160,6 +176,20 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/promotion', [SectionController::class, 'promotion'])->name('promotion.index');
         Route::post('/promotion', [SectionController::class, 'promote'])->name('promotion.run');
         Route::post('/grade-submissions/{submission}', [GradebookController::class, 'review'])->name('gradebook.review');
+        Route::get('/allocation', [AllocationController::class, 'index'])->name('allocation.index');
+        Route::post('/allocation', [AllocationController::class, 'start'])->name('allocation.start');
+        Route::get('/allocation/{a}/step/{step}', [AllocationController::class, 'step'])->whereNumber('step')->name('allocation.step');
+        Route::post('/allocation/{a}/sections/{section?}', [AllocationController::class, 'saveSection'])->name('allocation.section');
+        Route::post('/allocation/{a}/rooms', [AllocationController::class, 'generateRooms'])->name('allocation.rooms');
+        Route::post('/allocation/{a}/method', [AllocationController::class, 'method'])->name('allocation.method');
+        Route::post('/allocation/{a}/reshuffle', [AllocationController::class, 'reshuffle'])->name('allocation.reshuffle');
+        Route::post('/allocation/{a}/plan', [AllocationController::class, 'savePlan'])->name('allocation.plan');
+        Route::post('/allocation/{a}/commit', [AllocationController::class, 'commit'])->name('allocation.commit');
+        Route::post('/allocation/{a}/undo', [AllocationController::class, 'undo'])->name('allocation.undo');
+        Route::post('/allocation/{a}/close', [AllocationController::class, 'close'])->name('allocation.close');
+        Route::get('/grade-approvals', [GradeApprovalController::class, 'index'])->name('approvals.index');
+        Route::post('/grade-approvals/bulk', [GradeApprovalController::class, 'bulk'])->name('approvals.bulk');
+        Route::get('/grade-approvals/{submission}', [GradeApprovalController::class, 'show'])->name('approvals.show');
     });
 
     // QR scanning: guard at the gate, teachers in their own classes, admin/registrar both
@@ -200,12 +230,12 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::delete('/assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
         Route::put('/assignments/{assignment}', [AssignmentController::class, 'update'])->name('assignments.update');
         Route::post('/assignments/{assignment}/students/{student}/grade', [AssignmentController::class, 'gradeStudent'])->name('assignments.grade-student');
-        Route::get('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'edit'])->name('quiz.edit');
-        Route::put('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'save'])->name('quiz.save');
-        Route::post('/assignments/{assignment}/quiz/import', [\App\Http\Controllers\QuizController::class, 'import'])->name('quiz.import');
-        Route::get('/assignments/{assignment}/quiz/export', [\App\Http\Controllers\QuizController::class, 'export'])->name('quiz.export');
-        Route::get('/assignments/{assignment}/quiz/results', [\App\Http\Controllers\QuizController::class, 'results'])->name('quiz.results');
-        Route::post('/quiz-attempts/{attempt}/review', [\App\Http\Controllers\QuizController::class, 'review'])->name('quiz.review');
+        Route::get('/assignments/{assignment}/quiz', [QuizController::class, 'edit'])->name('quiz.edit');
+        Route::put('/assignments/{assignment}/quiz', [QuizController::class, 'save'])->name('quiz.save');
+        Route::post('/assignments/{assignment}/quiz/import', [QuizController::class, 'import'])->name('quiz.import');
+        Route::get('/assignments/{assignment}/quiz/export', [QuizController::class, 'export'])->name('quiz.export');
+        Route::get('/assignments/{assignment}/quiz/results', [QuizController::class, 'results'])->name('quiz.results');
+        Route::post('/quiz-attempts/{attempt}/review', [QuizController::class, 'review'])->name('quiz.review');
         Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])->name('assignments.show');
         Route::post('/submissions/{submission}/grade', [AssignmentController::class, 'grade'])->name('assignments.grade');
         Route::get('/submissions/{submission}/file', [AssignmentController::class, 'file'])->name('assignments.file');
@@ -213,6 +243,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Finance
     Route::middleware('role:admin,cashier')->prefix('finance')->group(function () {
+        Route::get('/bookstore', [ShopController::class, 'awaitingPayment'])->name('finance.bookstore');
         Route::get('/', [FinanceController::class, 'index'])->name('finance.index');
         Route::get('/payments', [FinanceController::class, 'payments'])->name('finance.payments');
         Route::get('/overdue', [FinanceController::class, 'overdue'])->name('finance.overdue');
@@ -222,8 +253,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/accounts/{enrollment}/schedule', [FinanceController::class, 'schedule'])->name('finance.schedule');
         Route::post('/accounts/{enrollment}/pay', [FinanceController::class, 'pay'])->name('finance.pay');
         Route::post('/payments/{payment}/void', [FinanceController::class, 'void'])->name('finance.void');
-        Route::get('/online', [\App\Http\Controllers\OnlinePaymentController::class, 'proofs'])->name('finance.proofs');
-        Route::post('/online/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'review'])->name('finance.proofs.review');
+        Route::get('/online', [OnlinePaymentController::class, 'proofs'])->name('finance.proofs');
+        Route::post('/online/{proof}', [OnlinePaymentController::class, 'review'])->name('finance.proofs.review');
     });
 
     // Library
@@ -247,30 +278,36 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::delete('/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
         Route::post('/{payroll}/finalize', [PayrollController::class, 'finalize'])->name('payroll.finalize');
         Route::get('/{payroll}/payslips', [PayrollController::class, 'payslips'])->name('payroll.payslips');
+        Route::post('/{payroll}/paid', [PayrollController::class, 'markPaid'])->name('payroll.paid');
+        Route::get('/items/{item}/payslip', [PayrollController::class, 'payslip'])->name('payroll.payslip');
         Route::put('/items/{item}', [PayrollController::class, 'updateItem'])->name('payroll.items.update');
     });
 
     // Administration
     Route::middleware('role:admin,registrar')->prefix('requests')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ServiceController::class, 'manage'])->name('services.manage');
-        Route::post('/services', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.store');
-        Route::post('/services/{service}', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.update');
-        Route::post('/{req}/notify', [\App\Http\Controllers\ServiceController::class, 'notify'])->name('services.requests.notify');
-        Route::post('/{req}', [\App\Http\Controllers\ServiceController::class, 'update'])->name('services.requests.update');
+        Route::get('/', [ServiceController::class, 'manage'])->name('services.manage');
+        Route::post('/services', [ServiceController::class, 'save'])->name('services.store');
+        Route::post('/services/{service}', [ServiceController::class, 'save'])->name('services.update');
+        Route::post('/{req}/notify', [ServiceController::class, 'notify'])->name('services.requests.notify');
+        Route::post('/{req}', [ServiceController::class, 'update'])->name('services.requests.update');
     });
     Route::middleware('role:admin,bookstore')->prefix('bookstore')->group(function () {
-        Route::get('/', [\App\Http\Controllers\ShopController::class, 'manage'])->name('shop.manage');
-        Route::post('/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');
-        Route::post('/items/{item}', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.update');
-        Route::delete('/items/{item}', [\App\Http\Controllers\ShopController::class, 'deleteItem'])->name('shop.items.destroy');
-        Route::post('/orders/{order}/notify', [\App\Http\Controllers\ShopController::class, 'notify'])->name('shop.orders.notify');
-        Route::post('/orders/{order}', [\App\Http\Controllers\ShopController::class, 'setStatus'])->name('shop.orders.status');
+        Route::get('/', [ShopController::class, 'manage'])->name('shop.manage');
+        Route::get('/orders.json', [ShopController::class, 'orders'])->name('shop.orders');
+        Route::get('/students', [ShopController::class, 'studentLookup'])->middleware('throttle:120,1')->name('shop.students');
+        Route::post('/walk-in', [ShopController::class, 'walkIn'])->middleware('throttle:30,1')->name('shop.walkin');
+        Route::get('/orders/{order}/slip', [ShopController::class, 'slip'])->name('shop.slip');
+        Route::post('/items', [ShopController::class, 'saveItem'])->name('shop.items.store');
+        Route::post('/items/{item}', [ShopController::class, 'saveItem'])->name('shop.items.update');
+        Route::delete('/items/{item}', [ShopController::class, 'deleteItem'])->name('shop.items.destroy');
+        Route::post('/orders/{order}/notify', [ShopController::class, 'notify'])->name('shop.orders.notify');
+        Route::post('/orders/{order}', [ShopController::class, 'setStatus'])->name('shop.orders.status');
     });
     Route::middleware('role:admin')->group(function () {
-        Route::get('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'channels'])->name('channels.index');
-        Route::post('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'saveChannel'])->name('channels.store');
-        Route::post('/payment-methods/{channel}', [\App\Http\Controllers\OnlinePaymentController::class, 'saveChannel'])->name('channels.update');
-        Route::delete('/payment-methods/{channel}', [\App\Http\Controllers\OnlinePaymentController::class, 'deleteChannel'])->name('channels.destroy');
+        Route::get('/payment-methods', [OnlinePaymentController::class, 'channels'])->name('channels.index');
+        Route::post('/payment-methods', [OnlinePaymentController::class, 'saveChannel'])->name('channels.store');
+        Route::post('/payment-methods/{channel}', [OnlinePaymentController::class, 'saveChannel'])->name('channels.update');
+        Route::delete('/payment-methods/{channel}', [OnlinePaymentController::class, 'deleteChannel'])->name('channels.destroy');
         Route::get('/setup-wizard/{step?}', [SetupWizardController::class, 'show'])->name('setup.wizard');
         Route::post('/setup-wizard/finish', [SetupWizardController::class, 'finish'])->name('setup.finish');
         Route::post('/setup-wizard/staff/{user}/reset', [SetupWizardController::class, 'resetPassword'])->name('setup.reset');

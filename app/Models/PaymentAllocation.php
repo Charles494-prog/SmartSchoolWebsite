@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Notifications\GeneralNotice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Notification;
 
 class PaymentAllocation extends Model
 {
@@ -22,13 +24,13 @@ class PaymentAllocation extends Model
             }
             $order = ShopOrder::with('student')->whereHas('charge', fn ($c) => $c->whereKey($a->account_charge_id))->whereIn('status', ['approved', 'ready'])->first();
             if ($order && $order->isPaid()) {
-                \Illuminate\Support\Facades\Notification::send(User::whereIn('role', ['bookstore', 'admin'])->where('is_active', true)->get(),
-                    new \App\Notifications\GeneralNotice('Paid – ready for releasing', 'Bookstore order #'.$order->id.' for '.$order->student->full_name.' is paid.', route('shop.manage', [], false)));
+                Notification::send(User::whereIn('role', ['bookstore', 'admin'])->where('is_active', true)->get(),
+                    new GeneralNotice('Paid – ready for releasing', 'Bookstore order #'.$order->id.' for '.$order->student->full_name.' is paid.', route('shop.manage', [], false)));
             }
             $req = ServiceRequest::with('service', 'student', 'charge')->where('account_charge_id', $a->account_charge_id)->whereIn('status', ['processing', 'ready'])->first();
             if ($req && $req->isPaid()) {
-                \Illuminate\Support\Facades\Notification::send(User::whereIn('role', ['registrar', 'admin'])->where('is_active', true)->get(),
-                    new \App\Notifications\GeneralNotice('Paid – ready for releasing', $req->service->name.' for '.$req->student->full_name.' is paid.', route('services.manage', ['status' => $req->status], false)));
+                Notification::send(User::whereIn('role', ['registrar', 'admin'])->where('is_active', true)->get(),
+                    new GeneralNotice('Paid – ready for releasing', $req->service->name.' for '.$req->student->full_name.' is paid.', route('services.manage', ['status' => $req->status], false)));
             }
         });
     }

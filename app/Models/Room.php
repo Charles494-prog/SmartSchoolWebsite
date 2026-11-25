@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Room extends Model
 {
@@ -12,6 +13,11 @@ class Room extends Model
     protected $guarded = ['id'];
 
     protected $casts = ['is_active' => 'boolean'];
+
+    public function gradeLevel(): BelongsTo
+    {
+        return $this->belongsTo(GradeLevel::class);
+    }
 
     /** name => "Room 101 · 40 seats" for dropdowns. */
     public static function options(): array

@@ -2,12 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\SetupWizardController;
+use App\Models\Announcement;
+use App\Models\Assessment;
 use App\Models\Assignment;
 use App\Models\ClassSubject;
+use App\Models\Score;
 use App\Models\Setting;
+use App\Models\Student;
 use App\Models\User;
+use App\Support\Classwork;
+use App\Support\School;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ClassworkTest extends TestCase
@@ -70,13 +80,15 @@ class ClassworkTest extends TestCase
         $this->actingAs(User::where('email', 'teacher@school.test')->first());
         $this->post('/dev/mode', ['mode' => 'lan'])->assertNotFound();
 
-        config(['smartschool.dev' => true, 'smartschool.dev_password_hash' => \Illuminate\Support\Facades\Hash::make('secret-pass')]);
+        config(['smartschool.dev' => true, 'smartschool.dev_password_hash' => Hash::make('secret-pass')]);
+        $this->get('/dashboard')->assertDontSee('Developer mode');   // only the Superadmin sees dev tools
+        $this->actingAs(User::where('role', 'admin')->first());
         $this->get('/dashboard')->assertSee('Developer mode');
         $this->post('/dev/mode', ['mode' => 'lan'])->assertNotFound();   // locked until the password is given
         $this->post('/dev/unlock', ['password' => 'wrong'])->assertSessionHas('error');
         $this->post('/dev/unlock', ['password' => 'secret-pass'])->assertSessionHas('ok');
         $this->post('/dev/mode', ['mode' => 'lan'])->assertRedirect();
-        $this->assertTrue(\App\Support\School::isLan());
+        $this->assertTrue(School::isLan());
         $student = User::where('email', 'student@school.test')->first();
         $this->post('/dev/login', ['user_id' => $student->id])->assertRedirect('/');
         $this->assertAuthenticatedAs($student);
@@ -84,7 +96,7 @@ class ClassworkTest extends TestCase
         $this->post('/dev/setup')->assertRedirect(route('setup.wizard', 'welcome'));
         $this->assertSame('admin', auth()->user()->role, 'wizard runs as the Superadmin');
         $this->get(route('setup.wizard', 'subjects'))->assertOk()->assertSee('Top achievers to list');
-        foreach (array_keys(\App\Http\Controllers\SetupWizardController::steps()) as $step) {
+        foreach (array_keys(SetupWizardController::steps()) as $step) {
             $this->get(route('setup.wizard', $step))->assertOk();
         }
     }
@@ -100,13 +112,13 @@ class ClassworkTest extends TestCase
         $this->post('/assignments', $base + ['type' => 'quiz', 'title' => 'Practice quiz', 'component' => ''])->assertRedirect();
         $counted = Assignment::where('title', 'Counted quiz')->first();
         $this->assertNotNull($counted->assessment_id);
-        $this->assertSame(3, (int) \App\Models\Assessment::find($counted->assessment_id)->term);
+        $this->assertSame(3, (int) Assessment::find($counted->assessment_id)->term);
         $this->assertNull(Assignment::where('title', 'Practice quiz')->value('assessment_id'));
 
         $student = $class->section->students()->first();
         $sub = $counted->submissions()->create(['student_id' => $student->id, 'body' => 'x', 'submitted_at' => now()]);
         $this->post("/submissions/{$sub->id}/grade", ['score' => 17])->assertRedirect();
-        $this->assertEquals(17, \App\Models\Score::where('assessment_id', $counted->assessment_id)->where('student_id', $student->id)->value('score'));
+        $this->assertEquals(17, Score::where('assessment_id', $counted->assessment_id)->where('student_id', $student->id)->value('score'));
         $this->get("/gradebook/{$class->id}?term=3")->assertOk()->assertSee('Counted quiz')->assertSee('Create in class card');
 
         // Q1 is approved in the demo data: new work can't count toward it
@@ -122,11 +134,11 @@ class ClassworkTest extends TestCase
         $class = ClassSubject::where('section_id', $student->student->currentEnrollment()->section_id)->first();
         $this->get('/portal/classes')->assertOk()->assertSee($class->subject->name);
         $this->get("/portal/classes/{$class->id}")->assertOk()->assertSee('Welcome to class!')->assertSee('Counts toward');
-        $teacherColor = \App\Support\Classwork::colorKey($class);
+        $teacherColor = Classwork::colorKey($class);
         $pick = $teacherColor === 'rose' ? 'teal' : 'rose';
         $this->post("/portal/classes/{$class->id}/color", ['color' => $pick])->assertRedirect();
-        $this->assertSame($pick, \App\Support\Classwork::colorKey($class, $student));
-        $this->assertSame($teacherColor, \App\Support\Classwork::colorKey($class), 'teacher default is unchanged');
+        $this->assertSame($pick, Classwork::colorKey($class, $student));
+        $this->assertSame($teacherColor, Classwork::colorKey($class), 'teacher default is unchanged');
 
         $designed = Assignment::where('class_subject_id', $class->id)->whereNotNull('body_html')->first();
         $r = $this->get("/assignments/{$designed->id}/content")->assertOk();
@@ -139,11 +151,11 @@ class ClassworkTest extends TestCase
     public function test_admin_sets_trimesters_or_semesters(): void
     {
         $this->actingAs(User::where('role', 'admin')->first());
-        $this->assertSame(4, \App\Support\School::periods());
-        \App\Models\Assessment::where('term', '>', 2)->delete();
+        $this->assertSame(4, School::periods());
+        Assessment::where('term', '>', 2)->delete();
         $this->put('/settings', $this->settingsPayload(['grading_periods' => 2]))->assertSessionHasNoErrors()->assertRedirect();
-        $this->assertSame(2, \App\Support\School::periods());
-        $this->assertSame('S2', \App\Support\School::term(2, 2));
+        $this->assertSame(2, School::periods());
+        $this->assertSame('S2', School::term(2, 2));
         $this->get('/gradebook/'.ClassSubject::first()->id)->assertOk()->assertSee('S2')->assertDontSee('>Q3<', false);
     }
 
@@ -163,7 +175,7 @@ class ClassworkTest extends TestCase
             $kid = $u->role === 'student' ? $u->student : $u->children()->first();
             $this->get('/portal/id-card')->assertRedirect(route('students.id', $kid));
             $this->get(route('students.id', $kid))->assertOk();
-            $other = \App\Models\Student::where('id', '!=', $kid->id)->first();
+            $other = Student::where('id', '!=', $kid->id)->first();
             $this->get(route('students.id', $other))->assertForbidden();
         }
     }
@@ -184,7 +196,7 @@ class ClassworkTest extends TestCase
 
         $student = $class->section->students()->first();
         $this->post("/assignments/{$a->id}/students/{$student->id}/grade", ['score' => 22])->assertRedirect();
-        $this->assertEquals(22, \App\Models\Score::where('assessment_id', $a->assessment_id)->where('student_id', $student->id)->value('score'));
+        $this->assertEquals(22, Score::where('assessment_id', $a->assessment_id)->where('student_id', $student->id)->value('score'));
 
         $this->put("/assignments/{$a->id}", ['title' => 'Essay v2', 'max_score' => 25, 'due_at' => now()->addDays(2)->format('Y-m-d H:i'), 'component' => ''])->assertRedirect();
         $this->assertNull($a->fresh()->assessment_id, 'not included any more – column removed');
@@ -196,7 +208,7 @@ class ClassworkTest extends TestCase
     public function test_staff_enter_unique_lrns(): void
     {
         $this->actingAs(User::where('email', 'registrar@school.test')->first());
-        [$a, $b] = \App\Models\Student::orderBy('id')->take(2)->get()->all();
+        [$a, $b] = Student::orderBy('id')->take(2)->get()->all();
         $this->get('/students/lrn?show=all')->assertOk()->assertSee('Enter LRNs')->assertSee('Missing LRN');
         $this->getJson('/students/lrn/check?lrn='.$a->lrn)->assertJson(['taken' => $a->full_name]);
         $this->getJson('/students/lrn/check?lrn='.$a->lrn.'&ignore='.$a->id)->assertJson(['taken' => null]);
@@ -208,11 +220,11 @@ class ClassworkTest extends TestCase
 
     public function test_designed_announcements_with_picture_event_and_seen_by(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('local');
+        Storage::fake('local');
         $admin = User::where('role', 'admin')->first();
         $this->actingAs($admin)->post('/announcements', ['title' => 'Family Day', 'body' => 'Join us!', 'audience' => 'all', 'event_at' => '2026-12-12 09:00',
-            'image' => \Illuminate\Http\UploadedFile::fake()->image('fam.jpg'), 'image_caption' => 'Last year', 'body_html' => '<b class="x">Hi</b>'])->assertRedirect();
-        $a = \App\Models\Announcement::where('title', 'Family Day')->first();
+            'image' => UploadedFile::fake()->image('fam.jpg'), 'image_caption' => 'Last year', 'body_html' => '<b class="x">Hi</b>'])->assertRedirect();
+        $a = Announcement::where('title', 'Family Day')->first();
         $this->assertNotNull($a->image_path);
         $r = $this->get("/announcements/{$a->id}/content")->assertOk();
         $this->assertStringContainsString('sandbox allow-scripts', $r->headers->get('Content-Security-Policy'));
@@ -220,9 +232,9 @@ class ClassworkTest extends TestCase
         $teacher = User::where('email', 'teacher@school.test')->first();
         $this->actingAs($teacher);
         $this->post('/announcements', ['title' => 'x', 'body' => 'y', 'audience' => 'all'])->assertForbidden();
-        $this->assertGreaterThan(0, \App\Models\Announcement::unreadCount($teacher));
+        $this->assertGreaterThan(0, Announcement::unreadCount($teacher));
         $this->get('/announcements')->assertOk()->assertSee('Family Day')->assertSee('New')->assertSee('Last year')->assertSee('December 12, 2026');
-        $this->assertSame(0, \App\Models\Announcement::unreadCount($teacher), 'opening the page reads them');
+        $this->assertSame(0, Announcement::unreadCount($teacher), 'opening the page reads them');
         $this->actingAs($admin)->get('/announcements')->assertSee('Seen by 1');
     }
 }

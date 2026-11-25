@@ -25,19 +25,9 @@
         </div>
     @endif
     @if($pending->isNotEmpty())
-        <div class="card mb-4">
-            <h2 class="h2 mb-3">Waiting for your approval</h2>
-            <div class="space-y-2">
-                @foreach($pending as $p)
-                    <div class="flex flex-wrap items-center gap-2 rounded-lg border p-3 text-sm" x-data="{ ret:false }">
-                        <div class="flex-1"><b>{{ $p->classSubject->subject->name }}</b> · {{ $p->classSubject->section->label() }} · term {{ $p->term }} · {{ $p->classSubject->teacher?->name }}</div>
-                        <a class="btn btn-sm" href="{{ route('gradebook.show', [$p->classSubject, 'term' => $p->term]) }}">View</a>
-                        <form method="post" action="{{ route('gradebook.review', $p) }}">@csrf<input type="hidden" name="action" value="approve"><button class="btn btn-primary btn-sm">Approve</button></form>
-                        <button class="btn btn-sm" @click="ret=!ret">Return…</button>
-                        <form x-show="ret" x-cloak method="post" action="{{ route('gradebook.review', $p) }}" class="flex w-full gap-2">@csrf<input type="hidden" name="action" value="return"><input name="remarks" class="input" placeholder="What should be corrected?" required><button class="btn btn-sm">Send back</button></form>
-                    </div>
-                @endforeach
-            </div>
+        <div class="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-200">
+            <x-icon name="clock" class="h-5 w-5 shrink-0" /><span class="flex-1">{{ $pending->count() }} {{ str('class')->plural($pending->count()) }} waiting for your approval.</span>
+            <a href="{{ route('approvals.index') }}" class="btn btn-primary min-h-11">Open approval queue</a>
         </div>
     @endif
     @php

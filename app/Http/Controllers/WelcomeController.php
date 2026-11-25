@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Guardian;
+use App\Models\SchoolService;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\Nav;
+use App\Support\ParentAccess;
 use App\Support\Role;
 use App\Support\School;
 use Illuminate\Http\Request;
@@ -79,12 +81,12 @@ class WelcomeController extends Controller
         if ($u->role === Role::REGISTRAR) {
             foreach ((array) $request->input('svc', []) as $row) {
                 if (filled($row['name'] ?? null)) {
-                    \App\Models\SchoolService::updateOrCreate(['name' => $row['name']], ['fee' => (float) ($row['fee'] ?? 0), 'days' => (int) ($row['days'] ?? 3), 'is_active' => ! empty($row['on'])]);
+                    SchoolService::updateOrCreate(['name' => $row['name']], ['fee' => (float) ($row['fee'] ?? 0), 'days' => (int) ($row['days'] ?? 3), 'is_active' => ! empty($row['on'])]);
                 }
             }
         }
 
-        $keys = array_keys(\App\Support\ParentAccess::LABELS);
+        $keys = array_keys(ParentAccess::LABELS);
         $clean = fn ($list) => array_values(array_intersect((array) $list, $keys));
         if ($u->role === Role::STUDENT && ($student = $u->student)) {
             foreach ((array) ($d['access'] ?? []) as $gid => $list) {

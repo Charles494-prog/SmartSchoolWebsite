@@ -59,9 +59,17 @@
             @if($a->overdueAmount() > 0)<p class="mt-3 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">Overdue: {{ \App\Services\Billing::peso($a->overdueAmount()) }}. {{ $channels->isNotEmpty() ? 'Pay online below or at the cashier.' : 'Please settle at the cashier.' }}</p>@endif
 
             @if($a->balance() > 0 && $channels->isNotEmpty())
-                @php $opts = \App\Support\PayOptions::for($a); @endphp
+                @php $opts = \App\Support\PayOptions::for($a); $pendingKeys = \App\Support\PayOptions::pendingKeys($a); $allPending = (bool) array_intersect($pendingKeys, ['full', 'other']);
+                    $opts = array_map(fn ($o) => $o + ['wait' => $allPending || in_array($o['key'], $pendingKeys, true)], $opts);
+                    $free = array_values(array_filter($opts, fn ($o) => ! $o['wait'] && $o['key'] !== 'full')); @endphp
+                @if($pendingKeys)
+                    <p class="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" role="status"><x-icon name="clock" class="mt-0.5 h-4 w-4 shrink-0" />
+                        {{ $allPending ? 'Your last online payment is waiting for Finance. You can pay again once it is accepted or rejected.' : 'Items marked “Waiting for Finance” already have a payment sent. They unlock once Finance accepts or rejects it.' }}</p>
+                @endif
+                @error('pay_key')<p class="field-error mt-2">{{ $message }}</p>@enderror
+                @if(! $allPending && $free)
                 <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js(collect($opts)->firstWhere(fn ($o) => $o['key'] !== 'full')['key'] ?? 'full')], other: '', ch: {{ $channels->first()->id }}, preview: null,
+                     x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js($free[0]['key'])], other: '', ch: {{ $channels->first()->id }}, preview: null,
                                opts: @js($opts), max: {{ $a->balance() }},
                                // Full balance and another amount stand alone; everything else can be combined.
                                solo(k) { return ['full', 'other'].includes(k) },
@@ -106,19 +114,19 @@
                                 <div x-show="step === 1" class="space-y-2">
                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                         <p class="text-xs text-slate-600 dark:text-slate-400">Tick what you want to pay.</p>
-                                        <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10">
+                                        <label @if($pendingKeys) hidden @endif class="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-500/10">
                                             <input type="checkbox" class="h-4 w-4 accent-brand-600" :checked="on('full')" x-on:change="sel = on('full') ? [] : ['full']">
                                             Select all <span class="font-normal text-slate-600 dark:text-slate-400" x-text="'(full balance ' + peso(max) + ')'"></span>
                                         </label>
                                     </div>
                                     <template x-for="o in opts.filter((x) => x.key !== 'full')" :key="o.key">
-                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="on(o.key) || on('full') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
-                                            <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key) || on('full')" x-on:change="toggle(o.key)">
-                                            <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.hint"></span></span>
+                                        <label class="flex items-center gap-3 rounded-xl border-2 p-3.5" :class="o.wait ? 'cursor-not-allowed border-slate-200 opacity-60 dark:border-slate-700' : (on(o.key) || on('full') ? 'cursor-pointer border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'cursor-pointer border-slate-200 dark:border-slate-700')">
+                                            <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :disabled="o.wait" :checked="!o.wait && (on(o.key) || on('full'))" x-on:change="toggle(o.key)">
+                                            <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.wait ? 'Waiting for Finance to check your payment' : o.hint"></span></span>
                                             <span class="font-semibold tabular-nums" x-text="peso(o.amount)"></span>
                                         </label>
                                     </template>
-                                    <label class="block cursor-pointer rounded-xl border-2 p-3.5" :class="on('other') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="if (!on('other')) { toggle('other'); $nextTick(() => $refs.oth.focus()) }">
+                                    <label @if($pendingKeys) hidden @endif class="block cursor-pointer rounded-xl border-2 p-3.5" :class="on('other') ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="if (!on('other')) { toggle('other'); $nextTick(() => $refs.oth.focus()) }">
                                         <span class="block font-medium">Another amount</span>
                                         <span class="text-xs text-slate-600 dark:text-slate-400">Pay any part of the balance (up to <span x-text="peso(max)"></span>)</span>
                                         <span x-show="on('other')" x-cloak class="mt-3 flex items-center rounded-xl border border-slate-300 bg-white px-4 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900">
@@ -153,7 +161,7 @@
                                 <div x-show="step === 3" x-cloak class="space-y-4">
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <label class="block"><span class="label">Reference number</span><input name="reference" value="{{ old('reference') }}" class="input" placeholder="From the GCash / bank receipt" :required="step === 3"></label>
-                                        <label class="block"><span class="label">Date paid</span><input name="paid_on" type="date" value="{{ old('paid_on', today()->toDateString()) }}" max="{{ today()->toDateString() }}" class="input"></label>
+                                        <div><span class="label">Date</span><p class="input flex items-center bg-slate-50 text-slate-700 dark:bg-white/5 dark:text-slate-300">{{ now()->format('M j, Y') }} <span class="ml-1 text-xs text-slate-500">(today – set automatically)</span></p></div>
                                     </div>
                                     <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 p-6 text-center hover:border-brand-400 dark:border-slate-700">
                                         <img x-show="preview" :src="preview" alt="" class="max-h-48 rounded-lg">
@@ -184,6 +192,7 @@
                         </div>
                     </form>
                 </div>
+                @endif
             @endif
             @if($proofs->isNotEmpty())
                 <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">

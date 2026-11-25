@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\PaymentChannel;
 use App\Models\PaymentProof;
+use App\Models\StudentAccount;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,7 +28,7 @@ class OnlinePaymentTest extends TestCase
         $this->actingAs(User::where('role', 'admin')->first())->post('/payment-methods', ['name' => 'GCash', 'kind' => 'gcash', 'account_name' => 'Sampaguita IS', 'account_number' => '09171234567', 'qr' => UploadedFile::fake()->image('qr.png')])->assertRedirect();
         $ch = PaymentChannel::first();
 
-        $account = \App\Models\StudentAccount::get()->first(fn ($a) => $a->balance() > 600);
+        $account = StudentAccount::get()->first(fn ($a) => $a->balance() > 600);
         $kid = $account->enrollment->student;
         $parent = $kid->guardians()->first()->user;
         $before = $account->balance();

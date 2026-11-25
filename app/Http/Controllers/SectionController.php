@@ -13,9 +13,12 @@ use App\Models\Setting;
 use App\Models\Subject;
 use App\Models\User;
 use App\Services\Enrollment as EnrollmentService;
+use App\Services\Timetable;
 use App\Support\Role;
+use App\Support\School;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class SectionController extends Controller
@@ -123,6 +126,61 @@ class SectionController extends Controller
             ->where('grade_level_id', $section->grade_level_id)->get()->each->update(['section_id' => $section->id])->count();
 
         return back()->with('ok', "$n student(s) added to {$section->name}.");
+    }
+
+    /** Enrolled students with no section yet – pick a section for each, right here. */
+    public function unsectioned()
+    {
+        $sy = SchoolYear::current();
+        $students = $sy ? Enrollment::with('student', 'gradeLevel')->where('school_year_id', $sy->id)->whereNull('section_id')->where('status', 'enrolled')
+            ->get()->sortBy(fn ($e) => [$e->gradeLevel->sort_order, $e->student->last_name, $e->student->first_name]) : collect();
+        $sections = $sy ? Section::where('school_year_id', $sy->id)->whereIn('grade_level_id', $students->pluck('grade_level_id')->unique())
+            ->withCount(['enrollments' => fn ($q) => $q->where('status', 'enrolled')])->orderBy('name')->get()->groupBy('grade_level_id') : collect();
+
+        return view('sections.unsectioned', ['students' => $students, 'sections' => $sections]);
+    }
+
+    public function placeUnsectioned(Request $request)
+    {
+        $data = $request->validate(['place' => 'required|array', 'place.*' => 'nullable|integer|exists:sections,id']);
+        $picked = array_filter($data['place']);
+        if (! $picked) {
+            return back()->with('error', 'Pick a section for at least one student.');
+        }
+        $sy = SchoolYear::current();
+        $done = 0;
+        $full = [];
+        DB::transaction(function () use ($picked, $sy, &$done, &$full) {
+            $sections = Section::whereIn('id', array_unique($picked))->withCount(['enrollments' => fn ($q) => $q->where('status', 'enrolled')])->lockForUpdate()->get()->keyBy('id');
+            foreach (Enrollment::whereIn('id', array_keys($picked))->where('school_year_id', $sy?->id)->whereNull('section_id')->get() as $e) {
+                $sec = $sections[$picked[$e->id]] ?? null;
+                if (! $sec || $sec->grade_level_id !== $e->grade_level_id) {
+                    continue;
+                }
+                if ($sec->enrollments_count >= $sec->capacity) {
+                    $full[$sec->name] = true;
+
+                    continue;
+                }
+                $e->update(['section_id' => $sec->id]);
+                $sec->enrollments_count++;
+                $done++;
+            }
+        });
+        $msg = "$done ".str('student')->plural($done).' placed.';
+
+        return $full ? back()->with('error', $msg.' Full: '.implode(', ', array_keys($full)).'. Raise the capacity or choose another section.') : back()->with('ok', $msg);
+    }
+
+    /** Rooms page: create a grade's block of rooms (one per section, plus spares). */
+    public function generateRooms(Request $request)
+    {
+        $d = $request->validate(['grade_level_id' => 'required|exists:grade_levels,id', 'spare' => 'nullable|integer|min:0|max:9']);
+        $g = GradeLevel::findOrFail($d['grade_level_id']);
+        $sections = Section::where('school_year_id', SchoolYear::current()?->id)->where('grade_level_id', $g->id)->count();
+        $made = Timetable::generateRooms($g, max(1, $sections) + (int) ($d['spare'] ?? 0));
+
+        return back()->with('ok', $made ? 'Created '.implode(', ', $made).'.' : "{$g->name} already has these rooms – nothing new to create.");
     }
 
     public function removeStudent(Section $section, Enrollment $enrollment)
@@ -258,50 +316,88 @@ class SectionController extends Controller
         return back()->with('ok', 'Schedule removed.');
     }
 
-    /** Weekly timetable of a section, a teacher, or "my" schedule. */
+    /** Weekly timetable: all rooms of a grade (one day), or one section / teacher / room / subject. */
     public function timetable(Request $request)
     {
         $u = $request->user();
         $sy = SchoolYear::current();
-        $sections = Section::where('school_year_id', $sy?->id)->with('gradeLevel')->get();
+        $staff = $u->hasRole(Role::ADMIN, Role::REGISTRAR);
+        $sections = Section::where('school_year_id', $sy?->id)->with('gradeLevel')->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name]);
+        $levels = $sections->pluck('gradeLevel')->unique('id')->values();
         $q = ScheduleSlot::with('classSubject.subject', 'classSubject.section.gradeLevel', 'classSubject.teacher')->whereHas('classSubject.section', fn ($s) => $s->where('school_year_id', $sy?->id));
-        $title = '';
-        $rooms = Room::orderBy('name')->pluck('name');
-        if ($request->query('room') === '__all') {
-            $all = $q->whereNotNull('room')->get();
-            $day = (int) $request->query('day', min(6, now()->dayOfWeekIso));
+        $rooms = Room::where('is_active', true)->orderByRaw('length(name)')->orderBy('name')->pluck('name');
+        $conflicts = Timetable::conflicts($sy)->count();
+        $print = $request->boolean('print');
+        $common = ['conflicts' => $conflicts, 'print' => $print, 'school' => Setting::get('school_name'), 'year' => $sy?->name, 'levels' => $levels];
 
-            return view('sections.rooms', [
-                'rooms' => $rooms->merge($all->pluck('room'))->unique()->values(),
-                'day' => $day,
+        if ($request->query('room') === '__all') {
+            $grade = (int) ($request->query('grade') ?: $levels->first()?->id);
+            $gradeSections = $sections->where('grade_level_id', $grade);
+            $gradeRooms = Room::where('grade_level_id', $grade)->orderBy('name')->pluck('name')->merge($gradeSections->pluck('room'))->filter()->unique()->sort(SORT_NATURAL)->values();
+            $all = (clone $q)->whereIn('room', $gradeRooms)->get();
+
+            return view('sections.rooms', $common + [
+                'rooms' => $gradeRooms, 'grade' => $grade,
+                'day' => (int) $request->query('day', min(5, now()->dayOfWeekIso)),
                 'slots' => $all,
-                'print' => $request->boolean('print'),
             ]);
         }
-        if ($request->filled('subject')) {
+
+        // Default view per role: teachers see their own week; staff start on the first section.
+        $mode = match (true) {
+            $request->filled('subject') => 'subject',
+            $request->filled('room') => 'room',
+            $request->filled('section_id') => 'section',
+            $request->filled('teacher_id') => 'teacher',
+            $u->role === Role::TEACHER => 'teacher',
+            default => 'section',
+        };
+        $title = '';
+        if ($mode === 'subject') {
             $q->whereHas('classSubject.subject', fn ($sub) => $sub->where('name', $request->subject));
-            $title = $request->subject.' – all sections';
-        } elseif ($request->filled('room')) {
+            $title = $request->subject;
+        } elseif ($mode === 'room') {
             $q->where('room', $request->room);
-            $title = 'Room '.preg_replace('/^Room\s*/i', '', $request->room);
-        } elseif ($request->filled('section_id')) {
-            $q->whereHas('classSubject', fn ($c) => $c->where('section_id', $request->section_id));
-            $title = $sections->firstWhere('id', $request->section_id)?->label();
+            $title = $request->room;
+        } elseif ($mode === 'section') {
+            $sid = (int) ($request->query('section_id') ?: $sections->first()?->id);
+            $q->whereHas('classSubject', fn ($c) => $c->where('section_id', $sid));
+            $title = $sections->firstWhere('id', $sid)?->label();
+            $request->merge(['section_id' => $sid]);
         } else {
-            $teacher = $request->filled('teacher_id') && $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? $request->teacher_id : $u->id;
+            $teacher = $request->filled('teacher_id') && $staff ? (int) $request->teacher_id : $u->id;
             $q->whereHas('classSubject', fn ($c) => $c->where('teacher_id', $teacher));
             $title = User::find($teacher)?->name;
         }
+        $slots = $q->get();
 
-        return view('sections.timetable', [
-            'slots' => $q->get()->sortBy('starts_at')->groupBy('day_of_week'),
+        // By subject: one row per class – identical times on several days collapse to "Mon–Fri".
+        $subjectRows = $mode !== 'subject' ? collect() : $slots->groupBy(fn ($s) => $s->class_subject_id.'|'.$s->starts_at.'|'.$s->ends_at.'|'.$s->room)
+            ->map(fn ($g) => ['slot' => $g->first(), 'days' => self::dayRange($g->pluck('day_of_week')->unique()->sort()->values()->all())])
+            ->sortBy(fn ($r) => [$r['slot']->classSubject->section->gradeLevel->sort_order, $r['slot']->classSubject->section->name, $r['slot']->starts_at])
+            ->groupBy(fn ($r) => $r['slot']->classSubject->section->gradeLevel->name);
+
+        return view('sections.timetable', $common + [
+            'slots' => $slots,
+            'subjectRows' => $subjectRows,
             'title' => $title,
             'sections' => $sections->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
             'rooms' => $rooms,
             'subjects' => Subject::where('is_active', true)->orderBy('name')->pluck('name')->unique()->values(),
-            'mode' => $request->filled('subject') ? 'subject' : ($request->filled('room') ? 'room' : ($request->filled('section_id') ? 'section' : 'teacher')),
-            'teachers' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? User::where('role', Role::TEACHER)->orderBy('name')->pluck('name', 'id') : collect(),
+            'mode' => $mode,
+            'teachers' => $staff ? User::where('role', Role::TEACHER)->where('is_active', true)->orderBy('name')->pluck('name', 'id') : collect(),
         ]);
+    }
+
+    /** [1,2,3,4,5] → "Mon–Fri", [1,3,5] → "Mon, Wed, Fri". */
+    public static function dayRange(array $days): string
+    {
+        $d = ScheduleSlot::DAYS;
+        if (count($days) > 2 && $days === range($days[0], end($days))) {
+            return $d[$days[0]].'–'.$d[end($days)];
+        }
+
+        return implode(', ', array_map(fn ($x) => $d[$x], $days));
     }
 
     public function promotion()
@@ -318,9 +414,24 @@ class SectionController extends Controller
             'from_year_id' => 'required|exists:school_years,id',
             'to_year_id' => 'required|exists:school_years,id|different:from_year_id',
             'confirm' => 'accepted',
+            'sectioning' => 'nullable|in:none,random,choice',
         ], ['confirm.accepted' => 'Tick the box to confirm.']);
         $r = EnrollmentService::promote((int) $data['from_year_id'], (int) $data['to_year_id'], (float) Setting::get('passing_grade'));
+        $how = $data['sectioning'] ?? 'none';
+        if ($how === 'choice' && ! School::allows('student_section_choice')) {
+            $how = 'random';
+        }
+        if ($how !== 'none') {
+            $done = AllocationController::autoAllocate((int) $data['to_year_id'], $how, $request->user()->id);
+            $msg = "Done: {$r['promoted']} promoted, {$r['retained']} retained, {$r['graduated']} graduated. ";
+            $msg .= $how === 'random' ? "Placed into sections automatically: {$done['placed']} students in {$done['grades']} grade(s)." : "Students can now choose their section in {$done['grades']} grade(s) (7 days).";
+            if ($done['missing']) {
+                $msg .= ' No sections yet for: '.implode(', ', $done['missing']).' – create them in Assign sections.';
+            }
 
-        return back()->with('ok', "Done: {$r['promoted']} promoted, {$r['retained']} retained, {$r['graduated']} graduated. Promoted/retained students are now enrolled in the new school year without a section – assign sections next.");
+            return back()->with('ok', $msg.' You can undo it in Assign sections.');
+        }
+
+        return back()->with('ok', "Done: {$r['promoted']} promoted, {$r['retained']} retained, {$r['graduated']} graduated. Promoted/retained students are now enrolled in the new school year without a section – assign sections next.")->with('next', route('allocation.index'));
     }
 }

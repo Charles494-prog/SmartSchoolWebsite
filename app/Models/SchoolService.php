@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SchoolService extends Model
 {
@@ -17,4 +18,9 @@ class SchoolService extends Model
         ['Copy of diploma', 'Certified true copy', 100, 3],
         ['Report card copy (SF9)', null, 0, 1],
     ];
+
+    public function requests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class, 'school_service_id');
+    }
 }

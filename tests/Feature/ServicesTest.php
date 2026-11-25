@@ -6,6 +6,7 @@ use App\Models\SchoolService;
 use App\Models\ServiceRequest;
 use App\Models\StudentAccount;
 use App\Models\User;
+use App\Support\Nav;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -45,7 +46,7 @@ class ServicesTest extends TestCase
 
     public function test_registrar_has_no_attendance_or_teaching_and_librarian_no_student_list(): void
     {
-        $labels = fn ($email) => collect(\App\Support\Nav::for(User::where('email', $email)->first()))->flatten(1)->pluck('label')->all();
+        $labels = fn ($email) => collect(Nav::for(User::where('email', $email)->first()))->flatten(1)->pluck('label')->all();
         $this->assertNotContains('QR scanner', $labels('registrar@school.test'));
         $this->assertNotContains('Honor roll', $labels('registrar@school.test'));
         $this->assertContains('Grade approvals', $labels('registrar@school.test'));

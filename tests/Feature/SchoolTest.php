@@ -63,7 +63,7 @@ class SchoolTest extends TestCase
         $enrollment = Enrollment::first();
         $class = ClassSubject::first();
         $pages = [
-            'admin@school.test' => ['/dashboard', '/students', "/students/{$student->id}", '/students/create', '/applications', '/applications/'.Application::first()->id, '/sections', '/sections/1', '/promotion', '/timetable', '/timetable?section_id=1', '/timetable?room=Room%20101', '/timetable?room=__all', '/timetable?subject=English', '/timetable?teacher_id=2', '/timetable?room=__all&day=2', '/timetable?room=__all&print=1', '/sections?level=8', '/manage/transfers/1/edit', '/gradebook', "/gradebook/{$class->id}", '/honors', '/attendance/scan', '/attendance', '/attendance?section_id=1&date=2026-11-20', '/attendance/report', '/assignments', '/finance', "/finance/accounts/{$enrollment->id}", '/finance/payments', '/finance/overdue', '/announcements', '/calendar', '/messages', '/notifications', '/library', '/payroll', '/settings', '/audit', '/backups', '/how-it-works', '/qr-cards',
+            'admin@school.test' => ['/dashboard', '/students', "/students/{$student->id}", '/students/create', '/applications', '/applications/'.Application::first()->id, '/sections', '/sections/1', '/promotion', '/timetable', '/timetable?section_id=1', '/timetable?room=Room%20101', '/timetable?room=__all', '/timetable?subject=English', '/timetable?teacher_id=2', '/timetable?room=__all&day=2', '/timetable?room=__all&print=1', '/sections?level=8', '/manage/transfers/1/edit', '/gradebook', "/gradebook/{$class->id}", '/honors', '/attendance/scan', '/attendance', '/attendance?section_id=1&date=2026-11-20', '/attendance/report', '/assignments', '/finance', "/finance/accounts/{$enrollment->id}", '/finance/payments', '/finance/overdue', '/announcements', '/calendar', '/messages', '/notifications', '/library', '/payroll', '/grade-approvals', '/allocation', '/sections/unsectioned', '/finance/bookstore', '/bookstore', '/manage/rooms', '/timetable?subject=English&print=1', '/settings', '/audit', '/backups', '/how-it-works', '/qr-cards',
                 '/manage/rooms', '/manage/rooms/create', '/manage/school-years', '/manage/grade-levels', '/manage/subjects', '/manage/users', '/manage/fee-items', '/manage/discounts', '/manage/payment-plans', '/manage/payment-plans/create', '/manage/events', '/manage/transfers', '/manage/clinic-visits', '/manage/employees', '/manage/subjects/create', '/manage/users/1/edit',
                 "/report-card/{$enrollment->id}", "/students/{$student->id}/sf10", "/students/{$student->id}/id-card", '/sections/1/id-cards', "/finance/soa/{$enrollment->id}"],
             'teacher@school.test' => ['/how-it-works', '/dashboard', '/gradebook', '/attendance', '/attendance/scan', '/attendance/report', '/honors', '/timetable', '/assignments', '/announcements', '/messages'],
@@ -200,20 +200,25 @@ class SchoolTest extends TestCase
     public function test_rooms_limit_capacity_and_block_double_booking(): void
     {
         $this->as('registrar@school.test');
-        $room = Room::where('name', 'Room 105')->first(); // 30 seats
+        Room::create(['name' => 'Room 901', 'capacity' => 30, 'is_active' => true]);
+        Room::create(['name' => 'Room 902', 'capacity' => 40, 'is_active' => true]);
         $sy = SchoolYear::current();
         $level = GradeLevel::where('name', 'Grade 9')->first();
-        $this->post('/sections', ['name' => 'Luna', 'grade_level_id' => $level->id, 'school_year_id' => $sy->id, 'room' => 'Room 105', 'capacity' => 45])->assertSessionHasErrors('capacity');
+        $this->post('/sections', ['name' => 'Luna', 'grade_level_id' => $level->id, 'school_year_id' => $sy->id, 'room' => 'Room 901', 'capacity' => 45])->assertSessionHasErrors('capacity');
         $this->post('/sections', ['name' => 'Luna', 'grade_level_id' => $level->id, 'school_year_id' => $sy->id, 'room' => 'Typed room', 'capacity' => 20])->assertSessionHasErrors('room');
-        $this->post('/sections', ['name' => 'Luna', 'grade_level_id' => $level->id, 'school_year_id' => $sy->id, 'room' => 'Room 105', 'capacity' => 30, 'add_subjects' => 1])->assertRedirect();
+        $this->post('/sections', ['name' => 'Luna', 'grade_level_id' => $level->id, 'school_year_id' => $sy->id, 'room' => 'Room 901', 'capacity' => 30, 'add_subjects' => 1])->assertRedirect();
         $luna = Section::where('name', 'Luna')->first();
-        $this->assertSame('Room 105', $luna->room);
+        $this->assertSame('Room 901', $luna->room);
 
-        // Room 101 is used by Rizal on weekdays 07:30–08:30; Luna cannot book it at the same time.
-        $cs = $luna->classSubjects()->first();
-        $this->post("/classes/{$cs->id}/slots", ['days' => [1], 'starts_at' => '07:30', 'ends_at' => '08:30', 'room' => 'Room 101'])->assertSessionHas('error');
+        // Rizal's home room is busy at its first class time; Luna cannot book it then.
+        $rizal = Section::where('name', 'Rizal')->first();
+        $busy = ScheduleSlot::whereHas('classSubject', fn ($q) => $q->where('section_id', $rizal->id))->where('day_of_week', 1)->orderBy('starts_at')->first();
+        $start = substr($busy->starts_at, 0, 5);
+        $end = substr($busy->ends_at, 0, 5);
+        $cs = $luna->classSubjects()->whereNull('teacher_id')->first() ?? tap($luna->classSubjects()->first())->update(['teacher_id' => null]);
+        $this->post("/classes/{$cs->id}/slots", ['days' => [1], 'starts_at' => $start, 'ends_at' => $end, 'room' => $rizal->room])->assertSessionHas('error');
         $this->assertSame(0, $cs->slots()->count());
-        $this->post("/classes/{$cs->id}/slots", ['days' => [1], 'starts_at' => '07:30', 'ends_at' => '08:30', 'room' => 'Room 106'])->assertSessionHas('ok');
+        $this->post("/classes/{$cs->id}/slots", ['days' => [1], 'starts_at' => $start, 'ends_at' => $end, 'room' => 'Room 902'])->assertSessionHas('ok');
         $this->assertSame(1, $cs->slots()->count());
     }
 
@@ -375,7 +380,7 @@ class SchoolTest extends TestCase
 
         $in = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 0));
         $this->assertSame('present', $in['status']);
-        $this->assertSame('already', Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 1))["status"]); // accidental double scan
+        $this->assertSame('already', Attendance::checkIn($s->qr_token, Carbon::today()->setTime(7, 1))['status']); // accidental double scan
         $out = Attendance::checkIn($s->qr_token, Carbon::today()->setTime(16, 30));
         $this->assertSame('out', $out['status']);
         $this->assertSame('16:30:00', AttendanceRecord::where('student_id', $s->id)->whereDate('date', today())->whereNull('class_subject_id')->value('time_out'));

@@ -7,6 +7,7 @@ use App\Models\QuizAttempt;
 use App\Models\QuizQuestion;
 use App\Models\Score;
 use App\Models\Submission;
+use App\Support\LiveReports;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -288,7 +289,7 @@ class Quiz
             $sub = Submission::firstOrNew(['assignment_id' => $a->id, 'student_id' => $studentId]);
             $sub->fill(['body' => 'Quiz attempt '.$best->attempt_no, 'submitted_at' => $best->finished_at, 'score' => $best->needs_review ? null : $best->score])->save();
             if (! $best->needs_review) {
-                \App\Support\LiveReports::send($best->student, $a->title.' (quiz)', $best->score.'/'.$a->max_score);
+                LiveReports::send($best->student, $a->title.' (quiz)', $best->score.'/'.$a->max_score);
             }
             if ($a->assessment_id && ! $best->needs_review && ! $a->classSubject->isLocked((int) $a->term)) {
                 Score::updateOrCreate(['assessment_id' => $a->assessment_id, 'student_id' => $studentId], ['score' => $best->score]);

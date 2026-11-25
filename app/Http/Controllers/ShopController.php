@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountCharge;
 use App\Models\ShopItem;
 use App\Models\ShopOrder;
+use App\Models\ShopOrderLine;
 use App\Models\Student;
 use App\Models\User;
 use App\Notifications\GeneralNotice;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Bookstore: the office posts books, uniforms, merch and souvenirs; families order online.
@@ -27,16 +29,32 @@ class ShopController extends Controller
 
     public function manage(Request $request)
     {
-        $status = in_array($request->query('status'), array_keys(ShopOrder::STATUSES), true) ? $request->query('status') : 'placed';
-        $all = ShopOrder::with('lines', 'student', 'charge')->latest()->get();
-        $eff = fn ($o) => in_array($o->status, ['approved', 'ready'], true) && $o->isPaid() ? 'paid' : $o->status;
-
         return view('shop.manage', [
-            'items' => ShopItem::orderBy('category')->orderBy('name')->get(),
-            'orders' => $all->filter(fn ($o) => $eff($o) === $status)->values(),
-            'status' => $status,
-            'counts' => $all->groupBy($eff)->map->count(),
+            'items' => ShopItem::where('is_active', true)->orderBy('category')->orderBy('name')->get(),
+            'hidden' => ShopItem::where('is_active', false)->orderBy('name')->get(),
+            'orderCounts' => $this->orderFeed()['counts'],
         ]);
+    }
+
+    /** Orders panel data (polled every few seconds – no outside services, works on LAN). */
+    public function orders(Request $request)
+    {
+        return response()->json($this->orderFeed());
+    }
+
+    private function orderFeed(): array
+    {
+        $all = ShopOrder::with('lines', 'student', 'charge')->where(fn ($q) => $q->whereNotIn('status', ['released', 'cancelled'])->orWhere('updated_at', '>=', now()->subDays(14)))->latest()->limit(300)->get();
+        $tab = fn ($o) => match ($o->shownStatus()) {
+            'placed' => 'new', 'approved', 'awaiting', 'ready' => 'payment', 'paid' => 'release', default => 'done'
+        };
+
+        return [
+            'counts' => $all->groupBy($tab)->map->count()->all() + ['new' => 0, 'payment' => 0, 'release' => 0, 'done' => 0],
+            'orders' => $all->map(fn ($o) => ['id' => $o->id, 'tab' => $tab($o), 'status' => $o->shownStatus(), 'label' => ShopOrder::SHOWN[$o->shownStatus()], 'walk_in' => $o->walk_in,
+                'student' => $o->student->full_name, 'summary' => $o->summary(), 'total' => $o->total, 'unpaid' => $o->charge?->remaining() ?? 0, 'note' => $o->note,
+                'when' => $o->created_at->format('M j, Y').' '.ampm($o->created_at->format('H:i')), 'canDecline' => ! $o->charge || $o->charge->paid() == 0])->values()->all(),
+        ];
     }
 
     public function saveItem(Request $request, ?ShopItem $item = null)
@@ -53,14 +71,19 @@ class ShopController extends Controller
         unset($d['image']);
         $item ? $item->update($d) : ShopItem::create($d);
 
-        return back()->with('ok', 'Item saved.');
+        return redirect()->route('shop.manage')->with('ok', 'Item saved.');
     }
 
     public function deleteItem(ShopItem $item)
     {
-        $item->update(['is_active' => false]);
+        if (ShopOrderLine::where('shop_item_id', $item->id)->exists()) {
+            $item->update(['is_active' => false]);
 
-        return back()->with('ok', 'Item hidden from the bookstore (past orders are kept).');
+            return back()->with('ok', $item->name.' is in past orders, so it was archived (hidden) instead of deleted.');
+        }
+        $item->delete();
+
+        return back()->with('ok', $item->name.' deleted.');
     }
 
     public function setStatus(Request $request, ShopOrder $order)
@@ -125,6 +148,69 @@ class ShopController extends Controller
         return back()->with('ok', 'Notified '.$people->count().' '.str('account')->plural($people->count()).'.');
     }
 
+    // ------------------------------------------------------------ shopping mode (staff shop for a student at the counter)
+
+    /** As-you-type student picker: only what's needed to pick the right child. */
+    public function studentLookup(Request $request)
+    {
+        $q = trim((string) $request->query('q'));
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+        $students = Student::where('status', 'active')
+            ->where(fn ($w) => $w->where('last_name', 'like', "%$q%")->orWhere('first_name', 'like', "%$q%")->orWhere('student_no', 'like', "%$q%"))
+            ->orderBy('last_name')->orderBy('first_name')->limit(12)->get();
+
+        return response()->json($students->map(function ($s) {
+            $e = $s->currentEnrollment();
+
+            return ['id' => $s->id, 'name' => $s->full_name, 'no' => $s->student_no, 'initials' => mb_substr($s->first_name, 0, 1).mb_substr($s->last_name, 0, 1),
+                'class' => $e ? $e->gradeLevel->name.($e->section ? ' – '.$e->section->name : '') : 'Not enrolled this year', 'billable' => (bool) $e?->account];
+        })->values());
+    }
+
+    /** Walk-in checkout: no approval, no "prepared" – the order goes straight to the balance; pay at Finance, then release. */
+    public function walkIn(Request $request)
+    {
+        $d = $request->validate(['student_id' => 'required|integer|exists:students,id', 'cart' => 'required|array|min:1|max:50', 'cart.*.id' => 'required|exists:shop_items,id', 'cart.*.qty' => 'required|integer|min:1|max:50', 'cart.*.size' => 'nullable|max:20'],
+            ['student_id.required' => 'Pick a student from the list first.', 'student_id.exists' => 'Pick a student from the list first.']);
+        $student = Student::findOrFail($d['student_id']);
+        $account = $student->currentEnrollment()?->account;
+        if (! $account) {
+            return back()->with('error', $student->full_name.' has no fee account this year – ask Finance to set it up first.');
+        }
+        $order = DB::transaction(function () use ($d, $student, $account, $request) {
+            $order = $this->placeOrder($d['cart'], $student, $account, $request->user());
+            AccountCharge::create(['student_account_id' => $account->id, 'shop_order_id' => $order->id, 'description' => 'Bookstore order #'.$order->id, 'amount' => $order->total]);
+            $order->update(['status' => 'approved', 'walk_in' => true]);
+
+            return $order;
+        });
+        Notification::send(User::whereIn('role', [Role::CASHIER])->where('is_active', true)->get(),
+            new GeneralNotice('Bookstore order to pay', 'Walk-in order #'.$order->id.' · '.$student->full_name.' · '.Billing::peso($order->total), route('finance.bookstore', [], false)));
+
+        return redirect()->route('shop.manage')->with('walkin', $order->id);
+    }
+
+    public function slip(ShopOrder $order)
+    {
+        $order->load('lines', 'student');
+
+        return view('shop.slip', ['o' => $order, 'e' => $order->student->currentEnrollment()]);
+    }
+
+    /** Finance: bookstore orders billed and not yet paid (walk-ins first). */
+    public function awaitingPayment(Request $request)
+    {
+        $orders = ShopOrder::with('lines', 'student', 'charge')->whereIn('status', ['approved', 'ready'])->latest()->get()
+            ->filter(fn ($o) => $o->charge && $o->charge->remaining() > 0)->sortByDesc('walk_in')->values();
+        if ($request->expectsJson()) {
+            return response()->json(['count' => $orders->count(), 'ids' => $orders->pluck('id')]);
+        }
+
+        return view('shop.finance', ['orders' => $orders]);
+    }
+
     public function image(ShopItem $item)
     {
         abort_unless($item->image_path, 404);
@@ -161,29 +247,34 @@ class ShopController extends Controller
         abort_unless($account, 422, 'Your school fees are not set up yet – ask the cashier.');
         $cart = $request->validate(['cart' => 'required|array|min:1', 'cart.*.id' => 'required|exists:shop_items,id', 'cart.*.qty' => 'required|integer|min:1|max:20', 'cart.*.size' => 'nullable|max:20'])['cart'];
 
-        $order = DB::transaction(function () use ($cart, $student, $account, $u) {
-            $lines = [];
-            foreach ($cart as $c) {
-                $item = ShopItem::lockForUpdate()->findOrFail($c['id']);
-                abort_unless($item->is_active, 422, $item->name.' is no longer available.');
-                if ($item->sizes) {
-                    abort_unless(in_array($c['size'] ?? null, $item->sizes, true), 422, 'Choose a size for '.$item->name.'.');
-                }
-                if ($item->stock !== null) {
-                    abort_if($item->stock < $c['qty'], 422, 'Only '.$item->stock.' '.$item->name.' left.');
-                    $item->decrement('stock', $c['qty']);
-                }
-                $lines[] = ['shop_item_id' => $item->id, 'name' => $item->name, 'size' => $item->sizes ? $c['size'] : null, 'qty' => $c['qty'], 'price' => $item->price];
-            }
-            $total = round(collect($lines)->sum(fn ($l) => $l['price'] * $l['qty']), 2);
-            $order = ShopOrder::create(['student_id' => $student->id, 'student_account_id' => $account->id, 'ordered_by' => $u->id, 'total' => $total]);
-            $order->lines()->createMany($lines);
-
-            return $order;
-        });
+        $order = DB::transaction(fn () => $this->placeOrder($cart, $student, $account, $u));
         Notification::send(User::whereIn('role', [Role::BOOKSTORE, Role::ADMIN])->where('is_active', true)->get(),
             new GeneralNotice('New bookstore order', $student->full_name.' · '.Billing::peso($order->total), route('shop.manage', [], false)));
 
         return redirect()->route('portal.shop')->with('ok', 'Order #'.$order->id.' sent. The bookstore will check it first; once approved you can pay it.');
+    }
+
+    /** Reserve stock (row-locked, so two checkouts can't oversell) and create the order. Call inside a transaction. */
+    private function placeOrder(array $cart, Student $student, $account, User $u): ShopOrder
+    {
+        $lines = [];
+        foreach ($cart as $c) {
+            $item = ShopItem::lockForUpdate()->findOrFail($c['id']);
+            $fail = fn ($m) => throw ValidationException::withMessages(['cart' => $m]);
+            $item->is_active || $fail($item->name.' is no longer available.');
+            if ($item->sizes && ! in_array($c['size'] ?? null, $item->sizes, true)) {
+                $fail('Choose a size for '.$item->name.'.');
+            }
+            if ($item->stock !== null) {
+                $item->stock >= $c['qty'] || $fail($item->stock > 0 ? 'Only '.$item->stock.' '.$item->name.' left – lower the quantity.' : $item->name.' just ran out of stock.');
+                $item->decrement('stock', $c['qty']);
+            }
+            $lines[] = ['shop_item_id' => $item->id, 'name' => $item->name, 'size' => $item->sizes ? $c['size'] : null, 'qty' => $c['qty'], 'price' => $item->price];
+        }
+        $total = round(collect($lines)->sum(fn ($l) => $l['price'] * $l['qty']), 2);
+        $order = ShopOrder::create(['student_id' => $student->id, 'student_account_id' => $account->id, 'ordered_by' => $u->id, 'total' => $total]);
+        $order->lines()->createMany($lines);
+
+        return $order;
     }
 }

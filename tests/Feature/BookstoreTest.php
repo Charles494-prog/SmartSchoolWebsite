@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AccountCharge;
 use App\Models\ShopItem;
 use App\Models\ShopOrder;
 use App\Models\StudentAccount;
@@ -76,9 +77,9 @@ class BookstoreTest extends TestCase
     public function test_paying_several_items_at_once_splits_between_them(): void
     {
         $account = StudentAccount::with('enrollment.student')->get()->first(fn ($a) => $a->tuitionBalance() > 500);
-        $c1 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'TOR', 'amount' => 150]);
-        $c2 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Good moral', 'amount' => 50]);
-        $c3 = \App\Models\AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Uniform', 'amount' => 600]);
+        $c1 = AccountCharge::create(['student_account_id' => $account->id, 'description' => 'TOR', 'amount' => 150]);
+        $c2 = AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Good moral', 'amount' => 50]);
+        $c3 = AccountCharge::create(['student_account_id' => $account->id, 'description' => 'Uniform', 'amount' => 600]);
         $tuition = $account->tuitionBalance();
         $this->actingAs(User::where('role', 'cashier')->first())->post("/finance/accounts/{$account->enrollment_id}/pay",
             ['amount' => 300, 'method' => 'cash', 'paid_on' => today()->toDateString(), 'pay_key' => "order:{$c1->id},order:{$c2->id},fee:1", 'purpose' => 'TOR + Good moral + ID'])->assertSessionHasNoErrors();

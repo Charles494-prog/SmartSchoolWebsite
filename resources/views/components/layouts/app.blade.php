@@ -70,6 +70,12 @@
 <div :class="mini ? 'lg:pl-20' : 'lg:pl-72'" class="lg:pl-72 transition-[padding] duration-300">
     {{-- Top bar --}}
     <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-slate-900/80">
+        @if(\App\Http\Controllers\DevController::impersonating())
+            <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-fuchsia-800 px-4 py-2 text-sm font-medium text-white" role="status">
+                <x-icon name="key" class="h-4 w-4" /> <span>Viewing as <b>{{ $u->roleLabel() }}</b> – {{ $u->name }}</span>
+                <form method="post" action="{{ route('dev.back') }}">@csrf<button class="min-h-9 rounded-lg border-2 border-white px-3 font-semibold text-white hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-fuchsia-800">Return to Superadmin</button></form>
+            </div>
+        @endif
         <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
             <button class="rounded-xl p-2 text-slate-600 hover:bg-slate-100 lg:hidden" @click="menu=true" aria-label="Open menu"><x-icon name="menu" /></button>
             <button @click="$dispatch('palette')" class="flex max-w-md flex-1 items-center gap-3 rounded-xl bg-slate-100 px-3.5 py-2.5 text-left text-sm text-slate-400 hover:bg-slate-200/70 dark:bg-white/5 dark:hover:bg-white/10">
@@ -78,9 +84,10 @@
             </button>
             <div class="ml-auto flex items-center gap-1">
                 <a href="{{ route('guide') }}" class="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:flex dark:text-slate-300 dark:hover:bg-white/10"><x-icon name="sparkles" class="h-4 w-4 text-violet-500" /> How it works</a>
-                <a href="{{ route('notifications') }}" class="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700" title="Notifications">
+                <a href="{{ route('notifications') }}" class="relative flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-700" title="Notifications"
+                   x-data x-init="$store.bell.count = {{ $unread }}" :aria-label="'Notifications' + ($store.bell.count ? ', ' + $store.bell.count + ' unread' : '')">
                     <x-icon name="bell" />
-                    @if($unread)<span class="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $unread > 9 ? '9+' : $unread }}</span>@endif
+                    <span x-show="$store.bell.count > 0" @if(! $unread) x-cloak @endif class="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white" x-text="$store.bell.count > 9 ? '9+' : $store.bell.count">{{ $unread > 9 ? '9+' : $unread }}</span>
                 </a>
                 <div x-data="{ o:false }" class="relative">
                     <button @click="o=!o" class="flex items-center gap-2 rounded-xl p-1.5 pr-2.5 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Account menu" :aria-expanded="o">
@@ -97,7 +104,7 @@
                             <svg x-show="$store.theme.dark" x-cloak class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
                             <span x-text="$store.theme.dark ? 'Light mode' : 'Dark mode'">Dark mode</span>
                         </button>
-                        @if(\App\Http\Controllers\DevController::enabled())
+                        @if(\App\Http\Controllers\DevController::visible())
                             @php $devLan = \App\Support\School::isLan(); @endphp
                             <div class="border-t border-slate-100 dark:border-white/10" x-data="{ dev: false }">
                                 <button type="button" @click="dev = !dev" class="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-fuchsia-700 hover:bg-fuchsia-50 dark:text-fuchsia-300 dark:hover:bg-fuchsia-500/10">

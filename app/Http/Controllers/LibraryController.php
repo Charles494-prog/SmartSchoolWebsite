@@ -6,7 +6,9 @@ use App\Models\Book;
 use App\Models\BookLoan;
 use App\Models\Setting;
 use App\Models\Student;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class LibraryController extends Controller
 {
@@ -56,7 +58,7 @@ class LibraryController extends Controller
         if ($book->available() < $copies) {
             return back()->with('error', 'Only '.$book->available().' '.str('copy')->plural($book->available()).' available.');
         }
-        $due = isset($data['due_on']) ? \Carbon\Carbon::parse($data['due_on']) : today()->addDays((int) Setting::get('library_loan_days'));
+        $due = isset($data['due_on']) ? Carbon::parse($data['due_on']) : today()->addDays((int) Setting::get('library_loan_days'));
         BookLoan::create(['book_id' => $book->id, 'student_id' => $data['student_id'], 'borrowed_on' => today(), 'due_on' => $due, 'copies' => $copies,
             'condition' => $data['condition'] ?? null, 'note' => $data['note'] ?? null]);
 
@@ -75,6 +77,6 @@ class LibraryController extends Controller
     {
         abort_unless($book->cover_path, 404);
 
-        return \Illuminate\Support\Facades\Storage::disk('local')->response($book->cover_path);
+        return Storage::disk('local')->response($book->cover_path);
     }
 }

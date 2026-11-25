@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\FeeItem;
+use App\Models\PaymentProof;
 use App\Models\StudentAccount;
 
 /** The quick choices for "what are you paying for?" – used by families online and by the cashier. */
@@ -50,7 +50,9 @@ class PayOptions
         }
 
         // Options with the same amount are one choice: keep the broadest and mention the others.
-        $rank = fn ($k) => match (true) { $k === 'full' => 0, $k === 'overdue' => 1, $k === 'next' => 2, $k === 'down' => 3, default => 4 };
+        $rank = fn ($k) => match (true) {
+            $k === 'full' => 0, $k === 'overdue' => 1, $k === 'next' => 2, $k === 'down' => 3, default => 4
+        };
         $tuitionKeys = ['full', 'overdue', 'next', 'down'];
         $merged = collect($opts)->unique('key')->groupBy(fn ($o) => in_array($o['key'], $tuitionKeys, true) ? 't'.number_format($o['amount'], 2) : $o['key'])
             ->map(function ($g) use ($rank) {
@@ -64,5 +66,26 @@ class PayOptions
             });
 
         return $merged->values()->all();
+    }
+
+    /** Item keys tied up in online payments that Finance has not reviewed yet. 'full'/'other' tie up everything. */
+    public static function pendingKeys(StudentAccount $a): array
+    {
+        return PaymentProof::where('student_account_id', $a->id)->where('status', 'pending')->pluck('pay_key')
+            ->flatMap(fn ($k) => array_filter(explode(',', (string) ($k ?: 'other'))))->unique()->values()->all();
+    }
+
+    public static function clashesWithPending(StudentAccount $a, ?string $key): bool
+    {
+        $pending = self::pendingKeys($a);
+        if ($pending === []) {
+            return false;
+        }
+        $keys = array_filter(explode(',', (string) ($key ?: 'other')));
+        if (array_intersect($pending, ['full', 'other']) || array_intersect($keys, ['full', 'other'])) {
+            return true;
+        }
+
+        return (bool) array_intersect($pending, $keys);
     }
 }

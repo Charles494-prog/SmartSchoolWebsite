@@ -3,15 +3,31 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Services\Timetable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Validation\ValidationException;
 
 class ClassSubject extends Model
 {
     use Auditable;
 
     protected $guarded = ['id'];
+
+    /** A new teacher must be free at every time this class already meets. */
+    protected static function booted(): void
+    {
+        static::updating(function (self $c) {
+            if ($c->isDirty('teacher_id') && $c->teacher_id) {
+                foreach ($c->slots()->get() as $slot) {
+                    if ($why = Timetable::clashFor($slot, (int) $c->teacher_id)) {
+                        throw ValidationException::withMessages(['teacher_id' => 'Teacher not changed – '.$why]);
+                    }
+                }
+            }
+        });
+    }
 
     public function section(): BelongsTo
     {

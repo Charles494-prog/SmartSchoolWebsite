@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class Payment extends Model
 {
@@ -15,7 +16,7 @@ class Payment extends Model
     /** Purpose can list several items – keep it within the column (120). */
     public function setPurposeAttribute($v): void
     {
-        $this->attributes['purpose'] = $v === null ? null : \Illuminate\Support\Str::limit((string) $v, 117);
+        $this->attributes['purpose'] = $v === null ? null : Str::limit((string) $v, 117);
     }
 
     protected $casts = ['paid_on' => 'date', 'amount' => 'float', 'is_void' => 'boolean'];

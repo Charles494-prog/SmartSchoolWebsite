@@ -7,9 +7,11 @@ use App\Models\Assignment;
 use App\Models\ClassSubject;
 use App\Models\SchoolYear;
 use App\Models\Score;
+use App\Models\Student;
 use App\Models\Submission;
 use App\Notifications\GeneralNotice;
 use App\Support\Classwork;
+use App\Support\LiveReports;
 use App\Support\Role;
 use App\Support\School;
 use Illuminate\Http\Request;
@@ -169,7 +171,7 @@ class AssignmentController extends Controller
     }
 
     /** Score a student who didn't turn in online (paper work, absent, etc.). */
-    public function gradeStudent(Request $request, Assignment $assignment, \App\Models\Student $student)
+    public function gradeStudent(Request $request, Assignment $assignment, Student $student)
     {
         $this->onlineOnly();
         $this->own($assignment);
@@ -223,7 +225,7 @@ class AssignmentController extends Controller
             }
         });
         $submission->student->user?->notify(new GeneralNotice('Work graded', $a->title.': '.$data['score'].'/'.$a->max_score, route('portal.class', $a->class_subject_id, false)));
-        \App\Support\LiveReports::send($submission->student, $a->title.' ('.$a->classSubject->subject->name.')', $data['score'].'/'.$a->max_score);
+        LiveReports::send($submission->student, $a->title.' ('.$a->classSubject->subject->name.')', $data['score'].'/'.$a->max_score);
 
         return back()->with('ok', 'Graded'.($a->assessment_id ? ' and saved to the gradebook.' : '.'));
     }

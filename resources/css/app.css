@@ -150,6 +150,22 @@ html { scroll-behavior: smooth; }
     .break-after-page { break-after: page; }
 }
 
+/* Timetable: subject colour (hue set per subject via --h), lunch band, print sheets */
+.subj { background: hsl(var(--h) 75% 96%); border-left: 4px solid hsl(var(--h) 55% 42%); color: rgb(15 23 42); }
+.dark .subj { background: hsl(var(--h) 30% 18%); border-left-color: hsl(var(--h) 60% 62%); color: rgb(241 245 249); }
+.tt-lunch { background: repeating-linear-gradient(135deg, rgb(241 245 249) 0 8px, rgb(248 250 252) 8px 16px); }
+.dark .tt-lunch { background: repeating-linear-gradient(135deg, rgb(30 41 59) 0 8px, rgb(15 23 42) 8px 16px); }
+.print-sheet { display: none; }
+@media print {
+    @page tt { size: A4 landscape; margin: 10mm; }
+    .print-sheet { display: block; page: tt; break-after: page; }
+    .print-sheet:last-child { break-after: auto; }
+    .screen-only { display: none !important; }
+    .print-grid { width: 100%; border-collapse: collapse; font-size: 10px; }
+    .print-grid th, .print-grid td { border: 1px solid #333; padding: 4px; vertical-align: top; color: #000; }
+    .print-grid th { background: #eee; }
+}
+
 /* Dark mode safety net: pages written for light mode stay readable (no dark-blue text on a dark screen). */
 .dark :is(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-black) { color: rgb(241 245 249); }
 .dark :is(.text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600) { color: rgb(203 213 225); }

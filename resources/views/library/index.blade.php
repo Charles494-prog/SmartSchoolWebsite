@@ -43,7 +43,7 @@
                             <div class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                                 <div class="relative aspect-[3/4] overflow-hidden">
                                     @if($b->cover_path)
-                                        <img src="{{ route('library.cover', $b) }}" alt="{{ $b->title }}" class="h-full w-full object-cover" loading="lazy">
+                                        <img src="{{ route('library.cover', $b) }}" alt="{{ $b->title }}" class="absolute inset-0 h-full w-full object-cover" loading="lazy">
                                     @else
                                         <div class="flex h-full flex-col justify-between p-4 text-white {{ $spine[crc32($b->title) % count($spine)] }}">
                                             <span class="text-xs uppercase tracking-wider text-white/70">{{ $b->category }}</span>

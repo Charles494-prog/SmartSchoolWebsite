@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\GradeLevel;
 use App\Models\Setting;
 
 /**
@@ -24,6 +25,8 @@ class School
         'configurable_message_retention' => [self::HOSTED => true, self::LAN => false],
         // Class cards with assignments/projects (Google Classroom style). In LAN mode teachers use the gradebook only.
         'classwork' => [self::HOSTED => true, self::LAN => false],
+        // Students pick their own section during an enrollment window (needs students online).
+        'student_section_choice' => [self::HOSTED => true, self::LAN => false],
     ];
 
     public static function mode(): string
@@ -48,7 +51,9 @@ class School
     /** Grading period names by how many there are in a year: 4 = quarters, 3 = trimesters, 2 = semesters. */
     public static function periodName(int $count): string
     {
-        return match ($count) { 3 => 'Trimester', 2 => 'Semester', default => 'Quarter' };
+        return match ($count) {
+            3 => 'Trimester', 2 => 'Semester', default => 'Quarter'
+        };
     }
 
     /** Short label for one grading period, e.g. Q1, T2, S1. */
@@ -60,7 +65,7 @@ class School
     /** The period count most grade levels use (what the admin picked in Settings). */
     public static function periods(): int
     {
-        return (int) (\App\Models\GradeLevel::selectRaw('terms, count(*) n')->groupBy('terms')->orderByDesc('n')->value('terms') ?: 4);
+        return (int) (GradeLevel::selectRaw('terms, count(*) n')->groupBy('terms')->orderByDesc('n')->value('terms') ?: 4);
     }
 
     /** Is a mode-dependent feature on? Unknown features are off. */

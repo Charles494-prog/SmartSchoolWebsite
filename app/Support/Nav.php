@@ -2,6 +2,11 @@
 
 namespace App\Support;
 
+use App\Models\Announcement;
+use App\Models\PaymentProof;
+use App\Models\ServiceRequest;
+use App\Models\Setting;
+use App\Models\ShopOrder;
 use App\Models\User;
 
 /**
@@ -18,7 +23,7 @@ class Nav
 
     public static function locked(string $role): array
     {
-        $set = json_decode((string) \App\Models\Setting::get('locked_features'), true);
+        $set = json_decode((string) Setting::get('locked_features'), true);
 
         return array_merge(['Home', 'How it works'], is_array($set) && isset($set[$role]) ? $set[$role] : (self::LOCKED_DEFAULT[$role] ?? []));
     }
@@ -64,7 +69,7 @@ class Nav
                 ],
                 'Bookstore' => [$item('Bookstore', 'portal.shop', 'tag', 'Order books, uniforms and school merch', 'amber')],
                 'School news' => [
-                    $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
+                    $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => Announcement::unreadCount($u)],
                     $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
                 ],
                 'Help' => [$item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet')],
@@ -74,8 +79,8 @@ class Nav
         if ($is(Role::BOOKSTORE)) {
             return ['' => [
                 $item('Home', 'dashboard', 'home', 'Overview'),
-                $item('Bookstore', 'shop.manage', 'tag', 'Approve orders, release items, post merch', 'amber', 'shop.manage') + ['badge' => \App\Models\ShopOrder::where('status', 'placed')->count()],
-                $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
+                $item('Bookstore', 'shop.manage', 'tag', 'Approve orders, release items, post merch', 'amber', 'shop.manage') + ['badge' => ShopOrder::where('status', 'placed')->count()],
+                $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => Announcement::unreadCount($u)],
             ]];
         }
 
@@ -99,10 +104,11 @@ class Nav
             if ($r === Role::REGISTRAR) {
                 $students[] = $crud('Rooms', 'rooms', 'home', 'Classrooms and how many seats each has');
             }
-            $students[] = $item('Document requests', 'services.manage', 'file', 'TOR, certificates – set fees and release', 'sky', 'services.*') + ['badge' => \App\Models\ServiceRequest::where('status', 'requested')->count()];
+            $students[] = $item('Document requests', 'services.manage', 'file', 'TOR, certificates – set fees and release', 'sky', 'services.*') + ['badge' => ServiceRequest::where('status', 'requested')->count()];
             $students[] = $item('Enter LRNs', 'students.lrn', 'key', 'Type or paste each student\'s DepEd LRN', 'indigo');
             $students[] = $item('QR ID cards', 'qr.cards', 'qr', 'Print students\' QR ID cards to hand out', 'emerald');
             $students[] = $item('Move up a grade', 'promotion.index', 'trending', 'End-of-year promotion', 'emerald', 'promotion.*');
+            $students[] = $item('Assign sections', 'allocation.index', 'layers', 'Put a grade\'s students into sections (random, by choice or by hand)', 'emerald', 'allocation.*');
             $students[] = $crud('Transfers', 'transfers', 'repeat', 'Students who moved schools');
         }
         if ($students) {
@@ -112,7 +118,7 @@ class Nav
         $acad = [];
         if ($r === Role::REGISTRAR) {
             // Registrar: records only – approve submitted grades, keep schedules and subjects. No teaching tools.
-            $acad[] = $item('Grade approvals', 'gradebook.index', 'check-square', 'Approve grades teachers submitted', 'amber', 'gradebook.*');
+            $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', ['approvals.*', 'gradebook.*']);
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
         }
         if ($is(Role::TEACHER, Role::ADMIN)) {
@@ -124,6 +130,9 @@ class Nav
                 if (School::allows('classwork')) {
                     $acad[] = $item('Class cards', 'assignments.index', 'clipboard', 'Each class: posts, classwork and submissions', 'violet', 'assignments.*');
                 }
+            }
+            if ($r === Role::ADMIN) {
+                $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', 'approvals.*');
             }
             $acad[] = $item('Honor roll', 'honors', 'award', 'Ranking and honors per section', 'amber');
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
@@ -146,7 +155,8 @@ class Nav
         if ($is(Role::CASHIER, Role::ADMIN)) {
             $g['Payments'] = [
                 $item('Transactions', 'finance.index', 'wallet', 'Find a student, take a payment, receipts and balances', 'rose', ['finance.index', 'finance.show', 'finance.payments', 'finance.overdue']),
-                ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => \App\Models\PaymentProof::where('status', 'pending')->count()]] : []),
+                ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => PaymentProof::where('status', 'pending')->count()]] : []),
+                $item('Bookstore orders to pay', 'finance.bookstore', 'tag', 'Bookstore orders waiting for payment (walk-ins first)', 'amber', 'finance.bookstore'),
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
                 $crud('Discounts & scholarships', 'discounts', 'percent', 'Discounts and scholarships'),
                 $crud('Payment plans', 'payment-plans', 'calendar', 'How tuition is divided into payments'),
@@ -154,7 +164,7 @@ class Nav
         }
 
         $comm = [
-            $item('Announcements', 'announcements.index', 'megaphone', 'News for parents, students and staff', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
+            $item('Announcements', 'announcements.index', 'megaphone', 'News for parents, students and staff', 'indigo', 'announcements.*') + ['badge' => Announcement::unreadCount($u)],
             $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
         ];
         if ($is(Role::ADMIN, Role::REGISTRAR)) {

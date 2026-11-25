@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AccountGuard;
+use App\Http\Middleware\EnsureOnboarded;
 use App\Http\Middleware\RequestId;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SecurityHeaders;
@@ -23,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(RequestId::class);
         $middleware->append(SecurityHeaders::class);
         $middleware->appendToGroup('web', AccountGuard::class);
-        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureOnboarded::class);
+        $middleware->appendToGroup('web', EnsureOnboarded::class);
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
     })

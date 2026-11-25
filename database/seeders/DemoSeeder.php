@@ -2,11 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Console\Commands\TimetableSchedule;
 use App\Models\Announcement;
 use App\Models\Application;
 use App\Models\Assessment;
 use App\Models\Assignment;
 use App\Models\AttendanceRecord;
+use App\Models\Award;
+use App\Models\AwardNomination;
 use App\Models\Book;
 use App\Models\ClassSubject;
 use App\Models\Discount;
@@ -17,13 +20,18 @@ use App\Models\FeeItem;
 use App\Models\GradeLevel;
 use App\Models\Guardian;
 use App\Models\Room;
+use App\Models\SchoolService;
 use App\Models\SchoolYear;
 use App\Models\Score;
 use App\Models\Section;
 use App\Models\Setting;
+use App\Models\ShopItem;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\Billing;
+use App\Services\Quiz;
+use App\Services\Timetable;
+use App\Support\DemoNames;
 use App\Support\Role;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -66,12 +74,6 @@ class DemoSeeder extends Seeder
             Employee::firstOrCreate(['employee_no' => 'EMP-'.str_pad($i + 1, 3, '0', STR_PAD_LEFT)], ['user_id' => $t->id, 'first_name' => explode(' ', $t->name)[0], 'last_name' => explode(' ', $t->name)[1], 'position' => 'Teacher I', 'department' => 'Academics', 'monthly_salary' => 27000 + $i * 1500, 'date_hired' => now()->subYears($i + 1)]);
         }
 
-        $first = ['Juan', 'Maria', 'Jose', 'Ana', 'Mark', 'Angel', 'Paolo', 'Jasmine', 'Carlo', 'Bea', 'Miguel', 'Sofia', 'Rafael', 'Andrea', 'Luis', 'Nicole', 'Gabriel', 'Patricia', 'Daniel', 'Kristine'];
-        $last = ['Santos', 'Reyes', 'Cruz', 'Bautista', 'Garcia', 'Mendoza', 'Torres', 'Flores', 'Ramos', 'Gonzales', 'Lopez', 'Castillo', 'Villanueva', 'Rivera', 'Aquino'];
-
-        foreach (range(101, 106) as $no) {
-            Room::firstOrCreate(['name' => 'Room '.$no], ['building' => 'Main building', 'capacity' => $no <= 104 ? 40 : 30]);
-        }
         // Two sections in every grade level (Grade 1 – 12) so the overall awards have lots to show.
         $plan = [['Grade 7', 'Rizal', 0], ['Grade 7', 'Bonifacio', 1], ['Grade 8', 'Mabini', 2]];
         if (! app()->runningUnitTests()) {
@@ -87,31 +89,23 @@ class DemoSeeder extends Seeder
         }
         $n = 0;
         $secIndex = 0;
-        $busy = [];
         foreach ($plan as [$levelName, $secName, $adv]) {
             $level = GradeLevel::where('name', $levelName)->first();
-            $roomName = 'Room '.(101 + $secIndex);   // one homeroom per section – no two sections share a room
-            Room::firstOrCreate(['name' => $roomName], ['building' => 'Main building', 'capacity' => 40]);
-            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'room' => $roomName, 'capacity' => 40]);
-            $times = [['07:30', '08:30'], ['08:30', '09:30'], ['09:45', '10:45'], ['10:45', '11:45'], ['13:00', '14:00'], ['14:00', '15:00'], ['15:00', '16:00'], ['16:00', '17:00']];
+            // Home room comes from the grade's room block (assigned after all sections exist).
+            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'capacity' => 40]);
             // Give each subject a time and a teacher who is free then (no teacher teaches two classes at once).
             foreach ($level->subjects as $i => $sub) {
                 $cs = ClassSubject::where(['section_id' => $section->id, 'subject_id' => $sub->id])->first();
                 if (! $cs) {
-                    $slot = ($i + $secIndex) % 8;
-                    $t = collect(range(0, count($teachers) - 1))->map(fn ($k) => ($i + $secIndex * 5 + $k) % count($teachers))->first(fn ($k) => empty($busy[$k][$slot])) ?? 0;
-                    $busy[$t][$slot] = true;
-                    $cs = ClassSubject::create(['section_id' => $section->id, 'subject_id' => $sub->id, 'teacher_id' => $teachers[$t]->id]);
-                    foreach ([1, 2, 3, 4, 5] as $d) {
-                        $cs->slots()->create(['day_of_week' => $d, 'starts_at' => $times[$slot][0], 'ends_at' => $times[$slot][1], 'room' => $section->room]);
-                    }
+                    $cs = ClassSubject::create(['section_id' => $section->id, 'subject_id' => $sub->id, 'teacher_id' => $teachers[($i + $secIndex * 5) % count($teachers)]->id]);
                 }
             }
             $secIndex++;
             for ($k = 0; $k < 12; $k++, $n++) {
                 $sex = $n % 2 ? 'Female' : 'Male';
+                [$fn, $mn, $ln] = DemoNames::for($n);   // every demo student has a different name
                 $st = Student::firstOrCreate(['lrn' => '1'.str_pad((string) (40000000000 + $n), 11, '0', STR_PAD_LEFT)], [
-                    'first_name' => $first[($n < 36 ? $n : $n * 7 + 3) % count($first)], 'middle_name' => $last[($n + 3) % count($last)], 'last_name' => $last[($n < 36 ? $n : $n * 11 + 5) % count($last)],
+                    'first_name' => $fn, 'middle_name' => $mn, 'last_name' => $ln,
                     'sex' => $sex, 'birthdate' => Carbon::create(2013 - ($level->sort_order - 7), ($n % 12) + 1, ($n % 27) + 1),
                     'address' => ($n + 10).' Mabuhay St., Quezon City', 'religion' => 'Roman Catholic',
                 ]);
@@ -127,6 +121,11 @@ class DemoSeeder extends Seeder
                 }
             }
         }
+
+        // Rooms per grade block and a conflict-free, staggered timetable (no room/teacher/section double-booked).
+        TimetableSchedule::ensureTeachers($sy);
+        Timetable::assignHomeRooms($sy);
+        Timetable::schedule($sy, true);
 
         $firstStudent = Student::orderBy('id')->first();
         $firstStudent->transfers()->firstOrCreate(['direction' => 'in'], ['school_name' => 'San Roque Elementary School', 'transfer_date' => $sy->starts_on]);
@@ -151,12 +150,12 @@ class DemoSeeder extends Seeder
         // Class cards (Online mode): announcements, documents and classwork. Graded classwork counts toward Q2.
         $posts = [
             ['announcement', 'Welcome to class!', "Hi everyone! This is where I'll post announcements, lessons and your work. Check it every day.", null, null, null],
-            ['material', 'Lesson 3 notes', "Read these notes before our next meeting.", null, null, null],
-            ['assignment', 'Reading log – Week 3', "Read the assigned chapter and write 5 sentences about the main idea.", -6, 20, 'ww'],
+            ['material', 'Lesson 3 notes', 'Read these notes before our next meeting.', null, null, null],
+            ['assignment', 'Reading log – Week 3', 'Read the assigned chapter and write 5 sentences about the main idea.', -6, 20, 'ww'],
             ['activity', 'Group activity: concept map', "With your group, make a concept map of today's lesson. Upload a photo.", -1, 30, 'pt'],
-            ['assignment', 'Practice worksheet', "Practice only – this is not included in your grade.", 3, 25, null],
-            ['quiz', 'Quiz 2', "Short quiz on lessons 1–3.", 2, 20, 'ww'],
-            ['project', 'Quarter project', "Make a poster or short video about a real-life use of this subject.", 14, 100, 'pt'],
+            ['assignment', 'Practice worksheet', 'Practice only – this is not included in your grade.', 3, 25, null],
+            ['quiz', 'Quiz 2', 'Short quiz on lessons 1–3.', 2, 20, 'ww'],
+            ['project', 'Quarter project', 'Make a poster or short video about a real-life use of this subject.', 14, 100, 'pt'],
         ];
         $design = ['<div class="hero"><h2>Let\'s learn!</h2><p>Tap the star ⭐</p><button id="star">⭐</button><p id="msg"></p></div>',
             '.hero{padding:24px;border-radius:16px;text-align:center;background:linear-gradient(135deg,#eef2ff,#ecfeff);animation:rise .8s ease-out}h2{margin:0 0 6px}#star{font-size:40px;border:0;background:none;cursor:pointer;transition:transform .2s}#star:hover{transform:scale(1.3) rotate(15deg)}@keyframes rise{from{opacity:0;transform:translateY(20px)}}',
@@ -200,28 +199,28 @@ class DemoSeeder extends Seeder
             ."What is 12 × 12? {#144}\n\n"
             ."Who wrote Noli Me Tangere? { =Jose Rizal =Rizal =Dr. Jose Rizal }\n\n"
             ."Match each animal to where it lives. { =Fish -> Water =Bird -> Nest =Carabao -> Farm }\n\n"
-            ."In 2–3 sentences, explain why reading every day helps you. {}";
+            .'In 2–3 sentences, explain why reading every day helps you. {}';
         foreach (Assignment::where('type', 'quiz')->whereDoesntHave('questions')->get() as $qz) {
-            foreach (\App\Services\Quiz::parseGift($gift) as $i => $q) {
+            foreach (Quiz::parseGift($gift) as $i => $q) {
                 $qz->questions()->create($q + ['position' => $i, 'points' => $q['type'] === 'essay' ? 3 : 1]);
             }
             $qz->update(['time_limit' => 15, 'attempts_allowed' => 2, 'shuffle_answers' => true]);
         }
 
         // Special awards and a few given / suggested ones
-        if (! \App\Models\Award::exists()) {
-            foreach (\App\Models\Award::DEFAULTS as [$name, $desc]) {
-                \App\Models\Award::create(['name' => $name, 'description' => $desc]);
+        if (! Award::exists()) {
+            foreach (Award::DEFAULTS as [$name, $desc]) {
+                Award::create(['name' => $name, 'description' => $desc]);
             }
         }
-        if (\App\Models\AwardNomination::doesntExist()) {
+        if (AwardNomination::doesntExist()) {
             foreach (Section::where('school_year_id', $sy->id)->get() as $si => $sec) {
                 $kids = $sec->students()->get();
                 if ($kids->count() < 5) {
                     continue;
                 }
-                \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Best in Conduct')->value('id'), 'student_id' => $kids[3]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Always respectful and kind to classmates.', 'status' => 'approved', 'nominated_by' => $sec->adviser_id]);
-                \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Leadership Award')->value('id'), 'student_id' => $kids[4]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Led the class clean-up drive.', 'status' => 'pending', 'nominated_by' => $sec->adviser_id]);
+                AwardNomination::create(['award_id' => Award::where('name', 'Best in Conduct')->value('id'), 'student_id' => $kids[3]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Always respectful and kind to classmates.', 'status' => 'approved', 'nominated_by' => $sec->adviser_id]);
+                AwardNomination::create(['award_id' => Award::where('name', 'Leadership Award')->value('id'), 'student_id' => $kids[4]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Led the class clean-up drive.', 'status' => 'pending', 'nominated_by' => $sec->adviser_id]);
             }
         }
 
@@ -256,16 +255,16 @@ class DemoSeeder extends Seeder
             }
         }
 
-        if (! \App\Models\SchoolService::exists()) {
-            foreach (\App\Models\SchoolService::DEFAULTS as [$nm, $desc, $fee, $days]) {
-                \App\Models\SchoolService::create(['name' => $nm, 'description' => $desc, 'fee' => $fee, 'days' => $days]);
+        if (! SchoolService::exists()) {
+            foreach (SchoolService::DEFAULTS as [$nm, $desc, $fee, $days]) {
+                SchoolService::create(['name' => $nm, 'description' => $desc, 'fee' => $fee, 'days' => $days]);
             }
         }
         // Bookstore
         foreach ([['PE uniform (shirt + jogging pants)', 'uniform', 650, 'XS, S, M, L, XL', 40], ['School uniform – blouse', 'uniform', 450, 'XS, S, M, L', 30], ['School uniform – polo', 'uniform', 450, 'XS, S, M, L, XL', 30],
             ['School ID lace', 'merch', 60, null, 200], ['School tote bag', 'merch', 250, null, 50], ['Foundation Day shirt', 'souvenir', 300, 'S, M, L, XL', 60],
             ['Science Links 7 (textbook)', 'book', 520, null, 25], ['Grammar workbook', 'book', 280, null, null], ['Yearbook 2027 (pre-order)', 'souvenir', 1200, null, null]] as [$nm, $cat, $price, $sizes, $stock]) {
-            \App\Models\ShopItem::firstOrCreate(['name' => $nm], ['category' => $cat, 'price' => $price, 'sizes' => $sizes ? array_map('trim', explode(',', $sizes)) : null, 'stock' => $stock, 'description' => null]);
+            ShopItem::firstOrCreate(['name' => $nm], ['category' => $cat, 'price' => $price, 'sizes' => $sizes ? array_map('trim', explode(',', $sizes)) : null, 'stock' => $stock, 'description' => null]);
         }
 
         // Finance

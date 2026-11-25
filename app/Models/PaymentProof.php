@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class PaymentProof extends Model
 {
@@ -12,7 +13,7 @@ class PaymentProof extends Model
     /** Purpose can list several items – keep it within the column (120). */
     public function setPurposeAttribute($v): void
     {
-        $this->attributes['purpose'] = $v === null ? null : \Illuminate\Support\Str::limit((string) $v, 117);
+        $this->attributes['purpose'] = $v === null ? null : Str::limit((string) $v, 117);
     }
 
     protected $casts = ['paid_on' => 'date', 'amount' => 'float'];

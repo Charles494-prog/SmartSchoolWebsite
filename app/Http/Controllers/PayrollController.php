@@ -64,12 +64,31 @@ class PayrollController extends Controller
 
     public function show(Payroll $payroll)
     {
-        return view('payroll.show', ['p' => $payroll->load('items.employee')]);
+        return view('payroll.show', ['p' => $payroll->load('items.employee'), 'periods' => Payroll::latest('period_start')->get(['id', 'period_start', 'period_end', 'status'])]);
+    }
+
+    /** Approved payroll handed out: mark it paid (amounts stay as approved). */
+    public function markPaid(Payroll $payroll)
+    {
+        abort_unless($payroll->status === 'finalized', 409, 'Approve the payroll first.');
+        $payroll->update(['status' => 'paid']);
+
+        return back()->with('ok', 'Payroll marked as paid.');
+    }
+
+    /** One employee's payslip as PDF (same template as the full set). */
+    public function payslip(PayrollItem $item)
+    {
+        $p = $item->payroll;
+        abort_if($p->status === 'draft', 409, 'Approve the payroll before printing payslips.');
+        $p->setRelation('items', collect([$item->load('employee')]));
+
+        return Pdf::loadView('pdf.payslips', ['p' => $p])->setPaper('a4')->stream('payslip-'.$item->employee->employee_no.'-'.$p->period_end->format('Y-m-d').'.pdf');
     }
 
     public function updateItem(Request $request, PayrollItem $item)
     {
-        abort_if($item->payroll->status === 'finalized', 403, 'This payroll is finalized.');
+        abort_unless($item->payroll->status === 'draft', 403, 'This payroll is already approved.');
         $data = $request->validate(collect(['basic_pay', 'allowances', 'sss', 'philhealth', 'pagibig', 'withholding_tax', 'other_deductions'])->mapWithKeys(fn ($f) => [$f => 'required|numeric|min:0'])->all());
         $data['net_pay'] = round($data['basic_pay'] + $data['allowances'] - $data['sss'] - $data['philhealth'] - $data['pagibig'] - $data['withholding_tax'] - $data['other_deductions'], 2);
         $item->update($data);
@@ -79,14 +98,15 @@ class PayrollController extends Controller
 
     public function finalize(Payroll $payroll)
     {
+        abort_unless($payroll->status === 'draft', 409);
         $payroll->update(['status' => 'finalized']);
 
-        return back()->with('ok', 'Payroll finalized. Payslips can now be printed.');
+        return back()->with('ok', 'Payroll approved. Payslips can now be generated.');
     }
 
     public function destroy(Payroll $payroll)
     {
-        abort_if($payroll->status === 'finalized', 403);
+        abort_unless($payroll->status === 'draft', 403);
         $payroll->delete();
 
         return redirect()->route('payroll.index')->with('ok', 'Draft payroll deleted.');

@@ -6,6 +6,7 @@ use App\Models\FeeItem;
 use App\Models\GradeLevel;
 use App\Models\SchoolYear;
 use App\Models\Setting;
+use App\Models\StudentAccount;
 
 /**
  * Tuition setup from School settings: public school (no tuition) or private school
@@ -50,5 +51,31 @@ class Tuition
                 FeeItem::create(['school_year_id' => $sy->id, 'grade_level_id' => $levelId, 'category' => 'tuition', 'name' => self::NAME, 'amount' => $amount]);
             }
         }
+        self::syncAccounts();
+    }
+
+    /**
+     * Re-bill this year's accounts whose tuition no longer matches the setting (e.g. the school switched to public),
+     * keeping each account's plan and discounts. Payments already made stay and count toward the new total.
+     */
+    public static function syncAccounts(): int
+    {
+        $sy = SchoolYear::current();
+        if (! $sy) {
+            return 0;
+        }
+        $rates = self::current();
+        $n = 0;
+        StudentAccount::with('enrollment', 'fees', 'discounts')->whereHas('enrollment', fn ($q) => $q->where('school_year_id', $sy->id))->get()
+            ->each(function ($a) use ($rates, &$n) {
+                $billed = round((float) $a->fees->where('category', 'tuition')->sum('amount'), 2);
+                if (abs($billed - round($rates[$a->enrollment->grade_level_id] ?? 0, 2)) < 0.005) {
+                    return;
+                }
+                Billing::assess($a->enrollment, $a->payment_plan, $a->discounts->pluck('discount_id')->all());
+                $n++;
+            });
+
+        return $n;
     }
 }

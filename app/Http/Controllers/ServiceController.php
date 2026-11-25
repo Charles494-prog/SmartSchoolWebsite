@@ -26,10 +26,14 @@ class ServiceController extends Controller
     public function manage(Request $request)
     {
         $status = in_array($request->query('status'), array_keys(ServiceRequest::STATUSES), true) ? $request->query('status') : 'requested';
+        $q = trim((string) $request->query('q'));
 
         return view('services.manage', [
-            'services' => SchoolService::orderBy('name')->get(),
-            'requests' => ServiceRequest::with('service', 'student', 'charge')->where('status', $status)->latest()->get(),
+            'services' => SchoolService::withCount('requests')->orderBy('name')->get(),
+            'requests' => ServiceRequest::with('service', 'charge')->where('status', $status)
+                ->when($q !== '', fn ($w) => $w->whereHas('student', fn ($s) => $s->where('last_name', 'like', "%{$q}%")->orWhere('first_name', 'like', "%{$q}%")->orWhere('student_no', 'like', "%{$q}%")))
+                ->latest()->paginate(25)->withQueryString(),
+            'q' => $q,
             'status' => $status,
             'counts' => ServiceRequest::selectRaw('status, count(*) n')->groupBy('status')->pluck('n', 'status'),
         ]);
@@ -69,17 +73,21 @@ class ServiceController extends Controller
         return back()->with('ok', 'Updated.');
     }
 
-    /** Tell the student and their parents the document is ready (and whether it still needs to be paid). */
+    /** Tell the student and their parents where the request is: being prepared, or ready (and whether it still needs paying). */
     public function notify(ServiceRequest $req)
     {
         abort_unless(in_array($req->status, ['ready', 'processing'], true), 422);
         $paid = $req->isPaid();
-        $body = $paid ? $req->service->name.' is ready. You can get it at the registrar\'s office now.'
-            : $req->service->name.' is ready, but '.Billing::peso($req->charge->remaining()).' is still unpaid. Please pay first (Payments), then get it at the registrar.';
+        $due = $paid ? '' : Billing::peso($req->charge->remaining());
+        $name = $req->service->name;
+        [$title, $body] = $req->status === 'processing'
+            ? ['Your document is being prepared', $name.' is being prepared by the registrar. We will tell you when it is ready.'.($paid ? '' : ' You can pay the '.$due.' now (Payments) so you can get it right away.')]
+            : ['Your document is ready', $paid ? $name.' is ready. You can get it at the registrar\'s office now.'
+                : $name.' is ready, but '.$due.' is still unpaid. Please pay first (Payments), then get it at the registrar.'];
         $people = collect([$req->student->user])->merge($req->student->guardians()->with('user')->get()->pluck('user'))->filter()->unique('id');
-        Notification::send($people, new GeneralNotice('Your document is ready', $body, $paid ? '/portal/services' : '/portal/account'));
+        Notification::send($people, new GeneralNotice($title, $body, $paid ? '/portal/services' : '/portal/account'));
 
-        return back()->with('ok', 'Notified '.$people->count().' '.str('account')->plural($people->count()).'.');
+        return back()->with('ok', 'Told '.$people->count().' '.str('account')->plural($people->count()).' that it is '.($req->status === 'processing' ? 'being prepared' : 'ready').'.');
     }
 
     // ------------------------------------------------------------ students / parents

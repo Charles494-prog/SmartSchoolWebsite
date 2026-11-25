@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\GeneralNotice;
 use App\Services\Billing;
 use App\Support\ParentAccess;
+use App\Support\PayOptions;
 use App\Support\Role;
 use App\Support\School;
 use Illuminate\Http\Request;
@@ -81,11 +82,15 @@ class OnlinePaymentController extends Controller
         $d = $request->validate([
             'payment_channel_id' => 'required|exists:payment_channels,id',
             'amount' => 'required|numeric|min:1|max:'.max(1, $account->balance()),
-            'reference' => 'required|max:60', 'paid_on' => 'required|date|before_or_equal:today',
+            'reference' => 'required|max:60',
             'screenshot' => 'required|image|max:8192', 'purpose' => 'nullable|max:255', 'pay_key' => 'nullable|max:255',
         ], ['amount.max' => 'That is more than the remaining balance ('.Billing::peso($account->balance()).').', 'screenshot.required' => 'Attach a screenshot or photo of your receipt.']);
+        // One online payment per item at a time: wait until Finance accepts or rejects the earlier one.
+        if (PayOptions::clashesWithPending($account, $d['pay_key'] ?? null)) {
+            return back()->withInput()->withErrors(['pay_key' => 'You already sent a payment for this. Please wait until Finance accepts or rejects it.']);
+        }
         $proof = $account->hasMany(PaymentProof::class, 'student_account_id')->create([
-            'payment_channel_id' => $d['payment_channel_id'], 'amount' => $d['amount'], 'reference' => $d['reference'], 'paid_on' => $d['paid_on'], 'purpose' => $d['purpose'] ?? null, 'pay_key' => $d['pay_key'] ?? null,
+            'payment_channel_id' => $d['payment_channel_id'], 'amount' => $d['amount'], 'reference' => $d['reference'], 'paid_on' => today()->toDateString(), 'purpose' => $d['purpose'] ?? null, 'pay_key' => $d['pay_key'] ?? null,
             'screenshot_path' => $request->file('screenshot')->store('payment-proofs', 'local'), 'submitted_by' => $u->id,
         ]);
         Notification::send(User::whereIn('role', [Role::CASHIER, Role::ADMIN])->where('is_active', true)->get(),

@@ -7,10 +7,14 @@ use App\Models\Event;
 use App\Models\Section;
 use App\Models\User;
 use App\Notifications\GeneralNotice;
+use App\Support\NoticeFeed;
 use App\Support\Role;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CommunicationController extends Controller
@@ -26,7 +30,7 @@ class CommunicationController extends Controller
         // Opening the page counts as reading what's on it; remember which ones were new for this visit.
         $new = $items->getCollection()->reject(fn ($a) => $a->readers->contains('id', $u->id))->pluck('id');
         foreach ($new as $id) {
-            \Illuminate\Support\Facades\DB::table('announcement_reads')->insertOrIgnore(['announcement_id' => $id, 'user_id' => $u->id, 'read_at' => now()]);
+            DB::table('announcement_reads')->insertOrIgnore(['announcement_id' => $id, 'user_id' => $u->id, 'read_at' => now()]);
         }
 
         return view('messages.announcements', [
@@ -85,7 +89,7 @@ class CommunicationController extends Controller
     {
         abort_unless($this->canSee($announcement) && $announcement->image_path, 404);
 
-        return \Illuminate\Support\Facades\Storage::disk('local')->response($announcement->image_path);
+        return Storage::disk('local')->response($announcement->image_path);
     }
 
     /** Designed content, shown in a sandboxed frame (see SecurityHeaders) – it can't affect the rest of the app. */
@@ -125,9 +129,56 @@ class CommunicationController extends Controller
 
     public function notifications(Request $request)
     {
-        $list = $request->user()->notifications()->paginate(30);
-        $request->user()->unreadNotifications->markAsRead();
+        $filter = array_key_exists($request->query('filter'), NoticeFeed::FILTERS) ? $request->query('filter') : 'all';
+        $q = $request->user()->notifications();
+        if ($filter === 'unread') {
+            $q->whereNull('read_at');
+        }
+        $all = $q->get();   // type is derived from the text, so filter in PHP; a user's own notices are a short list
+        if (in_array($filter, ['request', 'payment'], true)) {
+            $all = $all->filter(fn ($n) => NoticeFeed::type($n) === $filter)->values();
+        }
+        $page = max(1, (int) $request->query('page', 1));
+        $list = new LengthAwarePaginator($all->forPage($page, 30)->values(), $all->count(), 30, $page, ['path' => $request->url(), 'query' => $request->query()]);
 
-        return view('messages.notifications', ['list' => $list]);
+        return view('messages.notifications', [
+            'list' => $list, 'filter' => $filter,
+            'groups' => NoticeFeed::grouped($list->getCollection()),
+            'unread' => $request->user()->unreadNotifications()->count(),
+            'readCount' => $request->user()->notifications()->whereNotNull('read_at')->count(),
+        ]);
+    }
+
+    /** Open a notice: mark it read and go to the page it is about (same-site links only). */
+    public function openNotification(Request $request, string $id)
+    {
+        $n = $request->user()->notifications()->findOrFail($id);
+        $n->markAsRead();
+        $url = (string) ($n->data['url'] ?? '/');
+        $path = parse_url($url, PHP_URL_PATH) ?: '/';
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return redirect(! $host || $host === $request->getHost() ? $path.(($qs = parse_url($url, PHP_URL_QUERY)) ? '?'.$qs : '') : '/');
+    }
+
+    /** read / unread / delete on one or many of MY notices (others keep theirs). */
+    public function updateNotifications(Request $request)
+    {
+        $d = $request->validate(['action' => 'required|in:read,unread,delete,read_all,clear_read', 'ids' => 'array|max:500', 'ids.*' => 'string|max:64']);
+        $mine = $request->user()->notifications();
+        $n = match ($d['action']) {
+            'read' => (clone $mine)->whereIn('id', $d['ids'] ?? [])->update(['read_at' => now()]),
+            'unread' => (clone $mine)->whereIn('id', $d['ids'] ?? [])->update(['read_at' => null]),
+            'delete' => (clone $mine)->whereIn('id', $d['ids'] ?? [])->delete(),
+            'read_all' => (clone $mine)->whereNull('read_at')->update(['read_at' => now()]),
+            'clear_read' => (clone $mine)->whereNotNull('read_at')->delete(),
+        };
+        $unread = $request->user()->unreadNotifications()->count();
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'changed' => $n, 'unread' => $unread]);
+        }
+        $msg = ['read' => 'Marked as read.', 'unread' => 'Marked as unread.', 'delete' => "Deleted $n.", 'read_all' => 'All marked as seen.', 'clear_read' => "Cleared $n read ".str('notification')->plural($n).'.'][$d['action']];
+
+        return back()->with('ok', $msg);
     }
 }

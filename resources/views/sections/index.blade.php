@@ -10,7 +10,7 @@
             <div class="card"><x-empty icon="calendar" title="No school year yet" text="Create the current school year first."><a href="{{ route('crud.index', 'school-years') }}" class="btn btn-primary btn-sm">Set up school year</a></x-empty></div>
         @else
             @if($unsectioned)
-                <div class="mb-6 flex items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200"><x-icon name="alert" class="h-5 w-5" /> {{ $unsectioned }} enrolled student(s) still need a section. Open a section and use “Add students”.</div>
+                <div class="mb-6 flex items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200"><x-icon name="alert" class="h-5 w-5 shrink-0" /> <span class="flex-1">{{ $unsectioned }} enrolled {{ str('student')->plural($unsectioned) }} still {{ $unsectioned === 1 ? 'needs' : 'need' }} a section.</span> <a href="{{ route('sections.unsectioned') }}" class="btn btn-primary min-h-11 shrink-0">Set it here</a></div>
             @endif
 
             {{-- Grade level filter --}}

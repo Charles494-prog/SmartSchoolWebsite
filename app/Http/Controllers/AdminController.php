@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Console\Commands\BackupDatabase;
+use App\Models\Assessment;
 use App\Models\AuditLog;
 use App\Models\GradeLevel;
 use App\Models\SchoolYear;
@@ -71,7 +72,7 @@ class AdminController extends Controller
         }
         if (isset($data['grading_periods']) && (int) $data['grading_periods'] !== School::periods()) {
             $n = (int) $data['grading_periods'];
-            $used = \App\Models\Assessment::where('term', '>', $n)->exists();
+            $used = Assessment::where('term', '>', $n)->exists();
             if ($used) {
                 return back()->withInput()->with('error', 'Some classes already have scores in '.School::term($n + 1, School::periods()).' or later. Remove those first, or keep the current grading periods.');
             }

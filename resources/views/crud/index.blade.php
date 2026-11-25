@@ -1,6 +1,7 @@
 <x-layouts.app :title="$r['title']">
     <x-page-header :title="$r['title']"><a href="{{ route('crud.create', $slug) }}" class="btn btn-primary min-h-11"><x-icon name="plus" class="h-4 w-4" /> Add {{ $r['singular'] }}</a></x-page-header>
     @isset($r['help'])<p class="mb-4 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-900">{{ $r['help'] }}</p>@endisset
+    @isset($r['panel'])@include($r['panel'])@endisset
     <x-filters search="Search…" :filters="collect($r['filters'] ?? [])->map(fn ($f) => ['label' => $f['label'], 'options' => $f['options']()])->all()" />
 
     @php $pageIds = $rows->pluck('id')->values(); @endphp

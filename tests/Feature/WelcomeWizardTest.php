@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Support\LiveReports;
 use App\Support\Nav;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,7 +44,7 @@ class WelcomeWizardTest extends TestCase
         $this->assertSame('parent', $parent->role);
         $this->assertTrue($parent->children()->get()->contains('id', $student->student->id));
 
-        \App\Support\LiveReports::send($student->student, 'Quiz 9', '18/20');
+        LiveReports::send($student->student, 'Quiz 9', '18/20');
         $this->assertTrue($parent->notifications()->exists(), 'parent got the live score');
     }
 }

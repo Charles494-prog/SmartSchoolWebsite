@@ -8,6 +8,7 @@ use App\Models\Enrollment;
 use App\Models\FeeItem;
 use App\Models\Payment;
 use App\Models\PaymentPlan;
+use App\Models\PaymentProof;
 use App\Models\SchoolYear;
 use App\Models\StudentAccount;
 use App\Notifications\GeneralNotice;
@@ -50,7 +51,7 @@ class FinanceController extends Controller
                 'unassessed' => Enrollment::where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained'])->doesntHave('account')->count(),
             ],
             'overdueTotal' => $accounts->sum(fn ($a) => $a->overdueAmount()),
-            'pendingOnline' => \App\Models\PaymentProof::where('status', 'pending')->count(),
+            'pendingOnline' => PaymentProof::where('status', 'pending')->count(),
             'receipts' => $view === 'receipts' ? Payment::with('account.enrollment.student', 'receiver')->latest('paid_on')->latest('id')
                 ->when($t ?? null, fn ($r, $t) => $r->whereHas('account.enrollment.student', fn ($s) => $s->where('last_name', 'like', "%$t%")->orWhere('first_name', 'like', "%$t%"))->orWhere('or_number', 'like', "%$t%"))
                 ->paginate(30)->withQueryString() : null,
@@ -120,10 +121,11 @@ class FinanceController extends Controller
             'amount' => 'required|numeric|min:1|max:'.max(1, $a->balance()),
             'method' => 'required|in:'.implode(',', array_keys(Payment::METHODS)),
             'reference' => 'nullable|required_unless:method,cash|max:60',
-            'paid_on' => 'required|date|before_or_equal:today', 'purpose' => 'nullable|max:255', 'pay_key' => 'nullable|max:255',
+            'purpose' => 'nullable|max:255', 'pay_key' => 'nullable|max:255',
         ], ['amount.max' => 'Amount is more than the remaining balance ('.Billing::peso($a->balance()).').', 'reference.required_unless' => 'Enter the reference/check number.']);
         $payment = DB::transaction(function () use ($a, $data) {
-            $p = $a->payments()->create(collect($data)->except('pay_key')->all() + ['or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]);
+            // The payment date is always the day it is recorded – never typed in.
+            $p = $a->payments()->create(collect($data)->except('pay_key')->all() + ['paid_on' => today()->toDateString(), 'or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]);
             Billing::allocate($p, $data['pay_key'] ?? null);
 
             return $p;

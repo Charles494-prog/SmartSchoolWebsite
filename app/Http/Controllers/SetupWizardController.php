@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assessment;
+use App\Models\Award;
 use App\Models\GradeLevel;
 use App\Models\Room;
 use App\Models\SchoolYear;
@@ -203,17 +205,17 @@ class SetupWizardController extends Controller
             throw ValidationException::withMessages(['ww' => 'The three weights must add up to 100%.']);
         }
         Subject::query()->update(['ww_weight' => $d['ww'], 'pt_weight' => $d['pt'], 'qa_weight' => $d['qa']]);
-        if (! empty($d['grading_periods']) && ! \App\Models\Assessment::where('term', '>', (int) $d['grading_periods'])->exists()) {
-            \App\Models\GradeLevel::query()->update(['terms' => (int) $d['grading_periods']]);
+        if (! empty($d['grading_periods']) && ! Assessment::where('term', '>', (int) $d['grading_periods'])->exists()) {
+            GradeLevel::query()->update(['terms' => (int) $d['grading_periods']]);
         }
         Setting::put('honors_titles_when', $d['honors_titles_when'] ?? 'each_period');
         Setting::put('honors_titles_levels', implode(',', $d['honors_titles_levels'] ?? []));
         if (! empty($d['honors_top_n'])) {
             Setting::put('honors_top_n', (string) $d['honors_top_n']);
         }
-        if (! \App\Models\Award::exists()) {
-            foreach (\App\Models\Award::DEFAULTS as [$name, $desc]) {
-                \App\Models\Award::create(['name' => $name, 'description' => $desc]);
+        if (! Award::exists()) {
+            foreach (Award::DEFAULTS as [$name, $desc]) {
+                Award::create(['name' => $name, 'description' => $desc]);
             }
         }
 

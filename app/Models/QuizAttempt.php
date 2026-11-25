@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,7 +23,7 @@ class QuizAttempt extends Model
     }
 
     /** When time runs out (null = no limit). */
-    public function deadline(): ?\Carbon\Carbon
+    public function deadline(): ?Carbon
     {
         $m = $this->assignment->time_limit;
 
