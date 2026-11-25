@@ -1,22 +1,41 @@
 <x-layouts.app title="Set up SmartSchool for you">
-    @php $keys = array_keys($steps); $first = explode(' ', $u->name)[0]; @endphp
-    <form method="post" action="{{ route('welcome.save') }}" class="mx-auto max-w-2xl"
+    @php
+        $keys = array_keys($steps); $first = explode(' ', $u->name)[0];
+        $stepIcon = ['hello' => 'sparkles', 'look' => 'settings', 'menu' => 'list', 'classes' => 'clipboard', 'parents' => 'users', 'payments' => 'wallet', 'teaching' => 'book-open', 'family' => 'bell', 'done' => 'check-circle'];
+        $stepHint = ['hello' => 'About a minute', 'look' => 'Theme and first page', 'menu' => 'Keep it short', 'classes' => 'To-dos and classwork', 'parents' => 'Who sees your grades', 'payments' => 'Who pays the fees', 'teaching' => 'Notices for you', 'family' => 'What we tell you', 'done' => 'Finish'];
+    @endphp
+    <form method="post" action="{{ route('welcome.save') }}" class="mx-auto grid max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-[260px_minmax(0,1fr)] dark:border-slate-800 dark:bg-slate-900"
           x-data="{ i: 0, keys: @js($keys), theme: @js($u->pref('theme', 'system')),
                     setTheme(t) { this.theme = t; if (t === 'system') { localStorage.removeItem('theme'); $store.theme.dark = matchMedia('(prefers-color-scheme: dark)').matches } else { localStorage.theme = t; $store.theme.dark = t === 'dark' } document.documentElement.classList.toggle('dark', $store.theme.dark) } }">
         @csrf
         <input type="hidden" name="theme" :value="theme">
 
-        {{-- Progress --}}
-        <div class="mb-6">
-            <div class="mb-2 flex items-center justify-between text-sm text-slate-500"><span x-text="'Step ' + (i + 1) + ' of ' + keys.length"></span><span x-text="@js(array_values($steps))[i]"></span></div>
-            <div class="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div class="h-full rounded-full bg-brand-600 transition-all" :style="`width: ${(i + 1) / keys.length * 100}%`"></div></div>
-        </div>
+        {{-- Steps rail --}}
+        <aside class="border-b border-slate-100 bg-slate-50 p-6 md:border-r md:border-b-0 dark:border-slate-800 dark:bg-white/[.02]">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Personal setup</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ $u->name }}</p>
+            <ol class="mt-6 space-y-1">
+                @foreach($steps as $k => $label)
+                    <li>
+                        <button type="button" class="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left" :class="keys[i] === '{{ $k }}' ? 'bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700' : ''" x-on:click="i = {{ $loop->index }}">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border"
+                                  :class="i > {{ $loop->index }} ? 'border-brand-600 bg-brand-600 text-white' : (i === {{ $loop->index }} ? 'border-brand-600 text-brand-600' : 'border-slate-300 text-slate-400 dark:border-slate-600')">
+                                <template x-if="i > {{ $loop->index }}"><x-icon name="check" class="h-4 w-4" /></template>
+                                <template x-if="i <= {{ $loop->index }}"><x-icon :name="$stepIcon[$k] ?? 'sparkles'" class="h-4 w-4" /></template>
+                            </span>
+                            <span class="min-w-0"><span class="block text-sm font-medium" :class="i === {{ $loop->index }} ? 'text-slate-900 dark:text-white' : 'text-slate-500'">{{ $label }}</span><span class="block truncate text-xs text-slate-400">{{ $stepHint[$k] ?? '' }}</span></span>
+                        </button>
+                    </li>
+                @endforeach
+            </ol>
+        </aside>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex min-h-[480px] flex-col p-6 sm:p-10">
+        <div class="flex-1">
             {{-- Welcome --}}
             <section x-show="keys[i] === 'hello'">
-                <p class="text-4xl">👋</p>
-                <h1 class="mt-3 text-2xl font-bold">Hi {{ $first }}! Let's set SmartSchool up for you.</h1>
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300"><x-icon name="sparkles" class="h-6 w-6" /></span>
+                <h1 class="mt-5 text-2xl font-bold">Hi {{ $first }}! Let's set SmartSchool up for you.</h1>
                 <p class="mt-2 text-slate-600 dark:text-slate-300">A few quick choices so the app fits the way you work. It takes about a minute, and you can change everything later in <b>My profile → Personal setup</b>.</p>
             </section>
 
@@ -25,8 +44,15 @@
                 <div>
                     <h2 class="text-xl font-bold">How should it look?</h2>
                     <div class="mt-3 grid grid-cols-3 gap-2">
-                        @foreach(['light' => ['☀️', 'Light'], 'dark' => ['🌙', 'Dark'], 'system' => ['💻', 'Same as my device']] as $k => [$icon, $label])
-                            <button type="button" class="rounded-xl border-2 p-4 text-center text-sm font-medium" :class="theme === '{{ $k }}' ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="setTheme('{{ $k }}')"><span class="block text-2xl">{{ $icon }}</span>{{ $label }}</button>
+                        @php $svg = [
+                            'light' => '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+                            'dark' => '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+                            'system' => '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+                        ]; @endphp
+                        @foreach(['light' => 'Light', 'dark' => 'Dark', 'system' => 'Same as my device'] as $k => $label)
+                            <button type="button" class="flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium" :class="theme === '{{ $k }}' ? 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-200' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'" x-on:click="setTheme('{{ $k }}')">
+                                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{!! $svg[$k] !!}</svg>{{ $label }}
+                            </button>
                         @endforeach
                     </div>
                 </div>
@@ -121,17 +147,18 @@
             @endif
 
             <section x-show="keys[i] === 'done'" x-cloak>
-                <p class="text-4xl">🎉</p>
-                <h2 class="mt-3 text-2xl font-bold">You're all set, {{ $first }}!</h2>
+                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"><x-icon name="check-circle" class="h-6 w-6" /></span>
+                <h2 class="mt-5 text-2xl font-bold">You're all set, {{ $first }}!</h2>
                 <p class="mt-2 text-slate-600 dark:text-slate-300">Change any of this later in <b>My profile → Personal setup</b>.</p>
             </section>
         </div>
 
-        <div class="mt-5 flex items-center gap-2">
+        <div class="mt-8 flex items-center gap-2 border-t border-slate-100 pt-5 dark:border-slate-800">
             <button type="button" class="btn" x-show="i > 0" x-on:click="i--">Back</button>
             <button type="submit" class="btn ml-auto" x-show="i < keys.length - 1">Skip for now</button>
             <button type="button" class="btn btn-primary" x-show="i < keys.length - 1" x-on:click="i++">Next</button>
             <button type="submit" class="btn btn-primary ml-auto" x-show="i === keys.length - 1" x-cloak>Finish</button>
+        </div>
         </div>
     </form>
 </x-layouts.app>
