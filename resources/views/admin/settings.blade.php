@@ -35,7 +35,7 @@
             {{-- Section nav --}}
             <nav class="hidden lg:block">
                 <ul class="sticky top-24 space-y-0.5 text-sm">
-                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'privacy' => ['Privacy notice']] as $id => [$title])
+                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'admission' => ['Admission documents'], 'privacy' => ['Privacy notice']] as $id => [$title])
                         <li><a href="#{{ $id }}" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5">{{ $title }}</a></li>
                     @endforeach
                     <li class="pt-3"><a href="{{ route('crud.index', 'school-years') }}" class="block rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">School years →</a></li>
@@ -173,6 +173,14 @@
                             </ul>
                         </div>
                     </div>
+                </section>
+
+                <section id="admission" class="card scroll-mt-24 p-0">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">Admission documents</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">What families upload with an application. Required documents must be attached before the form can be sent.</p>
+                    </div>
+                    <div class="px-6 py-5"><x-document-requirements /></div>
                 </section>
 
                 <section id="privacy" class="card scroll-mt-24 p-0">

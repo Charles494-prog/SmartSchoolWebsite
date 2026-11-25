@@ -16,6 +16,19 @@ class Employee extends Model
 
     public const TYPES = ['regular' => 'Regular', 'probationary' => 'Probationary', 'contractual' => 'Contractual', 'part_time' => 'Part-time'];
 
+    /** Next free employee number for this year, e.g. EMP-2026-0007. */
+    public static function nextNumber(): string
+    {
+        $prefix = 'EMP-'.now()->format('Y').'-';
+        $last = static::where('employee_no', 'like', $prefix.'%')->orderByDesc('employee_no')->value('employee_no');
+        $n = $last ? ((int) substr($last, strlen($prefix))) + 1 : 1;
+        while (static::where('employee_no', $prefix.str_pad((string) $n, 4, '0', STR_PAD_LEFT))->exists()) {
+            $n++;
+        }
+
+        return $prefix.str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

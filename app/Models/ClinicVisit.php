@@ -19,6 +19,17 @@ class ClinicVisit extends Model
         return $this->belongsTo(Student::class);
     }
 
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    /** Who visited: the student's or the staff member's name. */
+    public function getPatientNameAttribute(): string
+    {
+        return $this->student?->full_name ?? ($this->employee ? $this->employee->full_name.' (staff)' : '—');
+    }
+
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');

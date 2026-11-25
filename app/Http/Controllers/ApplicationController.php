@@ -10,6 +10,7 @@ use App\Models\Section;
 use App\Models\User;
 use App\Notifications\GeneralNotice;
 use App\Services\Enrollment;
+use App\Support\Admission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -50,11 +51,12 @@ class ApplicationController extends Controller
             'documents' => 'array',
             'documents.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
             'consent' => 'accepted',
-        ], [
+        ] + collect(Admission::documents())->filter(fn ($d) => $d['required'])->mapWithKeys(fn ($d, $k) => ['documents.'.$k => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120'])->all(), [
             'guardian_phone.regex' => 'Enter a Philippine mobile number, e.g. 09171234567.',
             'consent.accepted' => 'Please agree to the privacy notice to continue.',
             'documents.*.max' => 'Each file must be 5 MB or smaller.',
             'documents.*.mimes' => 'Upload PDF, JPG or PNG files.',
+            'documents.*.required' => 'This document is required.',
         ]);
         $files = $request->file('documents', []);
         unset($data['documents'], $data['consent']);
@@ -63,7 +65,7 @@ class ApplicationController extends Controller
         $data['reference_no'] = 'APP-'.now()->format('y').'-'.strtoupper(Str::random(6));
         $app = Application::create($data);
         foreach ($files as $type => $file) {
-            if (! $file || ! array_key_exists($type, ApplicationDocument::TYPES)) {
+            if (! $file || ! array_key_exists($type, Admission::documents())) {
                 continue;
             }
             $app->documents()->create([

@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\Subject;
 use App\Models\User;
 use App\Services\Tuition;
+use App\Support\Admission;
 use App\Support\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ class SetupWizardController extends Controller
         'staff' => ['Staff accounts', 'Who will use SmartSchool with you?'],
         'sections' => ['Sections', "Let's create your sections."],
         'fees' => ['Fees', 'Is your school public or private?'],
+        'documents' => ['Admission documents', 'Which documents should families submit?'],
         'students' => ['Students & QR IDs', "Almost done! Here's how students get in."],
         'done' => ['Done', "You're all set!"],
     ];
@@ -83,6 +85,14 @@ class SetupWizardController extends Controller
         Setting::put('setup_completed_at', now()->toDateTimeString());
 
         return redirect()->route('dashboard')->with('ok', 'Setup finished. You can change everything later in School settings.');
+    }
+
+    private function saveDocuments(Request $r): string
+    {
+        $r->validate(Admission::rules());
+        Admission::save($r->input('docs', []));
+
+        return 'Admission documents saved.';
     }
 
     private function saveSchool(Request $r): string

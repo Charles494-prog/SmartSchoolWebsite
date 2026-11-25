@@ -6,6 +6,7 @@ use App\Models;
 use App\Notifications\GeneralNotice;
 use App\Services\StaffAccounts;
 use App\Support\Role;
+use App\Support\School;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
@@ -184,24 +185,32 @@ class Resources
             ],
             'clinic-visits' => [
                 'model' => Models\ClinicVisit::class, 'title' => 'Clinic visits', 'singular' => 'clinic visit',
-                'roles' => [Role::ADMIN, Role::NURSE], 'order' => ['visited_at', 'desc'], 'search' => ['complaint'], 'with' => ['student'],
-                'help' => 'Health information is sensitive personal information under the Data Privacy Act. Only the nurse and administrator can see these records.',
-                'columns' => ['visited_at' => 'When', 'student.full_name' => 'Student', 'complaint' => 'Complaint', 'treatment' => 'Treatment', 'sent_home' => 'Sent home'],
-                'fields' => [
-                    ['name' => 'student_id', 'label' => 'Student', 'type' => 'select', 'options' => $students, 'rules' => 'required|exists:students,id'],
+                'roles' => [Role::ADMIN, Role::NURSE], 'order' => ['visited_at', 'desc'], 'search' => ['complaint'], 'with' => ['student', 'employee'],
+                'help' => 'Students and staff. Health information is sensitive personal information under the Data Privacy Act. Only the nurse and administrator can see these records.',
+                'columns' => ['visited_at' => 'When', 'patient_name' => 'Patient', 'complaint' => 'Complaint', 'treatment' => 'Treatment', 'sent_home' => 'Sent home'],
+                'fields' => array_values(array_filter([
+                    ['name' => 'student_id', 'label' => 'Student', 'type' => 'select', 'options' => $students, 'help' => 'Pick a student or a staff member.', 'rules' => 'nullable|required_without:employee_id|prohibits:employee_id|exists:students,id'],
+                    ['name' => 'employee_id', 'label' => 'Staff member', 'type' => 'select', 'options' => fn () => Models\Employee::where('status', '!=', 'resigned')->orderBy('last_name')->get()->mapWithKeys(fn ($e) => [$e->id => $e->full_name.' – '.$e->position])->all(), 'rules' => 'nullable|required_without:student_id|exists:employees,id'],
                     ['name' => 'visited_at', 'label' => 'Date & time', 'type' => 'datetime-local', 'rules' => 'required|date', 'default' => fn () => now()->format('Y-m-d\TH:i')],
                     ['name' => 'complaint', 'label' => 'Complaint', 'rules' => 'required|max:200'],
                     ['name' => 'assessment', 'label' => 'Assessment', 'type' => 'textarea', 'rules' => 'nullable|max:2000'],
                     ['name' => 'treatment', 'label' => 'Treatment / action', 'type' => 'textarea', 'rules' => 'nullable|max:2000'],
                     ['name' => 'sent_home', 'label' => 'Sent home', 'type' => 'checkbox', 'rules' => 'boolean'],
-                    ['name' => 'parent_notified', 'label' => 'Notify parent/guardian now (portal + email)', 'type' => 'checkbox', 'rules' => 'boolean'],
-                ],
+                    // Parents have no portal accounts or email on the school-network-only (LAN) setup.
+                    School::allows('parent_accounts') ? ['name' => 'parent_notified', 'label' => 'Notify parent/guardian now (portal + email) – students only', 'type' => 'checkbox', 'rules' => 'boolean'] : null,
+                ])),
                 'saving' => function (array $d, $m) {
                     $d['recorded_by'] ??= auth()->id();
+                    if (! empty($d['employee_id']) || ! School::allows('parent_accounts')) {
+                        $d['parent_notified'] = false;
+                    }
 
                     return $d;
                 },
                 'after_save' => function ($m) {
+                    if (! $m->student || ! School::allows('parent_accounts')) {
+                        return;
+                    }
                     if ($m->parent_notified && $m->wasChanged('parent_notified') || ($m->wasRecentlyCreated && $m->parent_notified)) {
                         $users = $m->student->guardians()->whereNotNull('user_id')->with('user')->get()->pluck('user')->filter();
                         Notification::send($users, new GeneralNotice(
@@ -229,8 +238,11 @@ class Resources
                 },
             ],
             'employees' => [
-                'saving' => function (array $d) {
+                'saving' => function (array $d, $m) {
                     unset($d['login_email'], $d['login_role']);
+                    if (blank($d['employee_no'] ?? null)) {
+                        $d['employee_no'] = $m?->employee_no ?: Models\Employee::nextNumber();
+                    }
 
                     return $d;
                 },
@@ -239,7 +251,7 @@ class Resources
                 'roles' => [Role::ADMIN, Role::HR], 'order' => ['last_name', 'asc'], 'search' => ['first_name', 'last_name', 'employee_no', 'position'],
                 'columns' => ['employee_no' => 'Emp. no.', 'full_name' => 'Name', 'position' => 'Position', 'department' => 'Department', 'employment_type' => 'Type', 'monthly_salary' => 'Monthly salary', 'status' => 'Status'],
                 'fields' => [
-                    ['name' => 'employee_no', 'label' => 'Employee no.', 'rules' => fn ($m) => ['required', 'max:30', Rule::unique('employees', 'employee_no')->ignore($m?->id)]],
+                    ['name' => 'employee_no', 'label' => 'Employee no.', 'placeholder' => 'Automatic', 'help' => 'Leave empty to number automatically (e.g. EMP-2026-0001).', 'rules' => fn ($m) => ['nullable', 'max:30', Rule::unique('employees', 'employee_no')->ignore($m?->id)]],
                     ['name' => 'first_name', 'label' => 'First name', 'rules' => 'required|max:80'],
                     ['name' => 'last_name', 'label' => 'Last name', 'rules' => 'required|max:80'],
                     ['name' => 'position', 'label' => 'Position', 'rules' => 'required|max:100', 'placeholder' => 'Teacher I'],

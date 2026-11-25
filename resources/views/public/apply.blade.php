@@ -55,14 +55,15 @@
         </section>
 
         <section class="{{ $sec }}">
-            <div><h2 class="font-semibold text-slate-900">Documents</h2><p class="mt-1 text-sm text-slate-500">Optional now. PDF, JPG or PNG, up to 5 MB each.</p></div>
+            @php $docs = \App\Support\Admission::documents(); $anyRequired = collect($docs)->contains('required', true); @endphp
+            <div><h2 class="font-semibold text-slate-900">Documents</h2><p class="mt-1 text-sm text-slate-500">{{ $anyRequired ? 'Documents marked * are required.' : 'Optional now.' }} PDF, JPG or PNG, up to 5 MB each.</p></div>
             <div class="divide-y divide-slate-200 rounded-lg border border-slate-200 md:col-span-2">
-                @foreach(\App\Models\ApplicationDocument::TYPES as $k => $label)
+                @foreach($docs as $k => $d)
                     <label class="flex cursor-pointer items-center gap-4 px-4 py-3 hover:bg-slate-50" x-data="{ name: '' }">
                         <x-icon name="file" class="h-5 w-5 shrink-0 text-slate-400" />
-                        <span class="flex-1 text-sm"><span class="font-medium text-slate-800">{{ $label }}</span><span class="block truncate text-xs text-slate-500" x-text="name || 'No file selected'"></span></span>
+                        <span class="flex-1 text-sm"><span class="font-medium text-slate-800">{{ $d['label'] }}@if($d['required'])<span class="text-rose-600" aria-hidden="true"> *</span><span class="sr-only"> (required)</span>@endif</span><span class="block truncate text-xs text-slate-500" x-text="name || 'No file selected'"></span></span>
                         <span class="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">Choose file</span>
-                        <input type="file" name="documents[{{ $k }}]" accept=".pdf,.jpg,.jpeg,.png" class="sr-only" @change="name = $event.target.files[0]?.name || ''">
+                        <input type="file" name="documents[{{ $k }}]" accept=".pdf,.jpg,.jpeg,.png" class="sr-only" @change="name = $event.target.files[0]?.name || ''" @required($d['required'])>
                     </label>
                     @error('documents.'.$k)<p class="field-error px-4 pb-3">{{ $message }}</p>@enderror
                 @endforeach

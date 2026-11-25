@@ -12,7 +12,7 @@
             <h2 class="h2 mt-6 mb-2">Documents</h2>
             <ul class="space-y-1 text-sm">
                 @forelse($app->documents as $d)
-                    <li class="flex items-center gap-2"><x-icon name="clip" class="h-4 w-4 text-slate-400" /> <a class="link" href="{{ route('applications.document', $d) }}">{{ \App\Models\ApplicationDocument::TYPES[$d->type] ?? $d->type }}</a> <span class="muted">{{ $d->original_name }}</span></li>
+                    <li class="flex items-center gap-2"><x-icon name="clip" class="h-4 w-4 text-slate-400" /> <a class="link" href="{{ route('applications.document', $d) }}">{{ \App\Support\Admission::label($d->type) }}</a> <span class="muted">{{ $d->original_name }}</span></li>
                 @empty
                     <li class="muted">No documents uploaded. Ask the family to bring them.</li>
                 @endforelse

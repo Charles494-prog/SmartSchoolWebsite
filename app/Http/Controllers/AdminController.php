@@ -8,6 +8,7 @@ use App\Models\SchoolYear;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Tuition;
+use App\Support\Admission;
 use App\Support\AuditPresenter;
 use App\Support\School;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class AdminController extends Controller
             'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
             'deployment_mode' => 'nullable|in:lan,hosted', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
             'tuition_all' => 'nullable|required_if:tuition_mode,same|numeric|min:0|max:10000000', 'tuition' => 'array', 'tuition.*' => 'nullable|numeric|min:0|max:10000000'];
-        $data = $request->validate($rules + collect(self::SETTINGS)->flatMap(fn ($g) => $g)->map(fn () => 'nullable|max:255')->except(array_keys($rules))->all());
+        $data = $request->validate($rules + Admission::rules() + collect(self::SETTINGS)->flatMap(fn ($g) => $g)->map(fn () => 'nullable|max:255')->except(array_keys($rules))->all());
         foreach (collect(self::SETTINGS)->flatMap(fn ($g) => array_keys($g))->push('privacy_notice') as $k) {
             $v = (self::TYPES[$k] ?? '') === 'toggle' ? ($request->boolean($k) ? '1' : '0') : ($data[$k] ?? '');
             Setting::put($k, $v);
@@ -57,6 +58,9 @@ class AdminController extends Controller
         }
         if (isset($data['school_type'])) {
             Tuition::save($data['school_type'], $data['tuition_mode'] ?? 'per_level', isset($data['tuition_all']) ? (float) $data['tuition_all'] : null, $data['tuition'] ?? []);
+        }
+        if ($request->has('docs') || $request->boolean('docs_present')) {
+            Admission::save($request->input('docs', []));
         }
         if ($request->hasFile('logo')) {
             Setting::storeLogo($request->file('logo'));

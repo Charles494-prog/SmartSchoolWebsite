@@ -14,6 +14,7 @@
         'subjects' => 'I already added common subjects for every grade level. Set how grades are weighted – you can still change a single subject later.',
         'staff' => 'Each person gets their own login. Pick what they can open – a teacher only sees their own classes, a guard only sees the gate scanner.',
         'sections' => 'A section is a class of students, like "Grade 7 – Mabini". Give it an adviser and a room. Teachers per subject are assigned afterwards in Classes & sections.',
+        'documents' => 'These show on the online application form. Tick "Required" for documents that must be attached before a family can send the form.',
         'fees' => 'Public schools usually charge no tuition. Private schools can use one amount for everyone or a different amount per grade level.',
     ];
 @endphp
@@ -221,6 +222,13 @@
                                     <p class="text-xs text-slate-500">Other fees (miscellaneous, ID, books) can be added on the Fees page after setup.</p>
                                 </div>
                             </div>
+                            @break
+
+                        @case('documents')
+                            @unless(\App\Support\School::allows('online_application'))
+                                <p class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Online applications are off while SmartSchool runs on the school network only (LAN). This list is used if you switch to Hosted later.</p>
+                            @endunless
+                            <x-document-requirements />
                             @break
 
                         @case('students')
