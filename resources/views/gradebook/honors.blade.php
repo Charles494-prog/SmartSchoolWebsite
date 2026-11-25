@@ -47,16 +47,26 @@
             </div>
 
             @if($top->count() >= 3)
-                <div class="mb-6 grid items-end gap-3 sm:grid-cols-3">
+                {{-- Podium: 2nd · 1st · 3rd on steps --}}
+                <div class="mb-8 grid grid-cols-3 items-end gap-2 sm:gap-4">
                     @foreach([1, 0, 2] as $pos)
-                        @php $r = $top[$pos]; @endphp
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900 {{ $pos === 0 ? 'ring-2 ring-amber-300 sm:pb-10 sm:pt-8' : '' }}">
-                            <div class="text-4xl">{{ ['🥇', '🥈', '🥉'][$pos] }}</div>
-                            <div class="mt-2 font-semibold">{{ $r['enrollment']->student->full_name }}</div>
-                            @if($scope === 'level')<div class="text-xs text-slate-500">{{ $r['section']->name }}</div>@endif
-                            <div class="text-3xl font-bold text-brand-600">{{ $r['average'] }}</div>
-                            @if($r['honor'])<span class="mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $honorStyle[$r['honor']] }}">{{ $r['honor'] }}</span>@endif
-                        </div>
+                        @php
+                            $r = $top[$pos];
+                            $step = [['h-40 sm:h-48', 'from-amber-300 to-amber-500', '🥇', 'text-amber-900'], ['h-28 sm:h-36', 'from-slate-200 to-slate-400', '🥈', 'text-slate-800'], ['h-20 sm:h-24', 'from-orange-300 to-orange-500', '🥉', 'text-orange-950']][$pos];
+                            $url = route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']);
+                        @endphp
+                        <a href="{{ $url }}" class="group flex flex-col items-center text-center">
+                            <div class="mb-3 px-1">
+                                <div class="{{ $pos === 0 ? 'text-5xl sm:text-6xl' : 'text-4xl' }} transition group-hover:-translate-y-1">{{ $step[2] }}</div>
+                                <div class="mt-1 font-semibold text-slate-900 group-hover:underline dark:text-white {{ $pos === 0 ? 'sm:text-lg' : '' }}">{{ $r['enrollment']->student->full_name }}</div>
+                                @if($scope === 'level')<div class="text-xs text-slate-500">{{ $r['section']->name }}</div>@endif
+                                <div class="{{ $pos === 0 ? 'text-3xl sm:text-4xl' : 'text-2xl' }} font-extrabold text-brand-600">{{ $r['average'] }}</div>
+                                @if($r['honor'])<span class="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 {{ $honorStyle[$r['honor']] }}">{{ $r['honor'] }}</span>@endif
+                            </div>
+                            <div class="flex w-full items-start justify-center rounded-t-2xl bg-gradient-to-b pt-3 shadow-inner {{ $step[0] }} {{ $step[1] }}">
+                                <span class="text-4xl font-black {{ $step[3] }} opacity-80 sm:text-5xl">{{ $pos + 1 }}</span>
+                            </div>
+                        </a>
                     @endforeach
                 </div>
             @endif
@@ -68,7 +78,7 @@
                     @forelse($top as $r)
                         <tr>
                             <td class="font-bold text-slate-500">#{{ $r['rank'] }}</td>
-                            <td class="font-medium">{{ $r['enrollment']->student->full_name }}</td>
+                            <td class="font-medium"><a class="hover:text-brand-600 hover:underline" href="{{ route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']) }}">{{ $r['enrollment']->student->full_name }}</a></td>
                             @if($scope === 'level')<td>{{ $r['section']->name }}</td>@endif
                             <td><div class="flex items-center gap-3"><span class="w-12 font-semibold">{{ $r['average'] }}</span><span class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><span class="block h-full rounded-full {{ $r['honor'] ? 'bg-amber-400' : 'bg-brand-500' }}" style="width: {{ max(0, min(100, ($r['average'] - 70) * 3.4)) }}%"></span></span></div></td>
                             <td>@if($r['honor'])<span class="rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 {{ $honorStyle[$r['honor']] }}">{{ $r['honor'] }}</span>@endif</td>
@@ -79,7 +89,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="mt-3 text-xs text-slate-500 print:hidden">Only students who passed every subject are listed. {{ $private ? $private.' student(s) with a failing grade are not shown here – this is kept private.' : '' }} The list length (top {{ $n }}) and honor cut-offs are set in Settings.</p>
+            <p class="mt-3 text-xs text-slate-500 print:hidden">Click a name to see their journey – every graded item. Only students who passed every subject are listed. {{ $private ? $private.' student(s) with a failing grade are not shown here – this is kept private.' : '' }} The list length (top {{ $n }}) and honor cut-offs are set in Settings.</p>
         </div>
 
         {{-- BEST IN SUBJECT --}}
@@ -89,7 +99,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">Best in {{ $sub }}</p>
                     @foreach($winners as $w)
                         <div class="mt-2 flex items-center justify-between gap-2">
-                            <span class="font-semibold">{{ $w['enrollment']->student->full_name }}@if($scope === 'level')<span class="block text-xs font-normal text-slate-500">{{ $w['section']->name }}</span>@endif</span>
+                            <a href="{{ route('honors.journey', ['student' => $w['enrollment']->student_id, 'term' => $term ?? 'final']) }}" class="font-semibold hover:underline">{{ $w['enrollment']->student->full_name }}@if($scope === 'level')<span class="block text-xs font-normal text-slate-500">{{ $w['section']->name }}</span>@endif</a>
                             <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-sm font-bold text-emerald-700">{{ $w['grade'] }}</span>
                         </div>
                     @endforeach

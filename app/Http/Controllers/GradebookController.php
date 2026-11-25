@@ -256,6 +256,33 @@ class GradebookController extends Controller
         ]);
     }
 
+    /** A student's "journey to the top": every graded item and grade, per subject, for a period. Staff only. */
+    public function journey(Request $request, \App\Models\Student $student)
+    {
+        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR, Role::TEACHER), 403);
+        $e = $student->currentEnrollment();
+        abort_unless($e?->section, 404);
+        $terms = $e->section->gradeLevel->terms ?: 4;
+        $term = $request->query('term') === 'final' ? null : min(max((int) $request->query('term', 1), 1), $terms);
+        $classes = $e->section->classSubjects()->with('subject', 'section.gradeLevel', 'assessments', 'teacher')->get()->sortBy('subject.name');
+        $rc = Grading::reportCard($e, $classes);
+        abort_if(collect($rc['subjects'])->contains(fn ($s) => collect($term ? [$s['terms'][$term] ?? null] : [$s['final']])->filter(fn ($g) => $g !== null && $g < (float) (\App\Models\Setting::get('passing_grade') ?: 75))->isNotEmpty())
+            && ! $request->user()->canViewStudent($student), 403, 'This student\'s grades are private.');
+        $scores = Score::where('student_id', $student->id)->whereIn('assessment_id', $classes->flatMap->assessments->pluck('id'))->get()->keyBy('assessment_id');
+        $subjects = $classes->map(fn ($cs) => [
+            'cs' => $cs,
+            'terms' => Grading::studentTerms($cs, $student),
+            'items' => $cs->assessments->when($term, fn ($c) => $c->where('term', $term))->sortBy('given_on')->map(fn ($a) => ['a' => $a, 'score' => $scores[$a->id]->score ?? null])->values(),
+        ]);
+        $avgByTerm = collect(range(1, $terms))->mapWithKeys(function ($t) use ($subjects) {
+            $g = $subjects->map(fn ($s) => $s['terms'][$t] ?? null);
+
+            return [$t => $g->contains(null) ? null : round($g->avg(), 2)];
+        });
+
+        return view('gradebook.journey', compact('student', 'e', 'terms', 'term', 'subjects', 'avgByTerm', 'rc'));
+    }
+
     public function saveAward(Request $request)
     {
         abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR), 403);

@@ -163,6 +163,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/grading-requests/{gradingRequest}', [GradebookController::class, 'reviewWeights'])->name('gradebook.weights.review');
         Route::delete('/gradebook/{class}/weights', [GradebookController::class, 'resetWeights'])->name('gradebook.weights.reset');
         Route::get('/honors', [GradebookController::class, 'honors'])->name('honors');
+        Route::get('/honors/student/{student}', [GradebookController::class, 'journey'])->name('honors.journey');
         Route::post('/honors/awards', [GradebookController::class, 'saveAward'])->name('honors.awards.store');
         Route::post('/honors/awards/{award}/toggle', [GradebookController::class, 'toggleAward'])->name('honors.awards.toggle');
         Route::post('/honors/nominations', [GradebookController::class, 'nominate'])->name('honors.nominate');

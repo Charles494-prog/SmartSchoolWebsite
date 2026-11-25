@@ -105,6 +105,10 @@ GIFT);
         $this->actingAs(User::where('role', 'admin')->first());
         $this->post("/honors/nominations/{$n->id}", ['action' => 'approve'])->assertRedirect();
         $this->assertSame('approved', $n->fresh()->status);
+        $topStudent = $r->viewData('top')->first()['enrollment']->student;
+        $this->actingAs($teacher)->get("/honors/student/{$topStudent->id}?term=1")->assertOk()->assertSee('Journey to the top')->assertSee('Quiz 1');
+        $this->actingAs(User::where('email', 'student@school.test')->first())->get("/honors/student/{$topStudent->id}")->assertForbidden();
+        $this->actingAs(User::where('role', 'admin')->first());
         \App\Models\Setting::put('honors_top_n', '3');
         $this->get("/honors?section_id={$section->id}&term=1")->assertOk()->assertSee('Top 3');
     }
