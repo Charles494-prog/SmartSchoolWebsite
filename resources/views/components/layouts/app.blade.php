@@ -113,8 +113,8 @@
                                 </form>
                             </div>
                             <form method="post" action="{{ route('dev.setup') }}" class="border-b border-slate-100 px-4 py-3 dark:border-white/10">@csrf
-                                <button class="flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"><x-icon name="sparkles" class="h-4 w-4" /> Run setup wizard again</button>
-                                <p class="mt-1 text-center text-[11px] text-slate-500">Signs in as the Superadmin if needed</p>
+                                <button class="flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"><x-icon name="sparkles" class="h-4 w-4" /> Run the school setup (Superadmin)</button>
+                                <p class="mt-1 text-center text-[11px] text-slate-500">Switches you to the Superadmin account</p>
                             </form>
                             <div class="px-2 py-2" x-data="{ f: '' }">
                                 <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Sign in as</p>
