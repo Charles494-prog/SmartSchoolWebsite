@@ -221,8 +221,8 @@ class ClassworkTest extends TestCase
         $this->actingAs($teacher);
         $this->post('/announcements', ['title' => 'x', 'body' => 'y', 'audience' => 'all'])->assertForbidden();
         $this->assertGreaterThan(0, \App\Models\Announcement::unreadCount($teacher));
-        $this->get('/announcements')->assertOk()->assertSee('Family Day')->assertSee('Mark as read')->assertSee('Last year')->assertSee('December 12, 2026');
-        $this->post("/announcements/{$a->id}/read")->assertRedirect();
+        $this->get('/announcements')->assertOk()->assertSee('Family Day')->assertSee('New')->assertSee('Last year')->assertSee('December 12, 2026');
+        $this->assertSame(0, \App\Models\Announcement::unreadCount($teacher), 'opening the page reads them');
         $this->actingAs($admin)->get('/announcements')->assertSee('Seen by 1');
     }
 }

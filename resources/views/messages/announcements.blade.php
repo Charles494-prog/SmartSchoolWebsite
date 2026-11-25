@@ -54,7 +54,7 @@
         {{-- Feed --}}
         <div class="space-y-4">
             @forelse($items as $a)
-                <article class="card relative p-0 {{ $a->readers->contains('id', $me->id) ? '' : 'ring-2 ring-brand-200 dark:ring-brand-500/30' }}">
+                <article class="card relative p-0 {{ $new->contains($a->id) ? 'ring-2 ring-brand-200 dark:ring-brand-500/30' : '' }}">
                     <header class="flex items-start gap-3 px-4 pt-4">
                         @if($a->author?->avatar_path)<img src="{{ route('profile.photo', $a->author) }}" class="h-10 w-10 shrink-0 rounded-full object-cover" alt="">@else<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">{{ $initials($a->author?->name ?? 'School') }}</span>@endif
                         <div class="min-w-0 flex-1">
@@ -94,7 +94,7 @@
                             <iframe src="{{ route('announcements.content', $a) }}" data-ss-frame="a{{ $a->id }}" sandbox="allow-scripts allow-popups allow-forms allow-modals" loading="lazy" class="mt-3 block h-48 w-full rounded-xl border border-slate-200 dark:border-slate-700" title="{{ $a->title }}"></iframe>
                         @endif
                     </div>
-                    @php $read = $a->readers->contains('id', $me->id); $seen = $a->readers->where('id', '!=', $a->author_id); @endphp
+                    @php $seen = $a->readers->where('id', '!=', $a->author_id); @endphp
                     <footer class="flex flex-wrap items-center gap-3 border-t border-slate-100 px-4 py-2.5 dark:border-slate-800">
                         @if($seen->isNotEmpty())
                             <div class="flex items-center gap-2" x-data="{ who: false }">
@@ -110,11 +110,7 @@
                                 </div>
                             </div>
                         @endif
-                        @if($read)
-                            <span class="ml-auto text-xs font-medium text-emerald-600">✓ Read</span>
-                        @else
-                            <form method="post" action="{{ route('announcements.read', $a) }}" class="ml-auto">@csrf<button class="rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700">Mark as read</button></form>
-                        @endif
+                        @if($new->contains($a->id))<span class="ml-auto rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-semibold text-white">New</span>@endif
                     </footer>
                 </article>
             @empty

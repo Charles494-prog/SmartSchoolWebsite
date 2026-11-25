@@ -21,9 +21,16 @@ class CommunicationController extends Controller
     {
         $u = $request->user();
 
+        $items = $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Announcement::with('author', 'section', 'readers')->orderByDesc('is_pinned')->latest('published_at')->latest('id')->paginate(20)
+            : Announcement::with('author', 'section', 'readers')->visibleTo($u)->orderByDesc('is_pinned')->latest('published_at')->paginate(20);
+        // Opening the page counts as reading what's on it; remember which ones were new for this visit.
+        $new = $items->getCollection()->reject(fn ($a) => $a->readers->contains('id', $u->id))->pluck('id');
+        foreach ($new as $id) {
+            \Illuminate\Support\Facades\DB::table('announcement_reads')->insertOrIgnore(['announcement_id' => $id, 'user_id' => $u->id, 'read_at' => now()]);
+        }
+
         return view('messages.announcements', [
-            'items' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Announcement::with('author', 'section', 'readers')->orderByDesc('is_pinned')->latest('published_at')->latest('id')->paginate(20)
-                : Announcement::with('author', 'section', 'readers')->visibleTo($u)->orderByDesc('is_pinned')->latest('published_at')->paginate(20),
+            'items' => $items, 'new' => $new,
             // School-wide announcements come from the office. Teachers post to their own classes from the class card.
             'canPost' => $u->hasRole(Role::ADMIN, Role::REGISTRAR),
             'sections' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Section::with('gradeLevel')->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))->get()->mapWithKeys(fn ($s) => [$s->id => $s->label()])
