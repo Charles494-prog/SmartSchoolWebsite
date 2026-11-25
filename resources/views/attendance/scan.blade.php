@@ -1,6 +1,6 @@
 <x-layouts.app :title="$gate ? 'Gate scanner' : 'QR scanner'">
     <div x-data="scanner()" x-init="init()" x-on:fullscreenchange.document="if (!document.fullscreenElement) full = false" x-on:keydown.escape.window="camOpen ? closeCam() : (full && exitFull())"
-         :class="full ? 'fixed inset-0 z-[70] overflow-y-auto bg-slate-100 p-4 sm:p-6 dark:bg-slate-950' : ''">
+         :class="full ? 'fixed inset-0 z-[70] overflow-x-hidden overflow-y-auto bg-slate-100 p-4 sm:p-6 dark:bg-slate-950' : ''">
 
       {{-- 1. Header: what this page is + settings, all on one quiet line --}}
       <div class="mb-4 flex flex-wrap items-end gap-3">
@@ -98,11 +98,12 @@
                 </div>
             </div>
 
-            {{-- USB / manual entry: small, always ready --}}
-            <form @submit.prevent="send(code)" class="flex items-center gap-2">
-                <label for="scan-box" class="sr-only">Student no. or LRN</label>
-                <input id="scan-box" x-ref="box" x-model="code" class="input h-11 flex-1" placeholder="USB scanner types here – or type student no./LRN and press Enter" autocomplete="off" autofocus>
-                <button class="btn h-11">Enter</button>
+            {{-- Manual entry: for a card that won't scan, or a USB QR scanner (it types here by itself) --}}
+            <form @submit.prevent="send(code)" class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+                <label for="scan-box" class="text-sm font-medium text-slate-600 dark:text-slate-300">Card won't scan? Type the student no. or LRN:</label>
+                <input id="scan-box" x-ref="box" x-model="code" class="input h-10 min-w-40 flex-1" placeholder="e.g. 2026-0001" autocomplete="off" autofocus>
+                <button class="btn h-10">Check in</button>
+                <p class="w-full text-xs text-slate-400">Using a USB QR scanner? Just scan – it types into this box automatically.</p>
             </form>
         </div>
 
@@ -132,10 +133,10 @@
             </div>
 
             {{-- Today's tally --}}
-            <div class="grid grid-cols-4 gap-2 text-center">
+            <div class="grid gap-2 text-center" :class="classId ? 'grid-cols-3' : 'grid-cols-4'">
                 <div class="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900"><div class="text-2xl font-bold text-emerald-600" x-text="counts.in">0</div><div class="text-xs text-slate-500">In</div></div>
                 <div class="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900"><div class="text-2xl font-bold text-amber-600" x-text="counts.late">0</div><div class="text-xs text-slate-500">Late</div></div>
-                <div class="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900"><div class="text-2xl font-bold text-slate-700 dark:text-slate-200" x-text="counts.out">0</div><div class="text-xs text-slate-500">Out</div></div>
+                <div x-show="!classId" class="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900"><div class="text-2xl font-bold text-slate-700 dark:text-slate-200" x-text="counts.out">0</div><div class="text-xs text-slate-500">Out</div></div>
                 <div class="rounded-xl bg-white p-3 shadow-sm dark:bg-slate-900"><div class="text-2xl font-bold text-rose-600" x-text="counts.err">0</div><div class="text-xs text-slate-500">Problems</div></div>
             </div>
 
