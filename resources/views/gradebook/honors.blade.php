@@ -9,6 +9,7 @@
         // "Play awardees": from the least intense award to the top 1.
         $slides = [];
         $intro = fn ($title, $sub) => ['intro' => true, 'title' => $title, 'sub' => $sub];
+        $slides[] = ['cover' => true, 'title' => ($scope === 'level' ? $section?->gradeLevel->name : $section?->label()).' Awarding Ceremony', 'sub' => $period, 'school' => (string) \App\Models\Setting::get('school_name')];
         if ($perfect->isNotEmpty()) {
             $slides[] = $intro('Perfect attendance', 'Never absent, never late');
             foreach ($perfect as $p) { $slides[] = ['icon' => '🏅', 'kind' => 'Perfect attendance', 'name' => $p['student']->full_name, 'detail' => $p['days'].' school days', 'section' => $p['section']->name]; }
@@ -277,6 +278,20 @@
             <template x-for="(s, k) in slides" :key="k">
                 <div x-show="i === k" x-transition:enter="transition duration-700 ease-out" x-transition:enter-start="opacity-0 translate-y-10 scale-90" x-transition:enter-end="opacity-100 translate-y-0 scale-100"
                      x-transition:leave="transition duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="absolute w-full max-w-5xl text-center">
+                    {{-- cover --}}
+                    <template x-if="s.cover">
+                        <div>
+                            <p class="text-sm font-semibold uppercase tracking-[.35em] text-white/50" x-text="s.school"></p>
+                            <div class="mt-6 text-7xl">🏆</div>
+                            <h2 class="mt-6 text-5xl font-bold leading-tight sm:text-7xl" x-text="s.title"></h2>
+                            <p class="mt-4 text-2xl text-amber-300" x-text="s.sub"></p>
+                            <p class="mx-auto mt-14 flex w-fit items-center gap-3 rounded-full border border-white/20 px-5 py-2.5 text-base text-white/70">
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                                Plug into HDMI and use a big screen for a better experience
+                            </p>
+                            <p class="mt-6 text-sm text-white/40">Press Space or click to begin</p>
+                        </div>
+                    </template>
                     {{-- group title --}}
                     <template x-if="s.intro"><div><p class="text-sm font-semibold uppercase tracking-[.3em] text-amber-400">Next</p><h2 class="mt-3 text-5xl font-bold sm:text-7xl" x-text="s.title"></h2><p class="mt-4 text-xl text-white/60" x-text="s.sub"></p></div></template>
                     {{-- drumroll countdown before #1 --}}
@@ -291,7 +306,7 @@
                         </div>
                     </template>
                     {{-- a student --}}
-                    <template x-if="!s.intro && !s.countdown">
+                    <template x-if="!s.intro && !s.countdown && !s.cover">
                         <div :class="s.tier === 1 && 'reveal-one'">
                             <div class="relative mx-auto flex h-48 w-48 items-center justify-center sm:h-60 sm:w-60">
                                 <template x-if="s.tier"><span class="absolute inset-0 animate-ping rounded-full" :class="{ 'border-8 border-amber-400/70': s.tier === 1, 'border-4 border-slate-300/40': s.tier === 2, 'border-4 border-orange-400/40': s.tier === 3 }"></span></template>
