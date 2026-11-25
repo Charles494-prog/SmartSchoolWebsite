@@ -44,7 +44,6 @@
                     @endforelse
                 </ul>
             </div>
-            <div class="mt-3">{{ $orders->links() }}</div>
         </div>
 
         <div x-show="tab === 'items'" x-cloak class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

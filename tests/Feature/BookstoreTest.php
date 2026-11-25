@@ -36,7 +36,8 @@ class BookstoreTest extends TestCase
         $this->post("/portal/shop/{$student->student->id}", ['cart' => [['id' => $item->id, 'qty' => 1, 'size' => 'M']]])->assertRedirect(route('portal.shop'));
         $order = ShopOrder::latest('id')->first();
         $this->assertEqualsWithDelta($before, $account->fresh()->balance(), 0.01, 'not billed until the bookstore approves');
-        $this->actingAs($store)->post("/bookstore/orders/{$order->id}", ['status' => 'approved'])->assertSessionHas('ok');
+        $this->actingAs($store)->get('/bookstore')->assertOk();
+        $this->post("/bookstore/orders/{$order->id}", ['status' => 'approved'])->assertSessionHas('ok');
         $this->actingAs($student);
         $this->assertEqualsWithDelta($before + 1200, $account->fresh()->balance(), 0.01);
         $this->assertSame(4, $item->fresh()->stock);
