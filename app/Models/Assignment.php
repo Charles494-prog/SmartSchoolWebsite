@@ -13,7 +13,7 @@ class Assignment extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['due_at' => 'datetime', 'max_score' => 'float'];
+    protected $casts = ['due_at' => 'datetime', 'max_score' => 'float', 'shuffle_questions' => 'boolean', 'shuffle_answers' => 'boolean'];
 
     public function classSubject(): BelongsTo
     {
@@ -23,5 +23,20 @@ class Assignment extends Model
     public function submissions(): HasMany
     {
         return $this->hasMany(Submission::class);
+    }
+
+    public function questions(): HasMany
+    {
+        return $this->hasMany(QuizQuestion::class)->orderBy('position');
+    }
+
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(QuizAttempt::class);
+    }
+
+    public function classSubjectSection(): ?int
+    {
+        return $this->classSubject?->section_id;
     }
 }

@@ -144,6 +144,14 @@
                                     </div>
                                 @endforeach
                                 <p class="text-sm" :class="ww + pt + qa === 100 ? 'text-emerald-700' : 'text-rose-700'">Total: <b x-text="ww + pt + qa"></b>% <span x-show="ww + pt + qa !== 100">– must be 100%</span></p>
+                                <div class="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 dark:border-white/10">
+                                    <label class="block"><span class="label">Grading periods</span>
+                                        <select name="grading_periods" class="input">@foreach([4 => 'Quarters (4)', 3 => 'Trimesters (3)', 2 => 'Semesters (2)'] as $n => $l)<option value="{{ $n }}" @selected(\App\Support\School::periods() === $n)>{{ $l }}</option>@endforeach</select>
+                                    </label>
+                                    <label class="block"><span class="label">Top achievers to list</span>
+                                        <select name="honors_top_n" class="input">@foreach([10, 15, 20, 30] as $n)<option value="{{ $n }}" @selected((int) (\App\Models\Setting::get('honors_top_n') ?: 10) === $n)>Top {{ $n }}</option>@endforeach</select>
+                                    </label>
+                                </div>
                                 <p class="text-xs text-slate-500">Want to add or rename subjects? Use <a class="link" href="{{ route('crud.index', 'subjects') }}" target="_blank">Subjects</a> after setup.</p>
                             </div>
                             @break

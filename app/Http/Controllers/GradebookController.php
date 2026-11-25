@@ -223,23 +223,78 @@ class GradebookController extends Controller
     {
         $u = $request->user();
         $sy = SchoolYear::current();
-        $sections = Section::where('school_year_id', $sy?->id)->with('gradeLevel')
-            ->when($u->role === Role::TEACHER, fn ($q) => $q->whereIn('id', $u->teacherSectionIds()))->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name]);
-        $section = $sections->firstWhere('id', (int) $request->query('section_id')) ?? $sections->first();
+        $all = Section::where('school_year_id', $sy?->id)->with('gradeLevel', 'schoolYear')->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name])->values();
+        $mine = $u->role === Role::TEACHER ? $all->whereIn('id', $u->teacherSectionIds())->values() : $all;
+        $section = $mine->firstWhere('id', (int) $request->query('section_id')) ?? $mine->first();
+        $scope = $request->query('scope') === 'level' ? 'level' : 'section';
+        // Whole grade level: every section of that level (results are public honors, so teachers may see them).
+        $sections = $section ? ($scope === 'level' ? $all->where('grade_level_id', $section->grade_level_id)->values() : collect([$section])) : collect();
         $terms = $section?->gradeLevel->terms ?: 4;
-        $term = $request->query('term') === 'final' ? null : (int) $request->query('term', 0);
-        if ($section && $term === 0) {
-            // Default: the latest grading period that has grades for everyone, else the whole year.
-            $term = collect(range($terms, 1))->first(fn ($t) => collect(Grading::rankSection($section, $t))->whereNotNull('average')->isNotEmpty());
+        if ($request->query('term') === 'final') {
+            $term = null;
+        } elseif ($request->filled('term')) {
+            $term = min(max((int) $request->query('term'), 1), $terms);
+        } else {
+            // Default: the latest grading period every class in the section already submitted, else Q1.
+            $done = $section ? collect(range($terms, 1))->first(fn ($t) => $section->classSubjects()->get()->every(fn ($cs) => $cs->isLocked($t))) : null;
+            $term = $done ?? 1;
         }
-        $term = $term ? min(max($term, 1), $terms) : null;
+        $rows = \App\Services\Honors::rows($sections, $term);
 
         return view('gradebook.honors', [
-            'sections' => $sections->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
-            'section' => $section,
-            'terms' => $terms,
-            'term' => $term,
-            'ranking' => $section ? Grading::rankSection($section, $term) : [],
+            'sections' => $mine->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
+            'section' => $section, 'scope' => $scope, 'terms' => $terms, 'term' => $term,
+            'top' => \App\Services\Honors::top($rows),
+            'ranked' => $rows->whereNotNull('average')->where('failed', false)->count(),
+            'private' => $rows->where('failed', true)->count(),
+            'bestSubject' => \App\Services\Honors::bestPerSubject($rows),
+            'perfect' => \App\Services\Honors::perfectAttendance($sections, $term),
+            'approved' => \App\Services\Honors::nominations($sections, $term, 'approved'),
+            'pending' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? \App\Services\Honors::nominations($all, null, 'pending') : \App\Models\AwardNomination::with('award', 'student')->where('nominated_by', $u->id)->where('status', 'pending')->get(),
+            'awards' => \App\Models\Award::orderBy('name')->get(),
+            'nominees' => $section ? $section->students()->get() : collect(),
         ]);
+    }
+
+    public function saveAward(Request $request)
+    {
+        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR), 403);
+        $d = $request->validate(['name' => 'required|max:100', 'description' => 'nullable|max:255']);
+        \App\Models\Award::create($d);
+
+        return back()->with('ok', 'Award added.');
+    }
+
+    public function toggleAward(Request $request, \App\Models\Award $award)
+    {
+        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR), 403);
+        $award->update(['is_active' => ! $award->is_active]);
+
+        return back()->with('ok', $award->is_active ? 'Award turned on.' : 'Award turned off.');
+    }
+
+    /** Teachers suggest an award for a student; the admin approves it. */
+    public function nominate(Request $request)
+    {
+        $u = $request->user();
+        $d = $request->validate(['award_id' => 'required|exists:awards,id', 'student_id' => 'required|exists:students,id', 'term' => 'nullable|integer|min:1|max:6', 'reason' => 'nullable|max:1000']);
+        $student = \App\Models\Student::findOrFail($d['student_id']);
+        abort_unless($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $u->teachesStudent($student), 403);
+        $isAdmin = $u->hasRole(Role::ADMIN, Role::REGISTRAR);
+        \App\Models\AwardNomination::create($d + ['school_year_id' => SchoolYear::current()->id, 'nominated_by' => $u->id, 'status' => $isAdmin ? 'approved' : 'pending', 'reviewed_by' => $isAdmin ? $u->id : null]);
+        if (! $isAdmin) {
+            Notification::send(User::whereIn('role', [Role::ADMIN, Role::REGISTRAR])->where('is_active', true)->get(), new GeneralNotice('Award suggestion', $u->name.' suggested '.$student->full_name.' for an award.', route('honors', ['tab' => 'awards'], false)));
+        }
+
+        return back()->with('ok', $isAdmin ? 'Award given.' : 'Suggestion sent to the admin for approval.');
+    }
+
+    public function reviewNomination(Request $request, \App\Models\AwardNomination $nomination)
+    {
+        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR), 403);
+        $ok = $request->validate(['action' => 'required|in:approve,reject'])['action'] === 'approve';
+        $nomination->update(['status' => $ok ? 'approved' : 'rejected', 'reviewed_by' => $request->user()->id]);
+
+        return back()->with('ok', $ok ? 'Award approved.' : 'Suggestion declined.');
     }
 }

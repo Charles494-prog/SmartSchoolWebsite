@@ -112,6 +112,10 @@ class AssignmentController extends Controller
         $students = $class->section->students()->with('user')->get();
         Notification::send($students->pluck('user')->filter(), new GeneralNotice('New '.strtolower($label).': '.$a->title, $class->subject->name.($a->due_at ? ' · due '.$a->due_at->format('M d g:i A') : ''), route('portal.class', $class, false)));
 
+        if ($a->type === 'quiz') {
+            return redirect()->route('quiz.edit', $a)->with('ok', 'Quiz created – now add the questions (or import GIFT).');
+        }
+
         return redirect()->route('assignments.class', $class)->with('ok', $label.' posted'.($a->component ? ' – it is now a column in the gradebook.' : '.'));
     }
 

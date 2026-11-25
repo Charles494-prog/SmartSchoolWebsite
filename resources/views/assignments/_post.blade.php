@@ -45,13 +45,18 @@
 
         @if($teacher)
             <div class="flex flex-wrap gap-2">
-                @if($graded)<a href="{{ route('assignments.show', $p) }}" class="btn btn-primary btn-sm">Check work</a>@endif
+                @if($p->type === 'quiz')
+                    <a href="{{ route('quiz.edit', $p) }}" class="btn btn-primary btn-sm">Edit questions</a>
+                    <a href="{{ route('quiz.results', $p) }}" class="btn btn-sm">Quiz results</a>
+                @elseif($graded)<a href="{{ route('assignments.show', $p) }}" class="btn btn-primary btn-sm">Check work</a>@endif
                 @if($p->assessment_id)<a href="{{ route('gradebook.show', [$p->class_subject_id, 'term' => $p->term]) }}" class="btn btn-sm">See in gradebook</a>@endif
-                <form method="post" action="{{ route('assignments.destroy', $p) }}" onsubmit="return confirm('Delete this post?{{ $p->assessment_id ? ' Its gradebook column and scores are deleted too.' : '' }}')">@csrf @method('DELETE')<button class="btn btn-sm text-rose-600">Delete</button></form>
+                <form method="post" action="{{ route('assignments.destroy', $p) }}" x-on:submit="if (!confirm(@js('Delete this post?'.($p->assessment_id ? ' Its gradebook column and scores are deleted too.' : '')))) $event.preventDefault()">@csrf @method('DELETE')<button class="btn btn-sm text-rose-600">Delete</button></form>
             </div>
         @elseif($graded)
             @if($sub?->feedback)<p class="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"><b>Teacher feedback:</b> {{ $sub->feedback }}</p>@endif
-            @if(auth()->user()->role === 'student' && $sub?->score === null)
+            @if($p->type === 'quiz')
+                @if(auth()->user()->role === 'student')<a href="{{ route('quiz.take', $p) }}" class="btn btn-primary">{{ $sub ? 'See my quiz' : 'Take quiz' }}</a>@endif
+            @elseif(auth()->user()->role === 'student' && $sub?->score === null)
                 <form method="post" action="{{ route('portal.submit', $p) }}" enctype="multipart/form-data" class="space-y-3 rounded-xl bg-slate-50 p-4 dark:bg-white/5">
                     @csrf
                     <x-field name="body" label="Your answer / notes" type="textarea" :value="$sub?->body" />

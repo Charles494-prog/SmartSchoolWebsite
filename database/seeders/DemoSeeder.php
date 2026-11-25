@@ -167,6 +167,35 @@ class DemoSeeder extends Seeder
             }
         }
 
+        // Quiz questions (GIFT – the same text a teacher can paste or import from Moodle)
+        $gift = "::Capital:: What is the capital of the Philippines? { =Manila ~Cebu City ~Davao City ~Baguio }\n\n"
+            ."The Philippines has more than 7,000 islands. {T}\n\n"
+            ."Which of these are primary colors? { ~%50%Red ~%50%Blue ~%-50%Green ~%-50%Orange }\n\n"
+            ."What is 12 × 12? {#144}\n\n"
+            ."Who wrote Noli Me Tangere? { =Jose Rizal =Rizal =Dr. Jose Rizal }\n\n"
+            ."Match each animal to where it lives. { =Fish -> Water =Bird -> Nest =Carabao -> Farm }\n\n"
+            ."In 2–3 sentences, explain why reading every day helps you. {}";
+        foreach (Assignment::where('type', 'quiz')->whereDoesntHave('questions')->get() as $qz) {
+            foreach (\App\Services\Quiz::parseGift($gift) as $i => $q) {
+                $qz->questions()->create($q + ['position' => $i, 'points' => $q['type'] === 'essay' ? 3 : 1]);
+            }
+            $qz->update(['time_limit' => 15, 'attempts_allowed' => 2, 'shuffle_answers' => true]);
+        }
+
+        // Special awards and a few given / suggested ones
+        if (! \App\Models\Award::exists()) {
+            foreach (\App\Models\Award::DEFAULTS as [$name, $desc]) {
+                \App\Models\Award::create(['name' => $name, 'description' => $desc]);
+            }
+        }
+        if (\App\Models\AwardNomination::doesntExist()) {
+            foreach (Section::where('school_year_id', $sy->id)->get() as $si => $sec) {
+                $kids = $sec->students()->get();
+                \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Best in Conduct')->value('id'), 'student_id' => $kids[3]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Always respectful and kind to classmates.', 'status' => 'approved', 'nominated_by' => $sec->adviser_id]);
+                \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Leadership Award')->value('id'), 'student_id' => $kids[4]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Led the class clean-up drive.', 'status' => 'pending', 'nominated_by' => $sec->adviser_id]);
+            }
+        }
+
         // Attendance for the last 10 school days
         $sections = Section::where('school_year_id', $sy->id)->get();
         for ($d = today()->subDays(14); $d < today(); $d->addDay()) {

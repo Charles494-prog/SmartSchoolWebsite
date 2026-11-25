@@ -196,11 +196,23 @@ class SetupWizardController extends Controller
 
     private function saveSubjects(Request $r): string
     {
-        $d = $r->validate(['ww' => 'required|integer|between:0,100', 'pt' => 'required|integer|between:0,100', 'qa' => 'required|integer|between:0,100']);
+        $d = $r->validate(['ww' => 'required|integer|between:0,100', 'pt' => 'required|integer|between:0,100', 'qa' => 'required|integer|between:0,100',
+            'grading_periods' => 'nullable|in:2,3,4', 'honors_top_n' => 'nullable|integer|between:3,100']);
         if ($d['ww'] + $d['pt'] + $d['qa'] !== 100) {
             throw ValidationException::withMessages(['ww' => 'The three weights must add up to 100%.']);
         }
         Subject::query()->update(['ww_weight' => $d['ww'], 'pt_weight' => $d['pt'], 'qa_weight' => $d['qa']]);
+        if (! empty($d['grading_periods']) && ! \App\Models\Assessment::where('term', '>', (int) $d['grading_periods'])->exists()) {
+            \App\Models\GradeLevel::query()->update(['terms' => (int) $d['grading_periods']]);
+        }
+        if (! empty($d['honors_top_n'])) {
+            Setting::put('honors_top_n', (string) $d['honors_top_n']);
+        }
+        if (! \App\Models\Award::exists()) {
+            foreach (\App\Models\Award::DEFAULTS as [$name, $desc]) {
+                \App\Models\Award::create(['name' => $name, 'description' => $desc]);
+            }
+        }
 
         return 'Grading weights applied to every subject.';
     }

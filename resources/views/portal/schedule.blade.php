@@ -17,7 +17,7 @@
                 <h1 class="h1">Class schedule</h1>
                 <p class="muted">{{ $enrollment?->section?->label() ?? 'No section yet' }}</p>
             </div>
-            <button type="button" onclick="window.print()" class="btn print:hidden">Print</button>
+            <button type="button" x-data x-on:click="window.print()" class="btn print:hidden">Print</button>
         </div>
 
         @if($slots->isEmpty())

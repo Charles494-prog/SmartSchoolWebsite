@@ -84,6 +84,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
         Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
+        Route::get('/quiz/{assignment}', [\App\Http\Controllers\QuizController::class, 'take'])->name('quiz.take');
+        Route::post('/quiz/{assignment}/start', [\App\Http\Controllers\QuizController::class, 'start'])->name('quiz.start');
+        Route::post('/quiz-attempts/{attempt}', [\App\Http\Controllers\QuizController::class, 'submit'])->name('quiz.submit');
         Route::get('/classes/{class}', [PortalController::class, 'classroom'])->name('portal.class');
         Route::post('/classes/{class}/color', [PortalController::class, 'color'])->name('portal.color');
     });
@@ -160,6 +163,10 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/grading-requests/{gradingRequest}', [GradebookController::class, 'reviewWeights'])->name('gradebook.weights.review');
         Route::delete('/gradebook/{class}/weights', [GradebookController::class, 'resetWeights'])->name('gradebook.weights.reset');
         Route::get('/honors', [GradebookController::class, 'honors'])->name('honors');
+        Route::post('/honors/awards', [GradebookController::class, 'saveAward'])->name('honors.awards.store');
+        Route::post('/honors/awards/{award}/toggle', [GradebookController::class, 'toggleAward'])->name('honors.awards.toggle');
+        Route::post('/honors/nominations', [GradebookController::class, 'nominate'])->name('honors.nominate');
+        Route::post('/honors/nominations/{nomination}', [GradebookController::class, 'reviewNomination'])->name('honors.nominations.review');
 
         Route::get('/attendance/start', [HelpController::class, 'attendance'])->name('attendance.start');
         Route::get('/attendance', [AttendanceController::class, 'sheet'])->name('attendance.sheet');
@@ -171,6 +178,12 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/assignments/class/{class}', [AssignmentController::class, 'classroom'])->name('assignments.class');
         Route::post('/assignments/class/{class}/color', [AssignmentController::class, 'color'])->name('assignments.color');
         Route::delete('/assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
+        Route::get('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'edit'])->name('quiz.edit');
+        Route::put('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'save'])->name('quiz.save');
+        Route::post('/assignments/{assignment}/quiz/import', [\App\Http\Controllers\QuizController::class, 'import'])->name('quiz.import');
+        Route::get('/assignments/{assignment}/quiz/export', [\App\Http\Controllers\QuizController::class, 'export'])->name('quiz.export');
+        Route::get('/assignments/{assignment}/quiz/results', [\App\Http\Controllers\QuizController::class, 'results'])->name('quiz.results');
+        Route::post('/quiz-attempts/{attempt}/review', [\App\Http\Controllers\QuizController::class, 'review'])->name('quiz.review');
         Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])->name('assignments.show');
         Route::post('/submissions/{submission}/grade', [AssignmentController::class, 'grade'])->name('assignments.grade');
         Route::get('/submissions/{submission}/file', [AssignmentController::class, 'file'])->name('assignments.file');

@@ -24,7 +24,7 @@ class AdminController extends Controller
 {
     public const SETTINGS = [
         'School' => ['school_name' => 'School name', 'school_address' => 'Address', 'school_head' => 'Principal / school head (signs report cards)', 'school_email' => 'Email', 'school_phone' => 'Phone'],
-        'Grading' => ['use_transmutation' => 'Curve grades with a transmutation table', 'passing_grade' => 'Passing grade', 'honors_with_highest' => 'With Highest Honors – minimum average', 'honors_with_high' => 'With High Honors – minimum average', 'honors_with' => 'With Honors – minimum average'],
+        'Grading' => ['use_transmutation' => 'Curve grades with a transmutation table', 'passing_grade' => 'Passing grade', 'honors_with_highest' => 'With Highest Honors – minimum average', 'honors_with_high' => 'With High Honors – minimum average', 'honors_with' => 'With Honors – minimum average', 'honors_top_n' => 'Top achievers to list (e.g. 10, 15 or 20)'],
         'Attendance & notifications' => ['late_after' => 'Students are late after', 'notify_absent' => 'Notify parents when a student is absent', 'notify_late' => 'Notify parents when a student is late'],
         'Library' => ['library_loan_days' => 'Loan period (days)', 'library_fine_per_day' => 'Fine per day late (₱)'],
     ];
@@ -33,7 +33,7 @@ class AdminController extends Controller
     public const TYPES = [
         'use_transmutation' => 'toggle', 'notify_absent' => 'toggle', 'notify_late' => 'toggle',
         'late_after' => 'time', 'passing_grade' => 'number', 'honors_with_highest' => 'number', 'honors_with_high' => 'number',
-        'honors_with' => 'number', 'library_loan_days' => 'number', 'library_fine_per_day' => 'number', 'school_email' => 'email',
+        'honors_with' => 'number', 'honors_top_n' => 'number', 'library_loan_days' => 'number', 'library_fine_per_day' => 'number', 'school_email' => 'email',
     ];
 
     public function settings()
@@ -49,7 +49,7 @@ class AdminController extends Controller
     public function saveSettings(Request $request)
     {
         $rules = ['school_name' => 'required|max:150', 'passing_grade' => 'required|numeric|between:50,100', 'late_after' => 'required|date_format:H:i', 'use_transmutation' => 'boolean', 'notify_absent' => 'boolean', 'notify_late' => 'boolean',
-            'honors_with_highest' => 'required|numeric', 'honors_with_high' => 'required|numeric', 'honors_with' => 'required|numeric', 'library_loan_days' => 'required|integer|min:1', 'library_fine_per_day' => 'required|numeric|min:0',
+            'honors_with_highest' => 'required|numeric', 'honors_with_high' => 'required|numeric', 'honors_with' => 'required|numeric', 'honors_top_n' => 'nullable|integer|between:3,100', 'library_loan_days' => 'required|integer|min:1', 'library_fine_per_day' => 'required|numeric|min:0',
             'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
             'deployment_mode' => 'nullable|in:lan,hosted', 'grading_periods' => 'nullable|in:2,3,4', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
             'tuition_all' => 'nullable|required_if:tuition_mode,same|numeric|min:0|max:10000000', 'tuition' => 'array', 'tuition.*' => 'nullable|numeric|min:0|max:10000000'];

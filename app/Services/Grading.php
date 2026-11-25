@@ -251,14 +251,20 @@ class Grading
         foreach ($section->enrollments()->where('status', 'enrolled')->with('student')->get() as $e) {
             $e->setRelation('section', $section);
             $rc = self::reportCard($e, $classSubjects);
+            $grades = [];
+            foreach ($rc['subjects'] as $sub) {
+                $grades[$sub['name']] = $term === null ? $sub['final'] : ($sub['terms'][$term] ?? null);
+            }
             if ($term === null) {
                 $e->updateQuietly(['general_average' => $rc['general_average']]);
                 $avg = $rc['general_average'];
             } else {
-                $grades = array_map(fn ($s) => $s['terms'][$term] ?? null, $rc['subjects']);
                 $avg = $grades !== [] && ! in_array(null, $grades, true) ? round(array_sum($grades) / count($grades), 2) : null;
             }
-            $rows[] = ['enrollment' => $e, 'average' => $avg, 'honor' => self::honor($avg)];
+            $pass = (float) (Setting::get('passing_grade') ?: 75);
+            // 'failed' rows are never shown on public lists – kept private for the adviser and parents.
+            $failed = collect($grades)->filter(fn ($g) => $g !== null && $g < $pass)->isNotEmpty();
+            $rows[] = ['enrollment' => $e, 'average' => $avg, 'honor' => $failed ? null : self::honor($avg), 'failed' => $failed, 'grades' => $grades];
         }
         usort($rows, fn ($a, $b) => ($b['average'] ?? -1) <=> ($a['average'] ?? -1));
 
