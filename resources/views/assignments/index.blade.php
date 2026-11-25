@@ -16,7 +16,7 @@
             @foreach($classes as $cs)
                 @php $slot = $cs->slots->sortBy('starts_at')->first(); $due = $next[$cs->id] ?? null; $review = $toReview[$cs->id] ?? 0; @endphp
                 <a href="{{ route('assignments.class', $cs) }}" class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-slate-800 dark:bg-slate-900">
-                    <div class="relative bg-gradient-to-br {{ \App\Support\Classwork::color($cs) }} p-5 text-white">
+                    <div class="relative {{ \App\Support\Classwork::color($cs) }} p-5 text-white">
                         <div class="text-xl font-bold leading-tight group-hover:underline">{{ $cs->subject->name }}</div>
                         <div class="mt-0.5 text-sm text-white/85">{{ $cs->section->label() }}</div>
                         <div class="mt-3 text-xs text-white/80">{{ $cs->teacher?->name }}@if($slot) · {{ ampm(substr($slot->starts_at, 0, 5)) }}–{{ ampm(substr($slot->ends_at, 0, 5)) }}@endif</div>

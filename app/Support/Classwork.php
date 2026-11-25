@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\DB;
 class Classwork
 {
     public const COLORS = [
-        'indigo' => 'from-indigo-600 to-violet-600', 'emerald' => 'from-emerald-600 to-teal-600', 'sky' => 'from-sky-600 to-blue-600',
-        'amber' => 'from-amber-500 to-orange-600', 'rose' => 'from-rose-600 to-pink-600', 'fuchsia' => 'from-fuchsia-600 to-purple-600',
-        'teal' => 'from-teal-600 to-cyan-600', 'slate' => 'from-slate-700 to-slate-900',
+        // Solid colours (no gradients).
+        'indigo' => 'bg-indigo-700', 'emerald' => 'bg-emerald-700', 'sky' => 'bg-sky-700', 'amber' => 'bg-amber-600',
+        'rose' => 'bg-rose-700', 'fuchsia' => 'bg-fuchsia-700', 'teal' => 'bg-teal-700', 'slate' => 'bg-slate-800',
     ];
 
     /** label, icon, badge classes, graded? (has a due date and points) */

@@ -106,7 +106,7 @@ GIFT);
         $this->post("/honors/nominations/{$n->id}", ['action' => 'approve'])->assertRedirect();
         $this->assertSame('approved', $n->fresh()->status);
         $topStudent = $r->viewData('top')->first()['enrollment']->student;
-        $this->actingAs($teacher)->get("/honors/student/{$topStudent->id}?term=1")->assertOk()->assertSee('Journey to the top')->assertSee('Quiz 1');
+        $this->actingAs($teacher)->get("/honors/student/{$topStudent->id}?term=1")->assertOk()->assertSee('Year so far')->assertSee('Quiz 1');
         $this->actingAs(User::where('email', 'student@school.test')->first())->get("/honors/student/{$topStudent->id}")->assertForbidden();
         $this->actingAs(User::where('role', 'admin')->first());
         \App\Models\Setting::put('honors_top_n', '3');
@@ -137,6 +137,6 @@ GIFT);
         $r = $this->get("/honors?section_id={$section->id}&term=final")->assertOk()->assertSee('so far');
         $this->assertNotEmpty($r->viewData('top'), 'whole-year list shows before Q3/Q4 exist');
         $cs = ClassSubject::where('teacher_id', $teacher->id)->first();
-        $this->get("/gradebook/{$cs->id}?term=1")->assertOk()->assertSee('grade is computed')->assertSee('Initial grade');
+        $this->get("/gradebook/{$cs->id}?term=1")->assertOk()->assertSee('grade is computed')->assertSee('Initial grade')->assertSee('Consultation mode');
     }
 }

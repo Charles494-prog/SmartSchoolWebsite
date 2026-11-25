@@ -8,7 +8,7 @@
 
         {{-- Header --}}
         <div class="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="h-2 bg-gradient-to-r from-brand-600 to-violet-500"></div>
+            <div class="h-1.5 bg-brand-600"></div>
             <div class="flex flex-wrap items-end gap-4 p-6">
                 <div class="mr-auto">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">Quiz builder</p>

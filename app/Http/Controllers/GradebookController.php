@@ -276,13 +276,14 @@ class GradebookController extends Controller
             'terms' => Grading::studentTerms($cs, $student),
             'items' => $cs->assessments->when($term, fn ($c) => $c->where('term', $term))->sortBy('given_on')->map(fn ($a) => ['a' => $a, 'score' => $scores[$a->id]->score ?? null])->values(),
         ]);
+        $lockedTerms = collect(range(1, $terms))->filter(fn ($t) => $classes->every(fn ($cs) => $cs->isLocked($t)))->values();
         $avgByTerm = collect(range(1, $terms))->mapWithKeys(function ($t) use ($subjects) {
             $g = $subjects->map(fn ($s) => $s['terms'][$t] ?? null);
 
             return [$t => $g->contains(null) ? null : round($g->avg(), 2)];
         });
 
-        return view('gradebook.journey', compact('student', 'e', 'terms', 'term', 'subjects', 'avgByTerm', 'rc'));
+        return view('gradebook.journey', compact('student', 'e', 'terms', 'term', 'subjects', 'avgByTerm', 'rc', 'lockedTerms'));
     }
 
     /** Admins and advisers can add awards to the list (e.g. "Best in Science Fair"). */

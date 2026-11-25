@@ -25,7 +25,7 @@
         @else
             {{-- Right now --}}
             <div class="mb-6 grid gap-3 sm:grid-cols-2 print:hidden">
-                <div class="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-5 text-white shadow-sm">
+                <div class="rounded-2xl bg-slate-900 p-5 text-white dark:bg-slate-800">
                     <p class="text-xs font-semibold uppercase tracking-wider text-white/70">Now</p>
                     @if($current)
                         <p class="mt-1 text-2xl font-bold">{{ $current->classSubject->subject->name }}</p>

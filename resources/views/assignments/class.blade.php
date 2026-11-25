@@ -11,7 +11,7 @@
         <a href="{{ route('assignments.index') }}" class="link text-sm"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />My classes</a>
 
         {{-- Banner --}}
-        <div class="relative mt-3 overflow-hidden rounded-2xl bg-gradient-to-br {{ $CW::color($class) }} p-6 text-white shadow-sm sm:p-8">
+        <div class="relative mt-3 overflow-hidden rounded-2xl {{ $CW::color($class) }} p-6 text-white shadow-sm sm:p-8">
             <h1 class="text-3xl font-bold">{{ $class->subject->name }}</h1>
             <p class="mt-1 text-white/85">{{ $class->section->label() }} · {{ $class->teacher?->name }}</p>
             <div class="mt-4 flex flex-wrap gap-2 text-sm">
@@ -22,7 +22,7 @@
             <form x-show="settings" x-cloak method="post" action="{{ route('assignments.color', $class) }}" class="mt-4 flex flex-wrap items-center gap-2">@csrf
                 <span class="text-sm text-white/85">Default colour for your students:</span>
                 @foreach($CW::COLORS as $key => $grad)
-                    <button name="color" value="{{ $key }}" class="h-8 w-8 rounded-full bg-gradient-to-br {{ $grad }} ring-2 {{ $CW::colorKey($class) === $key ? 'ring-white' : 'ring-white/30' }}" aria-label="{{ ucfirst($key) }}"></button>
+                    <button name="color" value="{{ $key }}" class="h-8 w-8 rounded-full {{ $grad }} ring-2 {{ $CW::colorKey($class) === $key ? 'ring-white' : 'ring-white/30' }}" aria-label="{{ ucfirst($key) }}"></button>
                 @endforeach
             </form>
         </div>

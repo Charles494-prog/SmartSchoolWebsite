@@ -85,9 +85,23 @@
         </details>
     @endif
 
-    <form method="post" action="{{ route('gradebook.scores', $cs) }}">
+    <form method="post" action="{{ route('gradebook.scores', $cs) }}" x-data="{ consult: false, who: '' }" x-on:keydown.escape.window="consult = false">
         @csrf <input type="hidden" name="term" value="{{ $term }}">
-        <div class="card overflow-x-auto p-0">
+        {{-- Consultation (privacy) mode: show one student only, so they can see their own grade with the teacher. --}}
+        <div class="mb-3 flex flex-wrap items-center gap-3">
+            <button type="button" class="btn" x-show="!consult" x-on:click="consult = true; who = ''"><x-icon name="shield" class="h-4 w-4" /> Consultation mode</button>
+            <div x-show="consult" x-cloak class="flex w-full flex-wrap items-center gap-3 rounded-2xl border-2 border-brand-500 bg-brand-50 p-3 dark:bg-brand-500/10">
+                <x-icon name="shield" class="h-5 w-5 text-brand-700" />
+                <span class="text-sm font-semibold text-brand-900 dark:text-brand-200">Consultation mode – only one student is shown</span>
+                <select x-model="who" class="input h-10 w-auto min-w-56">
+                    <option value="">Choose a student…</option>
+                    @foreach($sheet as $sid => $row)<option value="{{ $sid }}">{{ $row['student']->full_name }}</option>@endforeach
+                </select>
+                <button type="button" class="btn btn-sm ml-auto" x-on:click="consult = false; who = ''">Exit</button>
+            </div>
+        </div>
+        <p x-show="consult && !who" x-cloak class="card py-10 text-center text-slate-500">Choose the student you're talking with. Other students' grades stay hidden.</p>
+        <div class="card overflow-x-auto p-0" x-show="!consult || who">
             <table class="table">
                 <thead>
                     <tr>
@@ -106,7 +120,7 @@
                 </thead>
                 <tbody>
                 @forelse($sheet as $sid => $row)
-                    </tbody><tbody x-data="{ open: false }" class="border-b border-slate-100 dark:border-slate-800">
+                    </tbody><tbody x-data="{ open: false }" x-show="!consult || who === '{{ $sid }}'" x-effect="if (consult && who === '{{ $sid }}') open = true" class="border-b border-slate-100 dark:border-slate-800">
                     <tr>
                         <td class="sticky left-0 whitespace-nowrap bg-white dark:bg-slate-900"><button type="button" class="flex items-center gap-1.5 text-left hover:text-brand-600" x-on:click="open = !open" :aria-expanded="open" title="Show how this grade is computed"><span class="text-slate-400 transition" :class="open && 'rotate-90'"><x-icon name="chevron" class="h-3.5 w-3.5" /></span>{{ $row['student']->full_name }}</button></td>
                         @foreach($assessments as $a)

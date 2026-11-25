@@ -2,7 +2,7 @@
     <a href="{{ route('portal.class', $a->class_subject_id) }}" class="link text-sm"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />{{ $a->classSubject->subject->name }}</a>
     <div class="mx-auto mt-4 max-w-2xl">
         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="h-2 bg-gradient-to-r from-brand-600 to-violet-500"></div>
+            <div class="h-1.5 bg-brand-600"></div>
             <div class="p-6">
                 <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">Quiz</p>
                 <h1 class="text-2xl font-bold">{{ $a->title }}</h1>

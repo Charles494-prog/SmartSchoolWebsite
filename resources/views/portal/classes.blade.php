@@ -7,7 +7,7 @@
             @forelse($classes as $cs)
                 @php $todo = ($todo[$cs->id] ?? collect())->count(); $slot = $cs->slots->sortBy('starts_at')->first(); @endphp
                 <a href="{{ route('portal.class', [$cs] + request()->only('child')) }}" class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900">
-                    <div class="relative bg-gradient-to-br {{ \App\Support\Classwork::color($cs, auth()->user()) }} p-5 text-white">
+                    <div class="relative {{ \App\Support\Classwork::color($cs, auth()->user()) }} p-5 text-white">
                         <div class="text-xl font-bold group-hover:underline">{{ $cs->subject->name }}</div>
                         <div class="text-sm text-white/85">{{ $cs->teacher?->name }}</div>
                         @if($slot)<div class="mt-3 text-xs text-white/80">{{ ampm(substr($slot->starts_at, 0, 5)) }}–{{ ampm(substr($slot->ends_at, 0, 5)) }}</div>@endif

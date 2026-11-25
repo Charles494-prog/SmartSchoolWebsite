@@ -255,14 +255,16 @@ class Grading
     public static function rankSection(Section $section, ?int $term = null): array
     {
         $rows = [];
-        $classSubjects = $section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments'])->get(); // once per section, not per student
+        $classSubjects = $section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments', 'submissions'])->get(); // once per section, not per student
+        // Periods each subject already submitted/approved – an unfinished period would pull the live year average down.
+        $locked = $classSubjects->mapWithKeys(fn ($cs) => [$cs->subject->name => $cs->submissions->whereIn('status', ['submitted', 'approved'])->pluck('term')->map(fn ($t) => (int) $t)->all()])->all();
         foreach ($section->enrollments()->where('status', 'enrolled')->with('student')->get() as $e) {
             $e->setRelation('section', $section);
             $rc = self::reportCard($e, $classSubjects);
             $grades = [];
             foreach ($rc['subjects'] as $sub) {
-                // Whole year is live: average of the periods graded so far (official final still needs every period).
-                $grades[$sub['name']] = $term === null ? self::runningFinal($sub['terms']) : ($sub['terms'][$term] ?? null);
+                // Whole year is live: average of the periods already submitted so far (official final still needs every period).
+                $grades[$sub['name']] = $term === null ? self::runningFinal(array_intersect_key($sub['terms'], array_flip($locked[$sub['name']] ?? []))) : ($sub['terms'][$term] ?? null);
             }
             if ($term === null) {
                 $e->updateQuietly(['general_average' => $rc['general_average']]);

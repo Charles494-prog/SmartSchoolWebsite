@@ -4,13 +4,13 @@
         @php $CW = \App\Support\Classwork::class; $mine = $CW::colorKey($class, auth()->user()); @endphp
         <div x-data="{ filter: 'all', colors: false }">
             <a href="{{ route('portal.classes', request()->only('child')) }}" class="link text-sm"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />My classes</a>
-            <div class="relative mt-3 rounded-2xl bg-gradient-to-br {{ $CW::color($class, auth()->user()) }} p-6 text-white sm:p-8">
+            <div class="relative mt-3 rounded-2xl {{ $CW::color($class, auth()->user()) }} p-6 text-white sm:p-8">
                 <h1 class="text-3xl font-bold">{{ $class->subject->name }}</h1>
                 <p class="mt-1 text-white/85">{{ $class->section->label() }} · {{ $class->teacher?->name }}</p>
                 <button type="button" class="absolute top-4 right-4 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur hover:bg-white/25" x-on:click="colors = !colors">Change colour</button>
                 <form x-show="colors" x-cloak method="post" action="{{ route('portal.color', $class) }}" class="mt-4 flex flex-wrap items-center gap-2">@csrf
                     @foreach($CW::COLORS as $key => $grad)
-                        <button name="color" value="{{ $key }}" class="h-8 w-8 rounded-full bg-gradient-to-br {{ $grad }} ring-2 {{ $mine === $key ? 'ring-white' : 'ring-white/30' }}" aria-label="{{ ucfirst($key) }}"></button>
+                        <button name="color" value="{{ $key }}" class="h-8 w-8 rounded-full {{ $grad }} ring-2 {{ $mine === $key ? 'ring-white' : 'ring-white/30' }}" aria-label="{{ ucfirst($key) }}"></button>
                     @endforeach
                     <button name="color" value="" class="rounded-full bg-white/15 px-3 py-1 text-xs">Use teacher's colour</button>
                 </form>
