@@ -11,7 +11,7 @@ class Nav
 {
     /** Features each role can never hide (the admin can change this in Settings → Personal setup). */
     public const LOCKED_DEFAULT = [
-        'guard' => ['Gate scanner'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Transactions'],
+        'guard' => ['Gate scanner'], 'bookstore' => ['Bookstore'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Transactions'],
         'student' => ['Grades', 'My classes'], 'parent' => ['Grades'], 'registrar' => ['Applications', 'Students'], 'nurse' => ['Clinic'],
         'guidance' => ['Guidance'], 'librarian' => ['Library'], 'hr' => ['Payroll', 'Employees'],
     ];
@@ -61,6 +61,14 @@ class Nav
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
                 $item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet'),
             ]))];
+        }
+
+        if ($is(Role::BOOKSTORE)) {
+            return ['' => [
+                $item('Home', 'dashboard', 'home', 'Overview'),
+                $item('Bookstore', 'shop.manage', 'tag', 'Approve orders, release items, post merch', 'amber', 'shop.manage') + ['badge' => \App\Models\ShopOrder::where('status', 'placed')->count()],
+                $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
+            ]];
         }
 
         if ($is(Role::GUARD)) {
@@ -124,7 +132,6 @@ class Nav
         if ($is(Role::CASHIER, Role::ADMIN)) {
             $g['Payments'] = [
                 $item('Transactions', 'finance.index', 'wallet', 'Find a student, take a payment, receipts and balances', 'rose', ['finance.index', 'finance.show', 'finance.payments', 'finance.overdue']),
-                $item('Bookstore', 'shop.manage', 'tag', 'Books, uniforms and merch – items and orders', 'amber', 'shop.manage') + ['badge' => \App\Models\ShopOrder::where('status', 'placed')->count()],
                 ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => \App\Models\PaymentProof::where('status', 'pending')->count()]] : []),
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
                 $crud('Discounts & scholarships', 'discounts', 'percent', 'Discounts and scholarships'),
@@ -164,6 +171,7 @@ class Nav
         if ($is(Role::ADMIN)) {
             $g['School setup'] = [
                 $item('School settings', 'settings.edit', 'settings', 'Name, logo, grading and rules'),
+                $item('Bookstore', 'shop.manage', 'tag', 'Bookstore items and orders', 'amber', 'shop.manage'),
                 $item('Payment methods', 'channels.index', 'banknote', 'GCash / bank accounts and QR codes for online payments', 'emerald', 'channels.*'),
                 $crud('School years', 'school-years', 'calendar', 'Start a new school year'),
                 $crud('Grade levels', 'grade-levels', 'cap', 'Kinder to Grade 12'),

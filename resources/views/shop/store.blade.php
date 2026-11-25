@@ -3,7 +3,7 @@
     <div x-data="shop(@js($items->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'price' => $i->price, 'sizes' => $i->sizes, 'stock' => $i->stock])->values()))" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div>
             <div class="mb-5 flex flex-wrap items-end gap-3">
-                <div class="mr-auto"><h1 class="h1">Bookstore</h1><p class="muted">Books, uniforms and school merch. Your order is added to {{ $child?->first_name ?? 'the' }}'s balance – pay it online or at the cashier, then claim it at school.</p></div>
+                <div class="mr-auto"><h1 class="h1">Bookstore</h1><p class="muted">Books, uniforms and school merch. How it works: 1. Order · 2. The bookstore approves it · 3. Pay online or at the finance office · 4. Claim it at the bookstore.</p></div>
                 @if($children->count() > 1)
                     <form><select name="child" class="input h-10" x-on:change="$el.form.submit()">@foreach($children as $c)<option value="{{ $c->id }}" @selected($child?->id === $c->id)>{{ $c->full_name }}</option>@endforeach</select></form>
                 @endif
@@ -58,7 +58,7 @@
                 </template>
                 <div x-show="cart.length" class="mt-3 space-y-3">
                     <p class="flex justify-between font-semibold"><span>Total</span><span class="tabular-nums" x-text="peso(total())"></span></p>
-                    <p class="text-xs text-slate-500">It's added to the balance as “Bookstore order”. You can pay it by itself or together with tuition.</p>
+                    <p class="text-xs text-slate-500">The bookstore checks your order first. Once approved, it appears on Payments for you to pay.</p>
                     <button class="btn btn-primary w-full" x-on:click="localStorage.removeItem('ss.cart')">Place order</button>
                 </div>
             </form>
@@ -68,9 +68,12 @@
                     @foreach($orders as $o)
                         @php $rem = $o->charge?->remaining() ?? 0; @endphp
                         <div class="border-b border-slate-100 py-2 text-sm last:border-0 dark:border-slate-800">
-                            <p class="flex justify-between"><b>#{{ $o->id }}</b><span class="rounded-full px-2 text-xs {{ ['placed' => 'bg-slate-100 text-slate-600', 'ready' => 'bg-emerald-100 text-emerald-700', 'claimed' => 'bg-slate-100 text-slate-500', 'cancelled' => 'bg-rose-100 text-rose-700'][$o->status] }}">{{ \App\Models\ShopOrder::STATUSES[$o->status] }}</span></p>
+                            <p class="flex justify-between"><b>#{{ $o->id }}</b>@php $st = $o->status === 'approved' && $o->isPaid() ? 'paid' : $o->status; @endphp
+                            <span class="rounded-full px-2 text-xs {{ ['placed' => 'bg-slate-100 text-slate-600', 'approved' => 'bg-amber-100 text-amber-800', 'paid' => 'bg-emerald-100 text-emerald-700', 'released' => 'bg-slate-100 text-slate-500', 'cancelled' => 'bg-rose-100 text-rose-700'][$st] }}">{{ \App\Models\ShopOrder::STATUSES[$st] }}</span></p>
                             <p class="text-slate-500">{{ $o->summary() }}</p>
-                            <p class="text-xs {{ $rem > 0 ? 'text-amber-700' : 'text-emerald-600' }}">{{ $o->status === 'cancelled' ? '' : ($rem > 0 ? $peso($rem).' to pay' : 'Paid') }}</p>
+                            @if($o->status === 'cancelled')<p class="text-xs text-rose-600">{{ $o->note }}</p>
+                            @elseif($o->status === 'approved' && $rem > 0)<a href="{{ route('portal.account') }}" class="text-xs font-semibold text-brand-600">Pay {{ $peso($rem) }} →</a>
+                            @elseif($o->status === 'approved')<p class="text-xs text-emerald-600">Paid – claim it at the bookstore</p>@endif
                         </div>
                     @endforeach
                 </div>

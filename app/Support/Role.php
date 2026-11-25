@@ -28,6 +28,8 @@ final class Role
 
     public const PARENT = 'parent';
 
+    public const BOOKSTORE = 'bookstore';
+
     public const LABELS = [
         self::ADMIN => 'Administrator',
         self::REGISTRAR => 'Registrar',
@@ -38,6 +40,7 @@ final class Role
         self::GUIDANCE => 'Guidance Counselor',
         self::HR => 'HR / Payroll',
         self::GUARD => 'Security guard (gate)',
+        self::BOOKSTORE => 'Bookstore',
         self::STUDENT => 'Student',
         self::PARENT => 'Parent / Guardian',
     ];
@@ -58,6 +61,7 @@ final class Role
         self::LIBRARIAN => 'Librarian – books and borrowing',
         self::HR => 'HR / Payroll – employees and payroll',
         self::GUARD => 'Security guard – gate QR scanner only (in and out)',
+        self::BOOKSTORE => 'Bookstore – posts items, approves and releases orders',
         self::ADMIN => 'Administrator – everything, including user accounts and settings',
     ];
 

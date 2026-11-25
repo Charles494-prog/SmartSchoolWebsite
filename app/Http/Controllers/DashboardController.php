@@ -44,6 +44,9 @@ class DashboardController extends Controller
         if ($u->role === Role::GUARD) {
             return redirect()->route('attendance.scan');
         }
+        if ($u->role === Role::BOOKSTORE) {
+            return redirect()->route('shop.manage');
+        }
         $sy = SchoolYear::current();
         $data = ['sy' => $sy, 'u' => $u];
 

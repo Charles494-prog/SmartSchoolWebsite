@@ -1,6 +1,6 @@
 <x-layouts.app title="Bookstore">
     @php $peso = fn ($v) => \App\Services\Billing::peso($v); @endphp
-    <div class="mb-5"><h1 class="h1">Bookstore</h1><p class="muted">Post books, uniforms, merch and souvenirs. Families order from their portal; each order is added to the student's balance.</p></div>
+    <div class="mb-5"><h1 class="h1">Bookstore</h1><p class="muted">1. Approve or decline new orders · 2. Finance confirms the payment · 3. Release the item.</p></div>
     <div x-data="{ tab: @js(request('tab', 'orders')) }">
         <div class="mb-4 inline-flex rounded-xl bg-slate-100 p-1 text-sm dark:bg-slate-800">
             <button type="button" class="rounded-lg px-3 py-1.5 font-medium" :class="tab === 'orders' ? 'bg-white shadow-sm dark:bg-slate-700' : 'text-slate-500'" x-on:click="tab = 'orders'">Orders</button>
@@ -22,11 +22,21 @@
                                 <p class="font-medium">#{{ $o->id }} · {{ $o->student->full_name }}</p>
                                 <p class="text-sm text-slate-500">{{ $o->summary() }} · {{ $o->created_at->diffForHumans() }}</p>
                             </div>
-                            <span class="text-right"><span class="block font-semibold tabular-nums">{{ $peso($o->total) }}</span><span class="text-xs {{ $rem > 0 ? 'text-amber-700' : 'text-emerald-600' }}">{{ $rem > 0 ? $peso($rem).' unpaid' : 'Paid' }}</span></span>
-                            <form method="post" action="{{ route('shop.orders.status', $o) }}" class="flex gap-2">@csrf
-                                @if($o->status === 'placed')<button name="status" value="ready" class="btn btn-primary btn-sm">Ready to claim</button>@endif
-                                @if($o->status === 'ready')<button name="status" value="claimed" class="btn btn-primary btn-sm">Mark claimed</button>@endif
-                                @if(in_array($o->status, ['placed', 'ready'], true) && $o->charge && $o->charge->paid() == 0)<button name="status" value="cancelled" class="btn btn-sm text-rose-600">Cancel</button>@endif
+                            <span class="text-right"><span class="block font-semibold tabular-nums">{{ $peso($o->total) }}</span>
+                                <span class="text-xs {{ $o->isPaid() ? 'text-emerald-600' : 'text-slate-500' }}">{{ $o->status === 'placed' ? 'Not billed yet' : ($o->isPaid() ? 'Paid' : ($o->charge ? $peso($o->charge->remaining()).' unpaid' : '')) }}</span></span>
+                            <form method="post" action="{{ route('shop.orders.status', $o) }}" class="flex flex-wrap items-center gap-2" x-data="{ no: false }">@csrf
+                                @if($o->status === 'placed')
+                                    <button name="status" value="approved" class="btn btn-primary btn-sm" x-show="!no">Approve</button>
+                                    <button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>
+                                @elseif($o->status === 'approved' && $o->isPaid())
+                                    <button name="status" value="released" class="btn btn-primary btn-sm">Release item</button>
+                                @elseif($o->status === 'approved')
+                                    <span class="text-xs text-slate-500">Waiting for finance to confirm payment</span>
+                                    @if($o->charge && $o->charge->paid() == 0)<button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>@endif
+                                @elseif($o->status === 'cancelled' && $o->note)
+                                    <span class="text-xs text-rose-600">“{{ $o->note }}”</span>
+                                @endif
+                                <div x-show="no" x-cloak class="flex gap-2"><input name="reason" class="input h-9 w-64" placeholder="Reason, e.g. Size M is out of stock"><button name="status" value="cancelled" class="btn btn-sm text-rose-600">Send</button><button type="button" class="btn btn-sm" x-on:click="no = false">Back</button></div>
                             </form>
                         </li>
                     @empty

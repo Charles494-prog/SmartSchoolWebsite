@@ -22,7 +22,9 @@ class BookstoreTest extends TestCase
 
     public function test_order_goes_on_the_balance_and_a_custom_payment_clears_the_order_first(): void
     {
-        $this->actingAs(User::where('role', 'cashier')->first())->post('/finance/bookstore/items', ['name' => 'Uniform', 'category' => 'uniform', 'price' => 1200, 'sizes' => 'S, M, L', 'stock' => 5])->assertRedirect();
+        $store = User::create(['name' => 'Book Store', 'email' => 'store@school.test', 'password' => 'Demo12345', 'role' => 'bookstore', 'is_active' => true]);
+        $this->actingAs(User::where('role', 'cashier')->first())->get('/bookstore')->assertForbidden();
+        $this->actingAs($store)->post('/bookstore/items', ['name' => 'Uniform', 'category' => 'uniform', 'price' => 1200, 'sizes' => 'S, M, L', 'stock' => 5])->assertRedirect();
         $item = ShopItem::where('name', 'Uniform')->first();
         $this->assertSame(['S', 'M', 'L'], $item->sizes);
 
@@ -31,8 +33,11 @@ class BookstoreTest extends TestCase
         $before = $account->balance();
         $tuitionBefore = $account->tuitionBalance();
         $this->actingAs($student)->get('/portal/shop')->assertOk()->assertSee('Uniform');
-        $this->post("/portal/shop/{$student->student->id}", ['cart' => [['id' => $item->id, 'qty' => 1, 'size' => 'M']]])->assertRedirect(route('portal.account'));
+        $this->post("/portal/shop/{$student->student->id}", ['cart' => [['id' => $item->id, 'qty' => 1, 'size' => 'M']]])->assertRedirect(route('portal.shop'));
         $order = ShopOrder::latest('id')->first();
+        $this->assertEqualsWithDelta($before, $account->fresh()->balance(), 0.01, 'not billed until the bookstore approves');
+        $this->actingAs($store)->post("/bookstore/orders/{$order->id}", ['status' => 'approved'])->assertSessionHas('ok');
+        $this->actingAs($student);
         $this->assertEqualsWithDelta($before + 1200, $account->fresh()->balance(), 0.01);
         $this->assertSame(4, $item->fresh()->stock);
         $this->get('/portal/account')->assertOk()->assertSee('What you owe')->assertSee('Bookstore order #'.$order->id);
@@ -44,7 +49,24 @@ class BookstoreTest extends TestCase
         $this->assertEqualsWithDelta(0, $order->charge->fresh()->remaining(), 0.01);
         $this->assertEqualsWithDelta(max(0, $tuitionBefore - 10), $a->tuitionBalance(), 0.01);
 
-        $this->post("/finance/bookstore/orders/{$order->id}", ['status' => 'ready'])->assertRedirect();
-        $this->post("/finance/bookstore/orders/{$order->id}", ['status' => 'cancelled'])->assertStatus(422);   // already paid
+        $this->actingAs($store)->post("/bookstore/orders/{$order->id}", ['status' => 'released'])->assertSessionHas('ok');
+        $this->assertSame('released', $order->fresh()->status);
+    }
+
+    public function test_bookstore_declines_with_a_reason_and_cannot_release_unpaid(): void
+    {
+        $store = User::create(['name' => 'Book Store', 'email' => 'store@school.test', 'password' => 'Demo12345', 'role' => 'bookstore', 'is_active' => true]);
+        $account = StudentAccount::with('enrollment.student')->get()->first(fn ($a) => $a->enrollment->student->user_id);
+        $student = $account->enrollment->student;
+        $item = ShopItem::create(['name' => 'Cap', 'category' => 'merch', 'price' => 100]);
+        $this->actingAs($student->user)->post("/portal/shop/{$student->id}", ['cart' => [['id' => $item->id, 'qty' => 1]]]);
+        $o = ShopOrder::latest('id')->first();
+        $this->actingAs($store)->post("/bookstore/orders/{$o->id}", ['status' => 'cancelled'])->assertSessionHasErrors('reason');
+        $this->post("/bookstore/orders/{$o->id}", ['status' => 'cancelled', 'reason' => 'Out of stock'])->assertSessionHas('ok');
+        $this->assertTrue($student->user->notifications()->get()->contains(fn ($n) => str_contains($n->data['body'] ?? json_encode($n->data), 'Out of stock')));
+        $this->actingAs($student->user)->post("/portal/shop/{$student->id}", ['cart' => [['id' => $item->id, 'qty' => 1]]]);
+        $o2 = ShopOrder::latest('id')->first();
+        $this->actingAs($store)->post("/bookstore/orders/{$o2->id}", ['status' => 'approved']);
+        $this->post("/bookstore/orders/{$o2->id}", ['status' => 'released'])->assertStatus(422);
     }
 }

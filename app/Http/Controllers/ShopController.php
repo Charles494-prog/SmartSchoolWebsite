@@ -28,12 +28,14 @@ class ShopController extends Controller
     public function manage(Request $request)
     {
         $status = in_array($request->query('status'), array_keys(ShopOrder::STATUSES), true) ? $request->query('status') : 'placed';
+        $all = ShopOrder::with('lines', 'student', 'charge')->latest()->get();
+        $eff = fn ($o) => $o->status === 'approved' && $o->isPaid() ? 'paid' : $o->status;
 
         return view('shop.manage', [
             'items' => ShopItem::orderBy('category')->orderBy('name')->get(),
-            'orders' => ShopOrder::with('lines', 'student', 'charge')->where('status', $status)->latest()->paginate(20)->withQueryString(),
+            'orders' => $all->filter(fn ($o) => $eff($o) === $status)->values(),
             'status' => $status,
-            'counts' => ShopOrder::selectRaw('status, count(*) n')->groupBy('status')->pluck('n', 'status'),
+            'counts' => $all->groupBy($eff)->map->count(),
         ]);
     }
 
@@ -63,24 +65,45 @@ class ShopController extends Controller
 
     public function setStatus(Request $request, ShopOrder $order)
     {
-        $status = $request->validate(['status' => ['required', Rule::in(array_keys(ShopOrder::STATUSES))]])['status'];
-        if ($status === 'cancelled') {
-            abort_if($order->charge && $order->charge->paid() > 0, 422, 'This order is already (partly) paid. Refund it at the cashier first.');
-            DB::transaction(function () use ($order) {
-                $order->charge?->update(['is_void' => true]);
-                foreach ($order->lines as $l) {
-                    if ($l->shop_item_id && ($item = ShopItem::find($l->shop_item_id)) && $item->stock !== null) {
-                        $item->increment('stock', $l->qty);
-                    }
-                }
-            });
+        $d = $request->validate(['status' => ['required', Rule::in(['approved', 'released', 'cancelled'])], 'reason' => 'nullable|required_if:status,cancelled|max:255'],
+            ['reason.required_if' => 'Tell the buyer why, e.g. "Size M is out of stock".']);
+        $status = $d['status'];
+        $user = $order->student->user;
+        if ($status === 'approved') {
+            abort_unless($order->status === 'placed', 422, 'Only new orders can be approved.');
+            $account = $order->student->currentEnrollment()?->account;
+            abort_unless($account, 422, 'This student has no fee account yet – ask finance to set it up.');
+            AccountCharge::create(['student_account_id' => $account->id, 'shop_order_id' => $order->id, 'description' => 'Bookstore order #'.$order->id, 'amount' => $order->total]);
+            $order->update(['status' => 'approved', 'student_account_id' => $account->id]);
+            foreach (array_filter([$user, ...$order->student->guardians()->with('user')->get()->pluck('user')->all()]) as $u) {
+                $u->notify(new GeneralNotice('Order approved – please pay', 'Bookstore order #'.$order->id.' ('.Billing::peso($order->total).') is on the balance. Pay online or at the finance office.', '/portal/account'));
+            }
+
+            return back()->with('ok', 'Order #'.$order->id.' approved and added to the balance. Finance will confirm the payment.');
         }
-        $order->update(['status' => $status]);
-        if ($status === 'ready') {
-            $order->student->user?->notify(new GeneralNotice('Your order is ready', 'Bookstore order #'.$order->id.' can be claimed at the school.', '/portal/shop'));
+        if ($status === 'released') {
+            abort_unless($order->isPaid(), 422, 'Not paid yet – finance must confirm the payment before you release it.');
+            $order->update(['status' => 'released']);
+            $user?->notify(new GeneralNotice('Order released', 'You received bookstore order #'.$order->id.'.', '/portal/shop'));
+
+            return back()->with('ok', 'Order #'.$order->id.' released.');
+        }
+        abort_if($order->charge && $order->charge->paid() > 0, 422, 'This order is already (partly) paid. Refund it at finance first.');
+        DB::transaction(function () use ($order, $d) {
+            $order->charge?->update(['is_void' => true]);
+            foreach ($order->lines as $l) {
+                if ($l->shop_item_id && ($item = ShopItem::find($l->shop_item_id)) && $item->stock !== null) {
+                    $item->increment('stock', $l->qty);
+                }
+            }
+            $order->update(['status' => 'cancelled', 'note' => $d['reason']]);
+        });
+        $buyer = $order->ordered_by ? User::find($order->ordered_by) : $user;
+        foreach (array_unique(array_filter([$buyer?->id, $user?->id])) as $uid) {
+            User::find($uid)?->notify(new GeneralNotice('Order not accepted', 'Bookstore order #'.$order->id.': '.$d['reason'], '/portal/shop'));
         }
 
-        return back()->with('ok', 'Order #'.$order->id.' – '.ShopOrder::STATUSES[$status].'.');
+        return back()->with('ok', 'Order #'.$order->id.' declined – the buyer was told why.');
     }
 
     public function image(ShopItem $item)
@@ -136,13 +159,12 @@ class ShopController extends Controller
             $total = round(collect($lines)->sum(fn ($l) => $l['price'] * $l['qty']), 2);
             $order = ShopOrder::create(['student_id' => $student->id, 'student_account_id' => $account->id, 'ordered_by' => $u->id, 'total' => $total]);
             $order->lines()->createMany($lines);
-            AccountCharge::create(['student_account_id' => $account->id, 'shop_order_id' => $order->id, 'description' => 'Bookstore order #'.$order->id, 'amount' => $total]);
 
             return $order;
         });
-        Notification::send(User::whereIn('role', [Role::CASHIER, Role::ADMIN])->where('is_active', true)->get(),
+        Notification::send(User::whereIn('role', [Role::BOOKSTORE, Role::ADMIN])->where('is_active', true)->get(),
             new GeneralNotice('New bookstore order', $student->full_name.' · '.Billing::peso($order->total), route('shop.manage', [], false)));
 
-        return redirect()->route('portal.account')->with('ok', 'Order #'.$order->id.' placed – '.Billing::peso($order->total).' was added to the balance. Pay it below or at the cashier.');
+        return redirect()->route('portal.shop')->with('ok', 'Order #'.$order->id.' sent. The bookstore will check it first; once approved you can pay it.');
     }
 }

@@ -220,11 +220,6 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/accounts/{enrollment}/schedule', [FinanceController::class, 'schedule'])->name('finance.schedule');
         Route::post('/accounts/{enrollment}/pay', [FinanceController::class, 'pay'])->name('finance.pay');
         Route::post('/payments/{payment}/void', [FinanceController::class, 'void'])->name('finance.void');
-        Route::get('/bookstore', [\App\Http\Controllers\ShopController::class, 'manage'])->name('shop.manage');
-        Route::post('/bookstore/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');
-        Route::post('/bookstore/items/{item}', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.update');
-        Route::delete('/bookstore/items/{item}', [\App\Http\Controllers\ShopController::class, 'deleteItem'])->name('shop.items.destroy');
-        Route::post('/bookstore/orders/{order}', [\App\Http\Controllers\ShopController::class, 'setStatus'])->name('shop.orders.status');
         Route::get('/online', [\App\Http\Controllers\OnlinePaymentController::class, 'proofs'])->name('finance.proofs');
         Route::post('/online/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'review'])->name('finance.proofs.review');
     });
@@ -254,6 +249,13 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     });
 
     // Administration
+    Route::middleware('role:admin,bookstore')->prefix('bookstore')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ShopController::class, 'manage'])->name('shop.manage');
+        Route::post('/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');
+        Route::post('/items/{item}', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.update');
+        Route::delete('/items/{item}', [\App\Http\Controllers\ShopController::class, 'deleteItem'])->name('shop.items.destroy');
+        Route::post('/orders/{order}', [\App\Http\Controllers\ShopController::class, 'setStatus'])->name('shop.orders.status');
+    });
     Route::middleware('role:admin')->group(function () {
         Route::get('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'channels'])->name('channels.index');
         Route::post('/payment-methods', [\App\Http\Controllers\OnlinePaymentController::class, 'saveChannel'])->name('channels.store');
