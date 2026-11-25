@@ -90,6 +90,8 @@
             </table>
         </div>
     @empty
-        <div class="card"><x-empty icon="book-open" title="No classes here" text="The registrar assigns teachers to subjects in Classes & sections." /></div>
+        <div class="card"><x-empty icon="book-open" title="No classes here" text="A class appears here once a subject in a section has a teacher."
+                @if(auth()->user()->hasRole('admin', 'registrar')) action="Open Classes & sections" :href="route('sections.index')" @endif
+                :steps="['Open <b>Classes &amp; sections</b> and click a section.', 'In <b>Subjects &amp; teachers</b>, add a subject and choose its teacher.', 'The class then shows here, where scores are entered.']" /></div>
     @endforelse
 </x-layouts.app>

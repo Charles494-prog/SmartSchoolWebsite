@@ -99,6 +99,7 @@ class SectionController extends Controller
             'busy' => $busy->values(),
             'section' => $section,
             'students' => $section->students()->get(),
+            'enrollmentIds' => $section->enrollments()->pluck('id', 'student_id'),
             'waiting' => Enrollment::with('student')->where('school_year_id', $section->school_year_id)->where('grade_level_id', $section->grade_level_id)
                 ->whereNull('section_id')->where('status', 'enrolled')->get()->sortBy('student.last_name'),
             'subjects' => Subject::where('is_active', true)->where(fn ($q) => $q->where('grade_level_id', $section->grade_level_id)->orWhereNull('grade_level_id'))

@@ -188,6 +188,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::middleware('role:admin,hr')->prefix('payroll')->group(function () {
         Route::get('/', [PayrollController::class, 'index'])->name('payroll.index');
         Route::post('/', [PayrollController::class, 'store'])->name('payroll.store');
+        Route::get('/rates', [PayrollController::class, 'rates'])->name('payroll.rates');
+        Route::put('/rates', [PayrollController::class, 'saveRates'])->name('payroll.rates.update');
+        Route::post('/rates/reset', [PayrollController::class, 'resetRates'])->name('payroll.rates.reset');
         Route::get('/{payroll}', [PayrollController::class, 'show'])->name('payroll.show');
         Route::delete('/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy');
         Route::post('/{payroll}/finalize', [PayrollController::class, 'finalize'])->name('payroll.finalize');
@@ -216,4 +219,5 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/manage/{resource}/{id}/edit', [CrudController::class, 'edit'])->name('crud.edit');
     Route::put('/manage/{resource}/{id}', [CrudController::class, 'update'])->name('crud.update');
     Route::delete('/manage/{resource}/{id}', [CrudController::class, 'destroy'])->name('crud.destroy');
+    Route::post('/manage/{resource}/bulk-delete', [CrudController::class, 'bulkDestroy'])->name('crud.bulk-destroy');
 });

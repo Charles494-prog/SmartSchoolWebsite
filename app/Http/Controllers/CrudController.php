@@ -6,6 +6,8 @@ use App\Crud\Resources;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CrudController extends Controller
@@ -92,6 +94,34 @@ class CrudController extends Controller
         $extra = isset($r['after_save']) ? $r['after_save']($model) : null;
 
         return redirect()->route('crud.index', $slug)->with('ok', ucfirst($r['singular']).' saved.'.(is_string($extra) ? ' '.$extra : ''));
+    }
+
+    /** Delete several selected rows at once. Rows still in use, or protected, are skipped and reported. */
+    public function bulkDestroy(Request $request, string $resource)
+    {
+        $r = $this->resource($resource);
+        $ids = $request->validate(['ids' => 'required|array|min:1|max:500', 'ids.*' => 'integer|min:1'], ['ids.required' => 'Select at least one row first.'])['ids'];
+        $deleted = 0;
+        $skipped = 0;
+        foreach ($r['model']::whereIn('id', array_unique($ids))->get() as $m) {
+            if (isset($r['can_delete']) && ! $r['can_delete']($m)) {
+                $skipped++;
+
+                continue;
+            }
+            try {
+                DB::transaction(fn () => $m->delete());
+                $deleted++;
+            } catch (QueryException) {
+                $skipped++;
+            }
+        }
+        $msg = $deleted.' '.Str::plural($r['singular'], $deleted).' deleted.';
+        if ($skipped) {
+            $msg .= ' '.$skipped.' could not be deleted because '.($skipped === 1 ? 'it is' : 'they are').' still in use or protected.';
+        }
+
+        return redirect()->route('crud.index', $resource)->with($deleted ? 'ok' : 'error', $msg);
     }
 
     public function destroy(string $resource, int $id)

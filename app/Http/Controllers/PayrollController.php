@@ -30,6 +30,38 @@ class PayrollController extends Controller
         return redirect()->route('payroll.show', $p)->with('ok', 'Payroll generated ('.($fraction < 1 ? 'semi-monthly' : 'monthly').'). Review the amounts, then finalize.');
     }
 
+    public function rates()
+    {
+        return view('payroll.rates', ['contributions' => Calc::contributions(), 'brackets' => Calc::brackets()]);
+    }
+
+    public function saveRates(Request $request)
+    {
+        $keys = array_keys(Calc::DEFAULTS);
+        $rules = ['brackets' => 'array|max:15', 'brackets.*.over' => 'nullable|numeric|min:0|max:100000000', 'brackets.*.base' => 'nullable|numeric|min:0|max:100000000', 'brackets.*.rate' => 'nullable|numeric|min:0|max:100'];
+        foreach ($keys as $k) {
+            $rules["c.$k.rate"] = 'required|numeric|min:0|max:100';
+            $rules["c.$k.min"] = 'required|numeric|min:0|max:100000000';
+            $rules["c.$k.max"] = 'required|numeric|min:0|max:100000000';
+        }
+        $data = $request->validate($rules, ['c.*.rate.max' => 'A rate cannot be more than 100%.']);
+        foreach ($keys as $k) {
+            if ($data['c'][$k]['max'] > 0 && $data['c'][$k]['max'] < $data['c'][$k]['min']) {
+                return back()->withInput()->withErrors(["c.$k.max" => 'The ceiling must be higher than the floor (or 0 for no ceiling).']);
+            }
+        }
+        Calc::save($data['c'], $data['brackets'] ?? []);
+
+        return redirect()->route('payroll.rates')->with('ok', 'Payroll rates saved. New payrolls use them; finalized payrolls are not changed.');
+    }
+
+    public function resetRates()
+    {
+        Calc::reset();
+
+        return redirect()->route('payroll.rates')->with('ok', 'Rates reset to the built-in government tables.');
+    }
+
     public function show(Payroll $payroll)
     {
         return view('payroll.show', ['p' => $payroll->load('items.employee')]);

@@ -107,12 +107,26 @@
                             <td class="text-right"><form x-data method="post" action="{{ route('classes.destroy', $cs) }}" x-on:submit="if (!confirm('Remove {{ $cs->subject->name }} from this section?')) $event.preventDefault()">@csrf @method('delete')<button class="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Remove"><x-icon name="x" class="h-4 w-4" /></button></form></td>
                         </tr>
                     @empty
-                        <tr><td colspan="4"><x-empty icon="book" title="No subjects yet" text="Add the subjects this section takes below." /></td></tr>
+                        <tr><td colspan="4">
+                            @if($subjects->isEmpty())
+                                <x-empty icon="book" title="No subjects for {{ $section->gradeLevel->name }} yet" text="Subjects are made once per grade level, then added to each section here."
+                                         action="Add a subject for {{ $section->gradeLevel->name }}" :href="route('crud.create', 'subjects')" :open="true"
+                                         :steps="['Open <b>Subjects</b> and click <b>Add subject</b>.', 'Type the code and name, and choose <b>'.e($section->gradeLevel->name).'</b> as the grade level.', 'Set how the grade is computed (the weights must total 100) and save.', 'Come back to this section → <b>Subjects &amp; teachers</b>, pick the subject and click <b>Add</b>.']" />
+                            @else
+                                <x-empty icon="book" title="No subjects in this section yet" text="Use the “Add subject” box below to add each subject this section takes."
+                                         :steps="['In <b>Add subject</b> below, choose a subject.', 'Choose its teacher (or leave it empty and assign later).', 'Click <b>Add</b>. Repeat for every subject.', 'Then open the <b>Schedule</b> tab to set the class times.']" />
+                            @endif
+                        </td></tr>
                     @endforelse
                     </tbody>
                 </table>
             </div>
             <p class="mt-3 text-sm text-slate-500">A teacher can't be assigned if they already teach somewhere else at one of this subject's times.</p>
+            @if($teachers->isEmpty())
+                <div class="card mt-4"><x-empty icon="users" title="No teachers yet" text="Teachers need an account before they can be assigned to a subject."
+                    action="Add a teacher" :href="route('crud.create', 'employees')"
+                    :steps="['Open <b>Employees</b> and click <b>Add employee</b>.', 'Fill in the name and position (e.g. Teacher I) and the monthly salary.', 'Under <b>SmartSchool login</b>, type their email and choose <b>Teacher</b>.', 'Save. Write down the temporary password shown – they change it at first login.', 'Come back here and choose them in the <b>Teacher</b> column.']" /></div>
+            @endif
             @if($subjects->isNotEmpty())
                 <form method="post" action="{{ route('classes.store', $section) }}" class="card mt-4 flex flex-wrap items-end gap-3">
                     @csrf
@@ -129,11 +143,12 @@
                 <h2 class="h2 mb-3">Class list</h2>
                 <ol class="divide-y divide-slate-100 text-sm dark:divide-white/5">
                     @forelse($students as $i => $st)
-                        @php $en = $st->enrollments()->where('section_id', $section->id)->first(); @endphp
+                        @php $en = $enrollmentIds[$st->id] ?? null; @endphp
                         <li class="flex items-center gap-3 py-2"><span class="w-6 text-right text-xs text-slate-400">{{ $i + 1 }}</span><a class="link flex-1" href="{{ route('students.show', $st) }}">{{ $st->full_name }}</a>
                             @if($en)<form method="post" action="{{ route('sections.students.remove', [$section, $en]) }}">@csrf @method('delete')<button class="text-xs text-slate-400 hover:text-rose-600">Remove</button></form>@endif</li>
                     @empty
-                        <li class="py-6 text-center text-slate-500">No students yet.</li>
+                        <li><x-empty icon="users" title="No students in this section yet" text="Students enrolled in {{ $section->gradeLevel->name }} without a section appear in “Add students”."
+                            :steps="['Approve an application in <b>Applications</b>, or add a student in <b>Students</b> and enroll them in '.e($section->gradeLevel->name).'.', 'Come back here – they show up under <b>Add students</b>.', 'Tick their names and click <b>Add selected</b>.']" /></li>
                     @endforelse
                 </ol>
             </div>

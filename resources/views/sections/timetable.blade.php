@@ -35,7 +35,8 @@
 
     <div class="card overflow-x-auto p-0">
         @if($times->isEmpty())
-            <x-empty icon="clock" title="Nothing scheduled here yet" text="Class times are added inside each section (Classes & sections → open a section → + Time)." />
+            <x-empty icon="clock" title="Nothing scheduled here yet" text="Class times are added inside each section." action="Open Classes & sections" :href="route('sections.index')"
+                :steps="['Open <b>Classes &amp; sections</b> and click a section.', 'In <b>Subjects &amp; teachers</b>, add the subjects and teachers.', 'Open the <b>Schedule</b> tab and click <b>+ Time</b> for each class.', 'Come back here to see the weekly timetable.']" />
         @else
         <table class="w-full min-w-[56rem] table-fixed border-collapse text-sm">
             <thead><tr><th class="w-28 border-b border-slate-100 bg-slate-50 px-3 py-3 text-left text-xs font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5">Time</th>@foreach($days as $d)<th class="border-b border-slate-100 bg-slate-50 px-3 py-3 text-left text-xs font-semibold text-slate-500 dark:border-white/10 dark:bg-white/5">{{ $d }}</th>@endforeach</tr></thead>
