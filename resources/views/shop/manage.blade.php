@@ -28,16 +28,17 @@
                                 @if($o->status === 'placed')
                                     <button name="status" value="approved" class="btn btn-primary btn-sm" x-show="!no">Approve</button>
                                     <button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>
-                                @elseif($o->status === 'approved' && $o->isPaid())
-                                    <button name="status" value="released" class="btn btn-primary btn-sm">Release item</button>
-                                @elseif($o->status === 'approved')
-                                    <span class="text-xs text-slate-500">Waiting for finance to confirm payment</span>
+                                @elseif(in_array($o->status, ['approved', 'ready'], true))
+                                    @if($o->status === 'approved')<button name="status" value="ready" class="btn btn-sm" x-show="!no">Prepared</button>@endif
+                                    @if($o->isPaid())<button name="status" value="released" class="btn btn-primary btn-sm" x-show="!no">Release item</button>@else<span class="text-xs text-slate-600">Waiting for payment</span>@endif
                                     @if($o->charge && $o->charge->paid() == 0)<button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>@endif
+                                    <button type="submit" form="notify-{{ $o->id }}" class="btn btn-sm" x-show="!no">Notify student &amp; parents</button>
                                 @elseif($o->status === 'cancelled' && $o->note)
                                     <span class="text-xs text-rose-600">“{{ $o->note }}”</span>
                                 @endif
                                 <div x-show="no" x-cloak class="flex gap-2"><input name="reason" class="input h-9 w-64" placeholder="Reason, e.g. Size M is out of stock"><button name="status" value="cancelled" class="btn btn-sm text-rose-600">Send</button><button type="button" class="btn btn-sm" x-on:click="no = false">Back</button></div>
                             </form>
+                            <form id="notify-{{ $o->id }}" method="post" action="{{ route('shop.orders.notify', $o) }}" class="hidden">@csrf</form>
                         </li>
                     @empty
                         <li class="px-5 py-10 text-center text-slate-500">No orders here.</li>

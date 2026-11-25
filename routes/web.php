@@ -263,6 +263,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');
         Route::post('/items/{item}', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.update');
         Route::delete('/items/{item}', [\App\Http\Controllers\ShopController::class, 'deleteItem'])->name('shop.items.destroy');
+        Route::post('/orders/{order}/notify', [\App\Http\Controllers\ShopController::class, 'notify'])->name('shop.orders.notify');
         Route::post('/orders/{order}', [\App\Http\Controllers\ShopController::class, 'setStatus'])->name('shop.orders.status');
     });
     Route::middleware('role:admin')->group(function () {

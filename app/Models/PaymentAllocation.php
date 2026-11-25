@@ -20,6 +20,11 @@ class PaymentAllocation extends Model
             if (! $a->account_charge_id) {
                 return;
             }
+            $order = ShopOrder::with('student')->whereHas('charge', fn ($c) => $c->whereKey($a->account_charge_id))->whereIn('status', ['approved', 'ready'])->first();
+            if ($order && $order->isPaid()) {
+                \Illuminate\Support\Facades\Notification::send(User::whereIn('role', ['bookstore', 'admin'])->where('is_active', true)->get(),
+                    new \App\Notifications\GeneralNotice('Paid – ready for releasing', 'Bookstore order #'.$order->id.' for '.$order->student->full_name.' is paid.', route('shop.manage', [], false)));
+            }
             $req = ServiceRequest::with('service', 'student', 'charge')->where('account_charge_id', $a->account_charge_id)->whereIn('status', ['processing', 'ready'])->first();
             if ($req && $req->isPaid()) {
                 \Illuminate\Support\Facades\Notification::send(User::whereIn('role', ['registrar', 'admin'])->where('is_active', true)->get(),

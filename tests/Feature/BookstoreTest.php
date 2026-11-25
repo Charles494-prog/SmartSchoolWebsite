@@ -50,6 +50,8 @@ class BookstoreTest extends TestCase
         $this->assertEqualsWithDelta(0, $order->charge->fresh()->remaining(), 0.01);
         $this->assertEqualsWithDelta(max(0, $tuitionBefore - 10), $a->tuitionBalance(), 0.01);
 
+        $this->assertTrue($store->notifications()->get()->contains(fn ($n) => str_contains(json_encode($n->data), 'ready for releasing')));
+        $this->actingAs($store)->post("/bookstore/orders/{$order->id}/notify")->assertSessionHas('ok');
         $this->actingAs($store)->post("/bookstore/orders/{$order->id}", ['status' => 'released'])->assertSessionHas('ok');
         $this->assertSame('released', $order->fresh()->status);
     }

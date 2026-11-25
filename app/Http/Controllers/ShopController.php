@@ -29,7 +29,7 @@ class ShopController extends Controller
     {
         $status = in_array($request->query('status'), array_keys(ShopOrder::STATUSES), true) ? $request->query('status') : 'placed';
         $all = ShopOrder::with('lines', 'student', 'charge')->latest()->get();
-        $eff = fn ($o) => $o->status === 'approved' && $o->isPaid() ? 'paid' : $o->status;
+        $eff = fn ($o) => in_array($o->status, ['approved', 'ready'], true) && $o->isPaid() ? 'paid' : $o->status;
 
         return view('shop.manage', [
             'items' => ShopItem::orderBy('category')->orderBy('name')->get(),
@@ -65,7 +65,7 @@ class ShopController extends Controller
 
     public function setStatus(Request $request, ShopOrder $order)
     {
-        $d = $request->validate(['status' => ['required', Rule::in(['approved', 'released', 'cancelled'])], 'reason' => 'nullable|required_if:status,cancelled|max:255'],
+        $d = $request->validate(['status' => ['required', Rule::in(['approved', 'ready', 'released', 'cancelled'])], 'reason' => 'nullable|required_if:status,cancelled|max:255'],
             ['reason.required_if' => 'Tell the buyer why, e.g. "Size M is out of stock".']);
         $status = $d['status'];
         $user = $order->student->user;
@@ -80,6 +80,12 @@ class ShopController extends Controller
             }
 
             return back()->with('ok', 'Order #'.$order->id.' approved and added to the balance. Finance will confirm the payment.');
+        }
+        if ($status === 'ready') {
+            abort_unless($order->status === 'approved', 422, 'Approve the order first.');
+            $order->update(['status' => 'ready']);
+
+            return back()->with('ok', $order->isPaid() ? 'Prepared. It is paid – release it, or notify the family to come get it.' : 'Prepared. Not paid yet – you will be notified when finance confirms the payment.');
         }
         if ($status === 'released') {
             abort_unless($order->isPaid(), 422, 'Not paid yet – finance must confirm the payment before you release it.');
@@ -104,6 +110,19 @@ class ShopController extends Controller
         }
 
         return back()->with('ok', 'Order #'.$order->id.' declined – the buyer was told why.');
+    }
+
+    /** Tell the student and parents the order is ready to claim (or that it still needs to be paid). */
+    public function notify(ShopOrder $order)
+    {
+        abort_unless(in_array($order->status, ['approved', 'ready'], true), 422);
+        $paid = $order->isPaid();
+        $body = $paid ? 'Bookstore order #'.$order->id.' ('.$order->summary().') is ready. You can claim it at the bookstore now.'
+            : 'Bookstore order #'.$order->id.' is ready, but '.Billing::peso($order->charge->remaining()).' is still unpaid. Please pay first (Payments), then claim it.';
+        $people = collect([$order->student->user])->merge($order->student->guardians()->with('user')->get()->pluck('user'))->filter()->unique('id');
+        Notification::send($people, new GeneralNotice('Your order is ready', $body, $paid ? '/portal/shop' : '/portal/account'));
+
+        return back()->with('ok', 'Notified '.$people->count().' '.str('account')->plural($people->count()).'.');
     }
 
     public function image(ShopItem $item)

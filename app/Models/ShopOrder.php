@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class ShopOrder extends Model
 {
     /** placed → (bookstore approves) approved → (finance confirms payment) paid → released. */
-    public const STATUSES = ['placed' => 'Waiting for bookstore', 'approved' => 'Approved – please pay', 'paid' => 'Paid – ready to release', 'released' => 'Released', 'cancelled' => 'Not accepted'];
+    public const STATUSES = ['placed' => 'Waiting for bookstore', 'approved' => 'Approved – please pay', 'ready' => 'Prepared – ready to claim', 'paid' => 'Paid – ready to release', 'released' => 'Released', 'cancelled' => 'Not accepted'];
 
     public function isPaid(): bool
     {

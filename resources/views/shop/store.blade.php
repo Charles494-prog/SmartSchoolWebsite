@@ -68,12 +68,12 @@
                     @foreach($orders as $o)
                         @php $rem = $o->charge?->remaining() ?? 0; @endphp
                         <div class="border-b border-slate-100 py-2 text-sm last:border-0 dark:border-slate-800">
-                            <p class="flex justify-between"><b>#{{ $o->id }}</b>@php $st = $o->status === 'approved' && $o->isPaid() ? 'paid' : $o->status; @endphp
-                            <span class="rounded-full px-2 text-xs {{ ['placed' => 'bg-slate-100 text-slate-600', 'approved' => 'bg-amber-100 text-amber-800', 'paid' => 'bg-emerald-100 text-emerald-700', 'released' => 'bg-slate-100 text-slate-500', 'cancelled' => 'bg-rose-100 text-rose-700'][$st] }}">{{ \App\Models\ShopOrder::STATUSES[$st] }}</span></p>
+                            <p class="flex justify-between"><b>#{{ $o->id }}</b>@php $st = in_array($o->status, ['approved', 'ready'], true) && $o->isPaid() ? 'paid' : $o->status; @endphp
+                            <span class="rounded-full px-2 text-xs {{ ['placed' => 'bg-slate-100 text-slate-600', 'approved' => 'bg-amber-100 text-amber-800', 'ready' => 'bg-sky-100 text-sky-800', 'paid' => 'bg-emerald-100 text-emerald-700', 'released' => 'bg-slate-100 text-slate-500', 'cancelled' => 'bg-rose-100 text-rose-700'][$st] }}">{{ \App\Models\ShopOrder::STATUSES[$st] }}</span></p>
                             <p class="text-slate-500">{{ $o->summary() }}</p>
                             @if($o->status === 'cancelled')<p class="text-xs text-rose-600">{{ $o->note }}</p>
-                            @elseif($o->status === 'approved' && $rem > 0)<a href="{{ route('portal.account') }}" class="text-xs font-semibold text-brand-600">Pay {{ $peso($rem) }} →</a>
-                            @elseif($o->status === 'approved')<p class="text-xs text-emerald-600">Paid – claim it at the bookstore</p>@endif
+                            @elseif(in_array($o->status, ['approved', 'ready'], true) && $rem > 0)<a href="{{ route('portal.account') }}" class="text-xs font-semibold text-brand-600">Pay {{ $peso($rem) }} →</a>
+                            @elseif(in_array($o->status, ['approved', 'ready'], true))<p class="text-xs text-emerald-600">Paid – claim it at the bookstore</p>@endif
                         </div>
                     @endforeach
                 </div>
