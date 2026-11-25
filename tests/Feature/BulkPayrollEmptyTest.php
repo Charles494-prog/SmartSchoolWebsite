@@ -96,4 +96,11 @@ class BulkPayrollEmptyTest extends TestCase
         $this->get('/backups/'.basename($file))->assertOk();
         $this->get('/backups/..%2F.env')->assertNotFound();
     }
+
+    public function test_go_online_guide(): void
+    {
+        $this->get('/settings')->assertOk()->assertSee('How to put SmartSchool online');
+        $this->get('/go-online')->assertOk()->assertSee('Put SmartSchool online')->assertSee('Make a backup')->assertSee('Switch to Online and tell families');
+        $this->actingAs(User::where('role', 'teacher')->firstOrFail())->get('/go-online')->assertForbidden();
+    }
 }

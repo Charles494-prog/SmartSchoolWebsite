@@ -150,7 +150,7 @@
                 <section id="mode" class="card scroll-mt-24 p-0" x-data="{ mode: @js(\App\Support\School::mode()) }">
                     <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
                         <h2 class="text-base font-semibold text-slate-900">How SmartSchool runs</h2>
-                        <p class="mt-0.5 text-sm text-slate-500">Chosen in the installer. Change it when your school moves from the school Wi-Fi to the internet, or back.</p>
+                        <p class="mt-0.5 text-sm text-slate-500">Chosen in the installer. Change it when your school moves from the school Wi-Fi to the internet, or back. <a class="link" href="{{ route('help.go-online') }}">How to put SmartSchool online →</a></p>
                     </div>
                     <div class="space-y-4 px-6 py-5">
                         <div class="grid gap-3 sm:grid-cols-2">
@@ -167,6 +167,7 @@
                                 <li>Make a backup first (School setup → Backups).</li>
                                 <li>This turns on the online features. To reach SmartSchool from outside the school, it must also run on a web host – install it there with the Online option and restore your backup.</li>
                             </ul>
+                            <a x-show="mode === 'hosted'" href="{{ route('help.go-online') }}" class="btn btn-sm mt-3 min-h-11 bg-white"><x-icon name="sparkles" class="h-4 w-4 text-violet-500" /> Step-by-step guide to go online</a>
                             <ul class="mt-1 list-disc space-y-1 pl-5" x-show="mode === 'lan'">
                                 <li>Student and parent logins stop working; their data is kept.</li>
                                 <li>Online applications and email notices are turned off.</li>

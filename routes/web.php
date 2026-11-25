@@ -207,6 +207,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/settings', [AdminController::class, 'settings'])->name('settings.edit');
         Route::put('/settings', [AdminController::class, 'saveSettings'])->name('settings.update');
         Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
+        Route::get('/go-online', [HelpController::class, 'goOnline'])->name('help.go-online');
         Route::get('/backups', [AdminController::class, 'backups'])->name('backups.index');
         Route::post('/backups', [AdminController::class, 'runBackup'])->name('backups.run');
         Route::get('/backups/{name}', [AdminController::class, 'downloadBackup'])->name('backups.download');

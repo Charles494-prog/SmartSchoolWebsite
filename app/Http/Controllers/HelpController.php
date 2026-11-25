@@ -2,16 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Console\Commands\BackupDatabase;
 use App\Models\AttendanceRecord;
 use App\Models\SchoolYear;
 use App\Models\Section;
 use App\Models\Student;
 use App\Support\Role;
+use App\Support\School;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class HelpController extends Controller
 {
     /** "How it works": the school's flow in order, plus who does what. */
+    /** Step-by-step: moving SmartSchool from the school Wi-Fi (LAN) to the internet (Hosted). */
+    public function goOnline()
+    {
+        $latest = collect(Storage::disk('local')->files('backups'))
+            ->filter(fn ($f) => BackupDatabase::isBackup($f))->sortDesc()->first();
+
+        return view('help.go-online', [
+            'mode' => School::mode(),
+            'latest' => $latest ? basename($latest) : null,
+            'mailReady' => filled(config('mail.mailers.smtp.host')) && config('mail.default') === 'smtp' && filled(config('mail.from.address')),
+        ]);
+    }
+
     public function guide()
     {
         return view('help.guide');
