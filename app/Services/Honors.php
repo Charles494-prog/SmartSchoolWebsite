@@ -47,16 +47,29 @@ class Honors
         return $out;
     }
 
-    /** Best in each subject: subject => [rows with the top grade] (passing students only). */
+    /** Each subject's top 3 (passing students only): subject => rows with 'grade' and 'place' (ties share a place). */
     public static function bestPerSubject(Collection $rows): Collection
     {
         $subjects = $rows->flatMap(fn ($r) => array_keys($r['grades']))->unique()->sort()->values();
 
         return $subjects->mapWithKeys(function ($sub) use ($rows) {
-            $ok = $rows->where('failed', false)->filter(fn ($r) => ($r['grades'][$sub] ?? null) !== null);
-            $best = $ok->max(fn ($r) => $r['grades'][$sub]);
+            $ok = $rows->where('failed', false)->filter(fn ($r) => ($r['grades'][$sub] ?? null) !== null)->sortByDesc(fn ($r) => $r['grades'][$sub])->values();
+            $out = collect();
+            $place = 0;
+            $prev = null;
+            foreach ($ok as $i => $r) {
+                $g = $r['grades'][$sub];
+                if ($g !== $prev) {
+                    $place = $i + 1;
+                    $prev = $g;
+                }
+                if ($place > 3) {
+                    break;
+                }
+                $out->push($r + ['grade' => $g, 'place' => $place]);
+            }
 
-            return [$sub => $best === null ? collect() : $ok->filter(fn ($r) => $r['grades'][$sub] == $best)->values()->map(fn ($r) => $r + ['grade' => $best])];
+            return [$sub => $out];
         })->filter(fn ($v) => $v->isNotEmpty());
     }
 

@@ -112,4 +112,18 @@ GIFT);
         \App\Models\Setting::put('honors_top_n', '3');
         $this->get("/honors?section_id={$section->id}&term=1")->assertOk()->assertSee('Top 3');
     }
+
+    public function test_teacher_sees_only_their_advisory_and_can_add_awards(): void
+    {
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $advisory = \App\Models\Section::where('adviser_id', $teacher->id)->first();
+        $other = \App\Models\Section::where('adviser_id', '!=', $teacher->id)->first();
+        $r = $this->get("/honors?section_id={$other->id}")->assertOk();
+        $this->assertSame($advisory->id, $r->viewData('section')->id, 'falls back to the advisory class');
+        $this->assertSame([$advisory->id], array_keys($r->viewData('sections')->all()));
+        $this->post('/honors/awards', ['name' => 'Kindness Award'])->assertRedirect();
+        $this->assertTrue(Award::where('name', 'Kindness Award')->exists());
+        $this->post('/honors/nominations', ['award_id' => Award::first()->id, 'student_id' => $other->students()->first()->id])->assertForbidden();
+    }
 }

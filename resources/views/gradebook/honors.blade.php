@@ -17,10 +17,10 @@
                 <p class="muted">{{ $where }} · {{ $period }}</p>
             </div>
             <input type="hidden" name="tab" :value="tab">
-            <label><span class="mb-1 block text-xs font-medium text-slate-500">Section</span>
+            <label><span class="mb-1 block text-xs font-medium text-slate-500">{{ $isAdmin ? 'Section' : 'My advisory class' }}</span>
                 <select name="section_id" class="input h-11" x-on:change="$refs.f.submit()">@foreach($sections as $k => $v)<option value="{{ $k }}" @selected($section?->id == $k)>{{ $v }}</option>@endforeach</select></label>
             <label><span class="mb-1 block text-xs font-medium text-slate-500">Show</span>
-                <select name="scope" class="input h-11" x-on:change="$refs.f.submit()"><option value="section" @selected($scope === 'section')>This section</option><option value="level" @selected($scope === 'level')>Whole grade level</option></select></label>
+                <select name="scope" class="input h-11" x-on:change="$refs.f.submit()"><option value="section" @selected($scope === 'section')>{{ $isAdmin ? 'This section' : 'My advisory' }}</option><option value="level" @selected($scope === 'level')>Whole grade level</option></select></label>
             <label><span class="mb-1 block text-xs font-medium text-slate-500">Period</span>
                 <select name="term" class="input h-11" x-on:change="$refs.f.submit()">
                     @foreach(range(1, $terms) as $t)<option value="{{ $t }}" @selected($term === $t)>{{ \App\Support\School::periodName($terms) }} {{ $t }}</option>@endforeach
@@ -52,7 +52,7 @@
                     @foreach([1, 0, 2] as $pos)
                         @php
                             $r = $top[$pos];
-                            $step = [['h-40 sm:h-48', 'from-amber-300 to-amber-500', '🥇', 'text-amber-900'], ['h-28 sm:h-36', 'from-slate-200 to-slate-400', '🥈', 'text-slate-800'], ['h-20 sm:h-24', 'from-orange-300 to-orange-500', '🥉', 'text-orange-950']][$pos];
+                            $step = [['h-40 sm:h-48', 'from-amber-300 to-amber-500', $scope === 'level' ? '🏆' : '🥇', 'text-amber-900'], ['h-28 sm:h-36', 'from-slate-200 to-slate-400', '🥈', 'text-slate-800'], ['h-20 sm:h-24', 'from-orange-300 to-orange-500', '🥉', 'text-orange-950']][$pos];
                             $url = route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']);
                         @endphp
                         <a href="{{ $url }}" class="group flex flex-col items-center text-center">
@@ -93,20 +93,39 @@
         </div>
 
         {{-- BEST IN SUBJECT --}}
-        <div x-show="tab === 'subjects'" x-cloak class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            @forelse($bestSubject as $sub => $winners)
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">Best in {{ $sub }}</p>
-                    @foreach($winners as $w)
-                        <div class="mt-2 flex items-center justify-between gap-2">
-                            <a href="{{ route('honors.journey', ['student' => $w['enrollment']->student_id, 'term' => $term ?? 'final']) }}" class="font-semibold hover:underline">{{ $w['enrollment']->student->full_name }}@if($scope === 'level')<span class="block text-xs font-normal text-slate-500">{{ $w['section']->name }}</span>@endif</a>
-                            <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-sm font-bold text-emerald-700">{{ $w['grade'] }}</span>
+        <div x-show="tab === 'subjects'" x-cloak>
+            @php $grads = ['from-indigo-500 to-violet-600', 'from-emerald-500 to-teal-600', 'from-sky-500 to-blue-600', 'from-amber-400 to-orange-500', 'from-rose-500 to-pink-600', 'from-fuchsia-500 to-purple-600', 'from-teal-500 to-cyan-600', 'from-lime-500 to-green-600']; @endphp
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                @forelse($bestSubject as $sub => $list)
+                    @php $win = $list->where('place', 1); $rest = $list->where('place', '>', 1); @endphp
+                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="flex items-center gap-2 bg-gradient-to-r px-5 py-3 text-white {{ $grads[crc32($sub) % count($grads)] }}">
+                            <span class="text-lg">{{ $scope === 'level' ? '🏆' : '⭐' }}</span>
+                            <span class="font-semibold">Best in {{ $sub }}</span>
                         </div>
-                    @endforeach
-                </div>
-            @empty
-                <p class="card muted sm:col-span-3">No grades for {{ strtolower($period) }} yet.</p>
-            @endforelse
+                        <div class="p-5">
+                            @foreach($win as $w)
+                                <a href="{{ route('honors.journey', ['student' => $w['enrollment']->student_id, 'term' => $term ?? 'final']) }}" class="group flex items-center gap-3 {{ ! $loop->first ? 'mt-3' : '' }}">
+                                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-800 ring-2 ring-amber-300">{{ strtoupper(substr($w['enrollment']->student->first_name, 0, 1).substr($w['enrollment']->student->last_name, 0, 1)) }}</span>
+                                    <span class="min-w-0 flex-1"><span class="block truncate text-lg font-bold group-hover:underline">{{ $w['enrollment']->student->full_name }}</span>@if($scope === 'level')<span class="text-xs text-slate-500">{{ $w['section']->name }}</span>@endif</span>
+                                    <span class="text-3xl font-extrabold text-brand-600">{{ $w['grade'] }}</span>
+                                </a>
+                            @endforeach
+                            @if($rest->isNotEmpty())
+                                <div class="mt-4 space-y-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                    @foreach($rest as $r)
+                                        <a href="{{ route('honors.journey', ['student' => $r['enrollment']->student_id, 'term' => $term ?? 'final']) }}" class="flex items-center gap-2 text-sm hover:underline">
+                                            <span>{{ $r['place'] === 2 ? '🥈' : '🥉' }}</span><span class="min-w-0 flex-1 truncate">{{ $r['enrollment']->student->full_name }}</span><span class="font-semibold text-slate-600 dark:text-slate-300">{{ $r['grade'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <p class="card muted sm:col-span-3">No grades for {{ strtolower($period) }} yet.</p>
+                @endforelse
+            </div>
         </div>
 
         {{-- PERFECT ATTENDANCE --}}
@@ -125,65 +144,73 @@
         </div>
 
         {{-- SPECIAL AWARDS --}}
-        <div x-show="tab === 'awards'" x-cloak class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div class="space-y-5">
-                <div class="card">
-                    <h2 class="h2 mb-3">Given awards</h2>
-                    @forelse($approved->groupBy('award.name') as $award => $list)
-                        <div class="mb-4"><p class="font-semibold text-brand-700 dark:text-brand-300">🏆 {{ $award }}</p>
-                            @foreach($list as $n)<p class="mt-1 text-sm"><b>{{ $n->student->full_name }}</b>@if($n->reason) – <span class="text-slate-500">{{ $n->reason }}</span>@endif</p>@endforeach
-                        </div>
-                    @empty
-                        <p class="text-sm text-slate-500">No special awards yet for this period.</p>
-                    @endforelse
-                </div>
-                <div class="card">
-                    <h2 class="h2 mb-3">{{ $isAdmin ? 'Waiting for your approval' : 'Your suggestions waiting for approval' }}</h2>
-                    @forelse($pending as $n)
-                        <div class="flex flex-wrap items-center gap-3 border-b border-slate-100 py-3 dark:border-slate-800">
-                            <div class="mr-auto"><p class="font-medium">{{ $n->student->full_name }} – {{ $n->award->name }}</p><p class="text-xs text-slate-500">{{ $n->reason }} @if($n->nominator)· suggested by {{ $n->nominator->name }}@endif</p></div>
+        <div x-show="tab === 'awards'" x-cloak x-data="{ give: null }">
+            <div class="mb-5 flex flex-wrap items-center gap-3">
+                <p class="mr-auto text-sm text-slate-500">{{ $section?->label() }} · {{ $period }}. {{ $isAdmin ? 'Give an award, or approve what advisers suggest.' : 'Suggest an award for a student in your advisory class – the admin approves it.' }}</p>
+            </div>
+
+            @if($pending->isNotEmpty())
+                <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <p class="mb-2 font-semibold text-amber-900 dark:text-amber-200">{{ $isAdmin ? 'Waiting for your approval' : 'Your suggestions waiting for approval' }} ({{ $pending->count() }})</p>
+                    @foreach($pending as $n)
+                        <div class="flex flex-wrap items-center gap-3 border-t border-amber-200/70 py-2 text-sm dark:border-amber-500/20">
+                            <span class="mr-auto"><b>{{ $n->student->full_name }}</b> – {{ $n->award->name }}@if($n->reason) <span class="text-amber-800/80 dark:text-amber-200/70">· “{{ $n->reason }}”</span>@endif @if($isAdmin && $n->nominator)<span class="text-xs text-amber-800/70">· by {{ $n->nominator->name }}</span>@endif</span>
                             @if($isAdmin)
                                 <form method="post" action="{{ route('honors.nominations.review', $n) }}" class="flex gap-2">@csrf
                                     <button name="action" value="approve" class="btn btn-primary btn-sm">Approve</button><button name="action" value="reject" class="btn btn-sm">Decline</button>
                                 </form>
+                            @else
+                                <span class="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-amber-800">Pending</span>
                             @endif
                         </div>
-                    @empty
-                        <p class="text-sm text-slate-500">Nothing waiting.</p>
-                    @endforelse
+                    @endforeach
                 </div>
+            @endif
+
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach($awards as $a)
+                    @php $winners = $approved->where('award_id', $a->id); @endphp
+                    <div class="flex flex-col rounded-2xl border bg-white shadow-sm dark:bg-slate-900 {{ $a->is_active ? 'border-slate-200 dark:border-slate-800' : 'border-dashed border-slate-300 opacity-60 dark:border-slate-700' }}">
+                        <div class="flex items-start gap-3 p-5">
+                            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-500 text-2xl shadow-sm">🏆</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold">{{ $a->name }}</p>
+                                @if($a->description)<p class="text-xs text-slate-500">{{ $a->description }}</p>@endif
+                            </div>
+                            @if($isAdmin)<form method="post" action="{{ route('honors.awards.toggle', $a) }}">@csrf<button class="text-xs text-slate-400 hover:text-brand-600">{{ $a->is_active ? 'Turn off' : 'Turn on' }}</button></form>@endif
+                        </div>
+                        <div class="flex-1 px-5">
+                            @forelse($winners as $w)
+                                <div class="mb-2 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm dark:bg-amber-500/10">
+                                    <span>🎖️</span><span class="min-w-0 flex-1"><b class="block truncate">{{ $w->student->full_name }}</b>@if($w->reason)<span class="block truncate text-xs text-slate-500">{{ $w->reason }}</span>@endif</span>
+                                </div>
+                            @empty
+                                <p class="mb-2 text-sm text-slate-400">No one yet this period.</p>
+                            @endforelse
+                        </div>
+                        @if($a->is_active && $nominees->isNotEmpty())
+                            <div class="border-t border-slate-100 p-4 dark:border-slate-800">
+                                <button type="button" x-show="give !== {{ $a->id }}" class="w-full rounded-xl border border-brand-200 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-300" x-on:click="give = {{ $a->id }}">{{ $isAdmin ? '+ Give this award' : '+ Suggest a student' }}</button>
+                                <form x-show="give === {{ $a->id }}" x-cloak method="post" action="{{ route('honors.nominate') }}" class="space-y-2">@csrf
+                                    <input type="hidden" name="award_id" value="{{ $a->id }}"><input type="hidden" name="term" value="{{ $term }}">
+                                    <select name="student_id" class="input" required>@foreach($nominees as $st)<option value="{{ $st->id }}">{{ $st->full_name }}</option>@endforeach</select>
+                                    <input name="reason" class="input" placeholder="Why? (optional)">
+                                    <div class="flex gap-2"><button class="btn btn-primary btn-sm flex-1">{{ $isAdmin ? 'Give award' : 'Send to admin' }}</button><button type="button" class="btn btn-sm" x-on:click="give = null">Cancel</button></div>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+
+                {{-- Add a custom award (advisers and admin) --}}
+                <form method="post" action="{{ route('honors.awards.store') }}" class="flex flex-col justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 p-5 dark:border-slate-700">@csrf
+                    <p class="font-semibold">+ New award</p>
+                    <p class="text-xs text-slate-500">e.g. Best in Science Fair, Most Improved, Kindness Award</p>
+                    <input name="name" class="input" placeholder="Award name" required>
+                    <input name="description" class="input" placeholder="Short description (optional)">
+                    <button class="btn btn-sm">Add to the award list</button>
+                </form>
             </div>
-            <aside class="space-y-5">
-                <div class="card">
-                    <h2 class="font-semibold">{{ $isAdmin ? 'Give an award' : 'Suggest an award' }}</h2>
-                    <form method="post" action="{{ route('honors.nominate') }}" class="mt-3 space-y-3">@csrf
-                        <select name="award_id" class="input" required>@foreach($awards->where('is_active', true) as $a)<option value="{{ $a->id }}">{{ $a->name }}</option>@endforeach</select>
-                        <select name="student_id" class="input" required>@foreach($nominees as $st)<option value="{{ $st->id }}">{{ $st->full_name }}</option>@endforeach</select>
-                        <input type="hidden" name="term" value="{{ $term }}">
-                        <textarea name="reason" rows="2" class="input" placeholder="Why? (optional)"></textarea>
-                        <button class="btn btn-primary w-full">{{ $isAdmin ? 'Give award' : 'Send to admin' }}</button>
-                    </form>
-                </div>
-                <div class="card">
-                    <h2 class="font-semibold">Awards list</h2>
-                    <ul class="mt-2 space-y-1.5 text-sm">
-                        @forelse($awards as $a)
-                            <li class="flex items-center gap-2 {{ $a->is_active ? '' : 'text-slate-400 line-through' }}"><span class="mr-auto" title="{{ $a->description }}">{{ $a->name }}</span>
-                                @if($isAdmin)<form method="post" action="{{ route('honors.awards.toggle', $a) }}">@csrf<button class="text-xs text-brand-600">{{ $a->is_active ? 'Turn off' : 'Turn on' }}</button></form>@endif
-                            </li>
-                        @empty
-                            <li class="text-slate-500">No awards set up yet.</li>
-                        @endforelse
-                    </ul>
-                    @if($isAdmin)
-                        <form method="post" action="{{ route('honors.awards.store') }}" class="mt-3 space-y-2 border-t border-slate-100 pt-3 dark:border-slate-800">@csrf
-                            <input name="name" class="input" placeholder="New award, e.g. Best in Science Fair" required>
-                            <input name="description" class="input" placeholder="Short description (optional)">
-                            <button class="btn btn-sm w-full">Add award</button>
-                        </form>
-                    @endif
-                </div>
-            </aside>
         </div>
     </div>
 </x-layouts.app>

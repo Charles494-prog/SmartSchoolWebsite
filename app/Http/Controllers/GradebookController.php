@@ -224,7 +224,8 @@ class GradebookController extends Controller
         $u = $request->user();
         $sy = SchoolYear::current();
         $all = Section::where('school_year_id', $sy?->id)->with('gradeLevel', 'schoolYear')->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name])->values();
-        $mine = $u->role === Role::TEACHER ? $all->whereIn('id', $u->teacherSectionIds())->values() : $all;
+        // Teachers see their advisory class; the admin and registrar supervise every section.
+        $mine = $u->role === Role::TEACHER ? $all->where('adviser_id', $u->id)->values() : $all;
         $section = $mine->firstWhere('id', (int) $request->query('section_id')) ?? $mine->first();
         $scope = $request->query('scope') === 'level' ? 'level' : 'section';
         // Whole grade level: every section of that level (results are public honors, so teachers may see them).
@@ -240,6 +241,7 @@ class GradebookController extends Controller
             $term = $done ?? 1;
         }
         $rows = \App\Services\Honors::rows($sections, $term);
+        $own = $section ? collect([$section]) : collect();   // perfect attendance and special awards: the section only
 
         return view('gradebook.honors', [
             'sections' => $mine->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
@@ -248,8 +250,8 @@ class GradebookController extends Controller
             'ranked' => $rows->whereNotNull('average')->where('failed', false)->count(),
             'private' => $rows->where('failed', true)->count(),
             'bestSubject' => \App\Services\Honors::bestPerSubject($rows),
-            'perfect' => \App\Services\Honors::perfectAttendance($sections, $term),
-            'approved' => \App\Services\Honors::nominations($sections, $term, 'approved'),
+            'perfect' => \App\Services\Honors::perfectAttendance($own, $term),
+            'approved' => \App\Services\Honors::nominations($own, $term, 'approved'),
             'pending' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? \App\Services\Honors::nominations($all, null, 'pending') : \App\Models\AwardNomination::with('award', 'student')->where('nominated_by', $u->id)->where('status', 'pending')->get(),
             'awards' => \App\Models\Award::orderBy('name')->get(),
             'nominees' => $section ? $section->students()->get() : collect(),
@@ -283,9 +285,10 @@ class GradebookController extends Controller
         return view('gradebook.journey', compact('student', 'e', 'terms', 'term', 'subjects', 'avgByTerm', 'rc'));
     }
 
+    /** Admins and advisers can add awards to the list (e.g. "Best in Science Fair"). */
     public function saveAward(Request $request)
     {
-        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR), 403);
+        abort_unless($request->user()->hasRole(Role::ADMIN, Role::REGISTRAR, Role::TEACHER), 403);
         $d = $request->validate(['name' => 'required|max:100', 'description' => 'nullable|max:255']);
         \App\Models\Award::create($d);
 
@@ -306,7 +309,7 @@ class GradebookController extends Controller
         $u = $request->user();
         $d = $request->validate(['award_id' => 'required|exists:awards,id', 'student_id' => 'required|exists:students,id', 'term' => 'nullable|integer|min:1|max:6', 'reason' => 'nullable|max:1000']);
         $student = \App\Models\Student::findOrFail($d['student_id']);
-        abort_unless($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $u->teachesStudent($student), 403);
+        abort_unless($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $student->currentEnrollment()?->section?->adviser_id === $u->id, 403, 'Only the adviser can suggest awards for this student.');
         $isAdmin = $u->hasRole(Role::ADMIN, Role::REGISTRAR);
         \App\Models\AwardNomination::create($d + ['school_year_id' => SchoolYear::current()->id, 'nominated_by' => $u->id, 'status' => $isAdmin ? 'approved' : 'pending', 'reviewed_by' => $isAdmin ? $u->id : null]);
         if (! $isAdmin) {
