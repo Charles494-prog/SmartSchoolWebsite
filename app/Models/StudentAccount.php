@@ -42,22 +42,50 @@ class StudentAccount extends Model
         return $this->hasMany(AccountDiscount::class);
     }
 
+    public function charges()
+    {
+        return $this->hasMany(AccountCharge::class)->where('is_void', false);
+    }
+
     public function paidAmount(): float
     {
         return (float) $this->payments()->where('is_void', false)->sum('amount');
     }
 
-    public function balance(): float
+    /** Money that went to bookstore orders and other charges (not tuition). */
+    public function paidToCharges(): float
     {
-        return round($this->net_amount - $this->paidAmount(), 2);
+        return (float) PaymentAllocation::whereNotNull('account_charge_id')->whereHas('payment', fn ($p) => $p->where('student_account_id', $this->id)->where('is_void', false))->sum('amount');
     }
 
-    /** Amount that should have been paid by today but was not. */
+    /** Tuition & fees paid (everything not set aside for an order). */
+    public function tuitionPaid(): float
+    {
+        return round($this->paidAmount() - $this->paidToCharges(), 2);
+    }
+
+    public function tuitionBalance(): float
+    {
+        return max(0, round($this->net_amount - $this->tuitionPaid(), 2));
+    }
+
+    public function chargesTotal(): float
+    {
+        return (float) $this->charges()->sum('amount');
+    }
+
+    /** Everything still owed: tuition plus unpaid orders/charges. */
+    public function balance(): float
+    {
+        return round($this->net_amount + $this->chargesTotal() - $this->paidAmount(), 2);
+    }
+
+    /** Tuition that should have been paid by today but was not. */
     public function overdueAmount(?CarbonInterface $today = null): float
     {
         $today ??= now();
         $due = (float) $this->installments()->whereDate('due_on', '<=', $today)->sum('amount');
 
-        return max(0, round($due - $this->paidAmount(), 2));
+        return max(0, round($due - $this->tuitionPaid(), 2));
     }
 }

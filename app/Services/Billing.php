@@ -96,4 +96,34 @@ class Billing
     {
         return '₱'.number_format($amount, 2);
     }
+
+    /**
+     * Split a payment between bookstore orders/other charges and tuition.
+     * "order:<charge id>" pays that order first; tuition choices (down payment, installment, overdue, a fee) pay tuition first;
+     * anything else (full balance, another amount) clears orders first, oldest first, and the rest goes to tuition.
+     */
+    public static function allocate(\App\Models\Payment $payment, ?string $key = null): void
+    {
+        $account = $payment->account;
+        $amount = (float) $payment->amount;
+        $charges = $account->charges()->orderBy('created_at')->get()->filter(fn ($c) => $c->remaining() > 0)->values();
+        if ($key && str_starts_with($key, 'order:')) {
+            $first = (int) substr($key, 6);
+            $charges = $charges->sortBy(fn ($c) => $c->id === $first ? 0 : 1)->values();
+        }
+        $left = $amount;
+        if ($key && (in_array($key, ['down', 'overdue', 'next'], true) || str_starts_with($key, 'fee:'))) {
+            // Tuition first: only money beyond what tuition still needed goes to orders.
+            $tuitionOwedBefore = max(0, round($account->net_amount - ($account->tuitionPaid() - $amount), 2));
+            $left = max(0, round($amount - $tuitionOwedBefore, 2));
+        }
+        foreach ($charges as $c) {
+            if ($left <= 0) {
+                break;
+            }
+            $take = min($left, $c->remaining());
+            \App\Models\PaymentAllocation::create(['payment_id' => $payment->id, 'account_charge_id' => $c->id, 'amount' => $take]);
+            $left = round($left - $take, 2);
+        }
+    }
 }

@@ -245,6 +245,13 @@ class DemoSeeder extends Seeder
             }
         }
 
+        // Bookstore
+        foreach ([['PE uniform (shirt + jogging pants)', 'uniform', 650, 'XS, S, M, L, XL', 40], ['School uniform – blouse', 'uniform', 450, 'XS, S, M, L', 30], ['School uniform – polo', 'uniform', 450, 'XS, S, M, L, XL', 30],
+            ['School ID lace', 'merch', 60, null, 200], ['School tote bag', 'merch', 250, null, 50], ['Foundation Day shirt', 'souvenir', 300, 'S, M, L, XL', 60],
+            ['Science Links 7 (textbook)', 'book', 520, null, 25], ['Grammar workbook', 'book', 280, null, null], ['Yearbook 2027 (pre-order)', 'souvenir', 1200, null, null]] as [$nm, $cat, $price, $sizes, $stock]) {
+            \App\Models\ShopItem::firstOrCreate(['name' => $nm], ['category' => $cat, 'price' => $price, 'sizes' => $sizes ? array_map('trim', explode(',', $sizes)) : null, 'stock' => $stock, 'description' => null]);
+        }
+
         // Finance
         foreach (GradeLevel::whereIn('department', ['jhs'])->get() as $gl) {
             FeeItem::firstOrCreate(['school_year_id' => $sy->id, 'grade_level_id' => $gl->id, 'name' => 'Tuition fee'], ['category' => 'tuition', 'amount' => 25000]);

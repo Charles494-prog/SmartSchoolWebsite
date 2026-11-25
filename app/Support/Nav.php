@@ -55,6 +55,7 @@ class Nav
                 $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
                 School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
+                $item('Bookstore', 'portal.shop', 'tag', 'Order books, uniforms and school merch', 'amber'),
                 $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
                 $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
@@ -123,6 +124,7 @@ class Nav
         if ($is(Role::CASHIER, Role::ADMIN)) {
             $g['Payments'] = [
                 $item('Transactions', 'finance.index', 'wallet', 'Find a student, take a payment, receipts and balances', 'rose', ['finance.index', 'finance.show', 'finance.payments', 'finance.overdue']),
+                $item('Bookstore', 'shop.manage', 'tag', 'Books, uniforms and merch – items and orders', 'amber', 'shop.manage') + ['badge' => \App\Models\ShopOrder::where('status', 'placed')->count()],
                 ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => \App\Models\PaymentProof::where('status', 'pending')->count()]] : []),
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
                 $crud('Discounts & scholarships', 'discounts', 'percent', 'Discounts and scholarships'),

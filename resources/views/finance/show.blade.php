@@ -125,7 +125,7 @@
                                         get chosen() { return this.opts.find((o) => o.key === this.pick) }, get amount() { return this.pick === 'other' ? this.other : (this.chosen?.amount ?? '') },
                                         get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label } }">
                             @csrf
-                            <input type="hidden" name="amount" :value="amount"><input type="hidden" name="purpose" :value="purpose">
+                            <input type="hidden" name="amount" :value="amount"><input type="hidden" name="purpose" :value="purpose"><input type="hidden" name="pay_key" :value="pick">
                             <div>
                                 <div class="label">Paying for</div>
                                 <div class="space-y-1.5">

@@ -14,6 +14,42 @@
                 <x-stat label="Balance" :value="\App\Services\Billing::peso($a->balance())" :tone="$a->balance() > 0 ? 'red' : 'green'" />
             </div>
             @php
+                $ens = $enrollment;
+                $feeItems = \App\Models\FeeItem::where('school_year_id', $ens->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $ens->grade_level_id))->orderBy('name')->get();
+                $orderCharges = $a->charges()->with('order.lines')->orderBy('created_at')->get();
+                $tPaid = $a->tuitionPaid(); $tBal = $a->tuitionBalance();
+            @endphp
+            <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                <div class="border-b border-slate-100 px-5 py-3 dark:border-slate-800"><h2 class="font-semibold">What you owe</h2></div>
+                <div class="divide-y divide-slate-100 dark:divide-slate-800">
+                    {{-- tuition --}}
+                    <details class="group" open>
+                        <summary class="flex cursor-pointer list-none items-center gap-3 px-5 py-4">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"><x-icon name="cap" class="h-5 w-5" /></span>
+                            <span class="flex-1"><span class="block font-medium">Tuition &amp; school fees</span><span class="text-xs text-slate-500">{{ $a->planName() }} · paid {{ \App\Services\Billing::peso($tPaid) }} of {{ \App\Services\Billing::peso($a->net_amount) }}</span></span>
+                            <span class="text-right"><span class="block font-semibold tabular-nums {{ $tBal > 0 ? '' : 'text-emerald-600' }}">{{ $tBal > 0 ? \App\Services\Billing::peso($tBal) : 'Paid' }}</span><span class="text-xs text-slate-400">{{ $tBal > 0 ? 'left' : '' }}</span></span>
+                        </summary>
+                        <dl class="mx-5 mb-4 rounded-xl bg-slate-50 px-4 py-2 text-sm dark:bg-white/5">
+                            @foreach($feeItems as $f)<div class="flex justify-between py-1"><dt class="text-slate-600 dark:text-slate-300">{{ $f->name }}</dt><dd class="tabular-nums">{{ number_format($f->amount, 2) }}</dd></div>@endforeach
+                            @foreach($a->discounts as $d)<div class="flex justify-between py-1 text-emerald-700"><dt>{{ $d->discount->name }}</dt><dd class="tabular-nums">−{{ number_format($d->amount, 2) }}</dd></div>@endforeach
+                            @if(round($a->net_amount - ($a->gross_amount - $a->discount_amount), 2) > 0)<div class="flex justify-between py-1"><dt>Installment surcharge</dt><dd class="tabular-nums">{{ number_format($a->net_amount - ($a->gross_amount - $a->discount_amount), 2) }}</dd></div>@endif
+                            <div class="flex justify-between border-t border-slate-200 py-1.5 font-semibold dark:border-slate-700"><dt>Total</dt><dd class="tabular-nums">{{ number_format($a->net_amount, 2) }}</dd></div>
+                        </dl>
+                    </details>
+                    {{-- orders --}}
+                    @foreach($orderCharges as $c)
+                        @php $rem = $c->remaining(); @endphp
+                        <div class="flex items-center gap-3 px-5 py-4">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"><x-icon name="tag" class="h-5 w-5" /></span>
+                            <span class="min-w-0 flex-1"><span class="block font-medium">{{ $c->description }}</span><span class="block truncate text-xs text-slate-500">{{ $c->order?->summary() }}{{ $c->order ? ' · '.\App\Models\ShopOrder::STATUSES[$c->order->status] : '' }}</span></span>
+                            <span class="text-right"><span class="block font-semibold tabular-nums {{ $rem > 0 ? '' : 'text-emerald-600' }}">{{ $rem > 0 ? \App\Services\Billing::peso($rem) : 'Paid' }}</span><span class="text-xs text-slate-400">{{ $rem > 0 && $rem < $c->amount ? 'of '.number_format($c->amount, 2) : '' }}</span></span>
+                        </div>
+                    @endforeach
+                    <div class="flex items-center justify-between bg-slate-50 px-5 py-4 dark:bg-white/[.03]"><span class="font-semibold">Total balance</span><span class="text-xl font-bold tabular-nums">{{ \App\Services\Billing::peso($a->balance()) }}</span></div>
+                </div>
+            </div>
+
+            @php
                 $online = \App\Support\School::allows('parent_accounts');
                 $channels = $online ? \App\Models\PaymentChannel::where('is_active', true)->orderBy('name')->get() : collect();
                 $proofs = \App\Models\PaymentProof::with('channel')->where('student_account_id', $a->id)->latest()->take(5)->get();
@@ -30,14 +66,26 @@
                                get chosen() { return this.opts.find((o) => o.key === this.pick) },
                                get amount() { return this.pick === 'other' ? Number(this.other || 0) : (this.chosen?.amount || 0) },
                                get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label },
-                               peso(v) { return '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }">
+                               peso(v) { return '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+                               charges: @js($a->charges()->orderBy('created_at')->get()->map(fn ($c) => ['key' => 'order:'.$c->id, 'label' => $c->description, 'left' => $c->remaining()])->filter(fn ($c) => $c['left'] > 0)->values()), tuition: {{ $a->tuitionBalance() }},
+                               // Same rule the school uses when it records the payment.
+                               split() {
+                                   let left = this.amount, out = [], list = [...this.charges];
+                                   if (this.pick.startsWith('order:')) list.sort((x) => x.key === this.pick ? -1 : 1);
+                                   const tuitionFirst = ['down', 'overdue', 'next'].includes(this.pick) || this.pick.startsWith('fee:');
+                                   const take = (label, cap) => { const t = Math.min(left, cap); if (t > 0) { out.push({ label, amount: t }); left = Math.round((left - t) * 100) / 100 } };
+                                   if (tuitionFirst) take('Tuition & school fees', this.tuition);
+                                   list.forEach((c) => take(c.label, c.left));
+                                   if (!tuitionFirst) take('Tuition & school fees', this.tuition);
+                                   return out;
+                               } }">
                     <div class="flex flex-wrap items-center gap-3 p-5">
                         <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300"><x-icon name="wallet" class="h-5 w-5" /></span>
                         <div class="mr-auto"><h2 class="text-lg font-semibold">Pay online</h2><p class="text-sm text-slate-500">Pay by GCash or bank, then send the receipt. The cashier confirms it and the official receipt appears here.</p></div>
                         <button type="button" class="btn btn-primary" x-show="!open" x-on:click="open = true">Make a payment</button>
                     </div>
                     <form x-show="open" x-cloak method="post" action="{{ route('portal.pay', $child) }}" enctype="multipart/form-data" class="border-t border-slate-100 dark:border-slate-800">@csrf
-                        <input type="hidden" name="amount" :value="amount.toFixed(2)"><input type="hidden" name="purpose" :value="purpose">
+                        <input type="hidden" name="amount" :value="amount.toFixed(2)"><input type="hidden" name="purpose" :value="purpose"><input type="hidden" name="pay_key" :value="pick">
                         {{-- steps header --}}
                         <ol class="flex border-b border-slate-100 text-sm dark:border-slate-800">
                             @foreach(['What for', 'Pay', 'Send receipt'] as $n => $label)
@@ -104,6 +152,10 @@
                                 <p class="text-xs uppercase tracking-wider text-slate-400">You're paying</p>
                                 <p class="text-3xl font-bold tabular-nums" x-text="peso(amount)"></p>
                                 <p class="text-sm text-slate-600 dark:text-slate-300" x-text="purpose"></p>
+                                <div class="space-y-1 rounded-lg bg-white p-3 text-xs dark:bg-slate-900" x-show="amount > 0">
+                                    <p class="mb-1 font-semibold text-slate-500">Where it goes</p>
+                                    <template x-for="l in split()" :key="l.label"><p class="flex justify-between gap-2"><span class="truncate" x-text="l.label"></span><span class="tabular-nums" x-text="peso(l.amount)"></span></p></template>
+                                </div>
                                 <p class="text-xs text-slate-500">Balance after: <span x-text="peso(Math.max(0, max - amount))"></span></p>
                                 <p x-show="amount > max" class="text-xs font-semibold text-rose-600">That's more than the balance.</p>
                                 <div class="mt-auto flex gap-2 pt-4">

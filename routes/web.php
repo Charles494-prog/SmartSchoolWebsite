@@ -91,6 +91,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
         Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
+        Route::get('/shop', [\App\Http\Controllers\ShopController::class, 'store'])->name('portal.shop');
+        Route::post('/shop/{student}', [\App\Http\Controllers\ShopController::class, 'checkout'])->name('portal.shop.checkout');
         Route::post('/pay/{student}', [\App\Http\Controllers\OnlinePaymentController::class, 'submit'])->name('portal.pay');
         Route::get('/quiz/{assignment}', [\App\Http\Controllers\QuizController::class, 'take'])->name('quiz.take');
         Route::post('/quiz/{assignment}/start', [\App\Http\Controllers\QuizController::class, 'start'])->name('quiz.start');
@@ -124,6 +126,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
     // Finance documents (parents can open their own child's receipts/SOA)
     Route::get('/finance/receipt/{payment}', [FinanceController::class, 'receipt'])->name('finance.receipt');
+    Route::get('/bookstore-items/{item}/image', [\App\Http\Controllers\ShopController::class, 'image'])->name('shop.image');
     Route::get('/payment-methods/{channel}/qr', [\App\Http\Controllers\OnlinePaymentController::class, 'qr'])->name('channels.qr');
     Route::get('/payment-proofs/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'screenshot'])->name('proofs.screenshot');
     Route::get('/finance/soa/{enrollment}', [FinanceController::class, 'soa'])->name('finance.soa');
@@ -217,6 +220,11 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/accounts/{enrollment}/schedule', [FinanceController::class, 'schedule'])->name('finance.schedule');
         Route::post('/accounts/{enrollment}/pay', [FinanceController::class, 'pay'])->name('finance.pay');
         Route::post('/payments/{payment}/void', [FinanceController::class, 'void'])->name('finance.void');
+        Route::get('/bookstore', [\App\Http\Controllers\ShopController::class, 'manage'])->name('shop.manage');
+        Route::post('/bookstore/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');
+        Route::post('/bookstore/items/{item}', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.update');
+        Route::delete('/bookstore/items/{item}', [\App\Http\Controllers\ShopController::class, 'deleteItem'])->name('shop.items.destroy');
+        Route::post('/bookstore/orders/{order}', [\App\Http\Controllers\ShopController::class, 'setStatus'])->name('shop.orders.status');
         Route::get('/online', [\App\Http\Controllers\OnlinePaymentController::class, 'proofs'])->name('finance.proofs');
         Route::post('/online/{proof}', [\App\Http\Controllers\OnlinePaymentController::class, 'review'])->name('finance.proofs.review');
     });

@@ -118,9 +118,14 @@ class FinanceController extends Controller
             'amount' => 'required|numeric|min:1|max:'.max(1, $a->balance()),
             'method' => 'required|in:'.implode(',', array_keys(Payment::METHODS)),
             'reference' => 'nullable|required_unless:method,cash|max:60',
-            'paid_on' => 'required|date|before_or_equal:today', 'purpose' => 'nullable|max:120',
+            'paid_on' => 'required|date|before_or_equal:today', 'purpose' => 'nullable|max:120', 'pay_key' => 'nullable|max:40',
         ], ['amount.max' => 'Amount is more than the remaining balance ('.Billing::peso($a->balance()).').', 'reference.required_unless' => 'Enter the reference/check number.']);
-        $payment = DB::transaction(fn () => $a->payments()->create($data + ['or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]));
+        $payment = DB::transaction(function () use ($a, $data) {
+            $p = $a->payments()->create(collect($data)->except('pay_key')->all() + ['or_number' => Billing::nextOrNumber(), 'received_by' => auth()->id()]);
+            Billing::allocate($p, $data['pay_key'] ?? null);
+
+            return $p;
+        });
         foreach ($enrollment->student->guardians()->whereNotNull('user_id')->with('user')->get() as $g) {
             $g->user?->notify(new GeneralNotice('Payment received', 'We received '.Billing::peso($payment->amount)." for {$enrollment->student->first_name} (OR {$payment->or_number}). Remaining balance: ".Billing::peso($a->balance()).'.', '/portal/account'));
         }

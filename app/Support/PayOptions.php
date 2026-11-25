@@ -13,12 +13,17 @@ class PayOptions
     {
         $bal = round($a->balance(), 2);
         $opts = [];
-        $paid = $a->paidAmount();
+        $paid = $a->tuitionPaid();
+        foreach ($a->charges()->with('order.lines')->orderBy('created_at')->get() as $c) {
+            if (($r = $c->remaining()) > 0) {
+                $opts[] = ['key' => 'order:'.$c->id, 'label' => $c->description, 'hint' => $c->order ? $c->order->summary() : 'Extra charge', 'amount' => $r];
+            }
+        }
         $first = $a->installments->sortBy('due_on')->first();
         if ($paid <= 0 && $first) {
-            $opts[] = ['key' => 'down', 'label' => 'Down payment', 'hint' => 'First payment, due '.$first->due_on->format('M d'), 'amount' => min($bal, (float) $first->amount)];
+            $opts[] = ['key' => 'down', 'label' => 'Down payment', 'hint' => 'First tuition payment, due '.$first->due_on->format('M d'), 'amount' => min($a->tuitionBalance(), (float) $first->amount)];
         }
-        if (($od = round($a->overdueAmount(), 2)) > 0) {
+        if (($od = round($a->overdueAmount(), 2)) > 0 && $a->tuitionBalance() > 0) {
             $opts[] = ['key' => 'overdue', 'label' => 'Overdue amount', 'hint' => 'Everything past due today', 'amount' => min($bal, $od)];
         }
         // next unpaid installment (installments are paid in order)
@@ -30,17 +35,17 @@ class PayOptions
                 continue;
             }
             if ($paid > 0) {
-                $opts[] = ['key' => 'next', 'label' => $i->label, 'hint' => 'Due '.$i->due_on->format('M d, Y'), 'amount' => min($bal, round($i->amount - $covered, 2))];
+                $opts[] = ['key' => 'next', 'label' => 'Tuition · '.$i->label, 'hint' => 'Due '.$i->due_on->format('M d, Y'), 'amount' => min($a->tuitionBalance(), round($i->amount - $covered, 2))];
             }
             break;
         }
         if ($bal > 0) {
-            $opts[] = ['key' => 'full', 'label' => 'Full balance', 'hint' => 'Pay everything left', 'amount' => $bal];
+            $opts[] = ['key' => 'full', 'label' => 'Full balance', 'hint' => 'Tuition and orders – everything left', 'amount' => $bal];
         }
         $e = $a->enrollment;
         foreach (FeeItem::where('school_year_id', $e->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $e->grade_level_id))->orderBy('name')->get() as $f) {
-            if ($f->amount > 0 && $f->amount <= $bal) {
-                $opts[] = ['key' => 'fee:'.$f->id, 'label' => $f->name, 'hint' => 'Just this fee', 'amount' => (float) $f->amount];
+            if ($f->amount > 0 && $f->amount <= $a->tuitionBalance()) {
+                $opts[] = ['key' => 'fee:'.$f->id, 'label' => $f->name, 'hint' => 'Just this school fee', 'amount' => (float) $f->amount];
             }
         }
 
