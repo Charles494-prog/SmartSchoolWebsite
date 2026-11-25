@@ -35,7 +35,7 @@
             {{-- Section nav --}}
             <nav class="hidden lg:block">
                 <ul class="sticky top-24 space-y-0.5 text-sm">
-                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'admission' => ['Admission documents'], 'privacy' => ['Privacy notice']] as $id => [$title])
+                    @foreach($sections + ['tuition' => ['Tuition'], 'mode' => ['How SmartSchool runs'], 'email' => ['Email (SMTP)'], 'security' => ['Sign-in security'], 'admission' => ['Admission documents'], 'privacy' => ['Privacy notice']] as $id => [$title])
                         <li><a href="#{{ $id }}" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5">{{ $title }}</a></li>
                     @endforeach
                     <li class="pt-3"><a href="{{ route('crud.index', 'school-years') }}" class="block rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">School years →</a></li>
@@ -164,6 +164,8 @@
                         <div x-show="mode !== @js(\App\Support\School::mode())" x-cloak class="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
                             <p class="font-semibold" x-text="mode === 'hosted' ? 'Before switching to Online' : 'Before switching to LAN'"></p>
                             <ul class="mt-1 list-disc space-y-1 pl-5" x-show="mode === 'hosted'">
+                                <li><b>SmartSchool becomes fully online: everyone needs internet to use it.</b> If the school's internet is down, nobody can sign in – including teachers taking attendance and the gate scanner.</li>
+                                <li>New features turn on: parent and student accounts, the online application form, email alerts, <b>Email (SMTP)</b> settings and <b>two-step sign-in</b> (both below on this page).</li>
                                 <li>Make a backup first (School setup → Backups).</li>
                                 <li>This turns on the online features. To reach SmartSchool from outside the school, it must also run on a web host – install it there with the Online option and restore your backup.</li>
                             </ul>
@@ -173,6 +175,57 @@
                                 <li>Online applications and email notices are turned off.</li>
                             </ul>
                         </div>
+                    </div>
+                </section>
+
+                @php $online = \App\Support\School::allows('email_notifications'); @endphp
+                <section id="email" class="card scroll-mt-24 p-0">
+                    <input type="hidden" name="mail_present" value="1">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">Email (SMTP)</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">The account SmartSchool sends email from: absence and late alerts, announcements, receipts and sign-in codes. Get these values from your email provider (Gmail with an app password, Brevo, Mailgun, your web host…).</p>
+                    </div>
+                    <div class="space-y-4 px-6 py-5">
+                        @unless($online)
+                            <p class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-white/5">Email works only in <b>Online</b> mode. You can fill this in now – it starts working when you switch to Online.</p>
+                        @endunless
+                        <div class="grid gap-4 sm:grid-cols-[1fr_8rem_10rem]">
+                            <x-field name="mail_host" label="SMTP server" :value="$S('mail_host')" placeholder="smtp.gmail.com" />
+                            <x-field name="mail_port" label="Port" type="number" :value="$S('mail_port') ?: '587'" />
+                            <x-field name="mail_encryption" label="Security" type="select" :options="['tls' => 'TLS (port 587)', 'ssl' => 'SSL (port 465)', 'none' => 'None']" :value="$S('mail_encryption') ?: 'tls'" />
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-field name="mail_username" label="Username" :value="$S('mail_username')" placeholder="usually your email address" />
+                            <div>
+                                <label class="label" for="mail_password">Password</label>
+                                <input id="mail_password" name="mail_password" type="password" autocomplete="new-password" class="input" placeholder="{{ $S('mail_password') ? 'Saved – type to replace' : 'App password from your provider' }}">
+                                <p class="mt-1 text-xs text-slate-500">Stored encrypted. Leave empty to keep the saved one.</p>
+                            </div>
+                            <x-field name="mail_from_address" label="Send from (email)" type="email" :value="$S('mail_from_address')" placeholder="noreply@yourschool.edu.ph" />
+                            <x-field name="mail_from_name" label="Send from (name)" :value="$S('mail_from_name')" :placeholder="$S('school_name')" />
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button type="submit" form="test-email" class="btn btn-sm min-h-11" @disabled(! $online || ! \App\Support\SchoolMail::configured())>Send a test email to me</button>
+                            <span class="text-xs text-slate-500">Save changes first, then send a test.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="security" class="card scroll-mt-24 p-0">
+                    <div class="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                        <h2 class="text-base font-semibold text-slate-900">Sign-in security</h2>
+                        <p class="mt-0.5 text-sm text-slate-500">Two-step sign-in: after the password, people type a 6-digit code sent to their email. Stops someone who guessed or stole a password.</p>
+                    </div>
+                    <div class="space-y-3 px-6 py-5">
+                        @php $twoAvailable = \App\Support\TwoStep::available(); $two = old('two_step', $S('two_step') ?: 'off'); @endphp
+                        @foreach(\App\Support\TwoStep::OPTIONS as $k => $label)
+                            <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl p-3 ring-1 ring-slate-200 has-[:checked]:ring-2 has-[:checked]:ring-brand-500 {{ ! $twoAvailable && $k !== 'off' ? 'cursor-not-allowed opacity-50' : '' }}">
+                                <input type="radio" name="two_step" value="{{ $k }}" @checked($two === $k) @disabled(! $twoAvailable && $k !== 'off')>
+                                <span class="text-sm font-medium text-slate-800">{{ $label }}</span>
+                            </label>
+                        @endforeach
+                        @error('two_step')<p class="field-error">{{ $message }}</p>@enderror
+                        @unless($twoAvailable)<p class="text-xs text-slate-500">Available after switching to <b>Online</b> and setting up <b>Email (SMTP)</b> above – otherwise nobody could receive their code.</p>@endunless
                     </div>
                 </section>
 
@@ -206,4 +259,5 @@
             </div>
         </div>
     </form>
+    <form id="test-email" method="post" action="{{ route('settings.test-email') }}" class="hidden">@csrf</form>
 </x-layouts.app>

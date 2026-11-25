@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Setting;
 use App\Support\EnvCheck;
+use App\Support\SchoolMail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -32,8 +33,14 @@ class AppServiceProvider extends ServiceProvider
             logger()->warning('N+1 lazy load', ['model' => $model::class, 'relation' => $relation]);
         });
 
+        // Outgoing email uses the SMTP settings saved in School settings (Online mode only).
+        SchoolMail::apply();
+
         // Queue workers live for hours: reload settings before each job so changes made in the app apply.
-        Queue::looping(fn () => Setting::flush());
+        Queue::looping(function () {
+            Setting::flush();
+            SchoolMail::apply();
+        });
 
         // Every signed-in change (POST/PUT/PATCH/DELETE) shares one generous per-user budget.
         RateLimiter::for('writes', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));

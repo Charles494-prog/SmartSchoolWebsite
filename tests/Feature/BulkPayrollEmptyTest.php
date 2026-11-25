@@ -100,7 +100,7 @@ class BulkPayrollEmptyTest extends TestCase
     public function test_go_online_guide(): void
     {
         $this->get('/settings')->assertOk()->assertSee('How to put SmartSchool online');
-        $this->get('/go-online')->assertOk()->assertSee('Put SmartSchool online')->assertSee('Make a backup')->assertSee('Switch to Online and tell families');
+        $this->get('/go-online')->assertOk()->assertSee('Put SmartSchool online')->assertSee('Make a backup')->assertSee('Switch to Online and tell families')->assertSee('hostinger.com/ph')->assertSee('forge.laravel.com')->assertSee('Choose where to host');
         $this->actingAs(User::where('role', 'teacher')->firstOrFail())->get('/go-online')->assertForbidden();
     }
 }

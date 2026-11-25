@@ -39,6 +39,9 @@ Route::middleware('guest')->group(function () {
     Route::post('/setup', [FirstRunController::class, 'store'])->middleware('throttle:10,1')->name('first-run.store');
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/login/code', [AuthController::class, 'showVerify'])->name('login.verify');
+    Route::post('/login/code', [AuthController::class, 'verify'])->middleware('throttle:20,1');
+    Route::post('/login/code/resend', [AuthController::class, 'resendCode'])->middleware('throttle:6,1')->name('login.resend');
 });
 
 // ---------------------------------------------------------------- signed-in
@@ -206,6 +209,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/setup-wizard/{step}', [SetupWizardController::class, 'save'])->name('setup.save');
         Route::get('/settings', [AdminController::class, 'settings'])->name('settings.edit');
         Route::put('/settings', [AdminController::class, 'saveSettings'])->name('settings.update');
+        Route::post('/settings/test-email', [AdminController::class, 'testEmail'])->middleware('throttle:5,1')->name('settings.test-email');
         Route::get('/audit', [AdminController::class, 'audit'])->name('audit');
         Route::get('/go-online', [HelpController::class, 'goOnline'])->name('help.go-online');
         Route::get('/backups', [AdminController::class, 'backups'])->name('backups.index');

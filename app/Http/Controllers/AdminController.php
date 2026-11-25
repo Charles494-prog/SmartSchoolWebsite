@@ -12,9 +12,13 @@ use App\Services\Tuition;
 use App\Support\Admission;
 use App\Support\AuditPresenter;
 use App\Support\School;
+use App\Support\SchoolMail;
+use App\Support\TwoStep;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -60,6 +64,15 @@ class AdminController extends Controller
         if (isset($data['school_type'])) {
             Tuition::save($data['school_type'], $data['tuition_mode'] ?? 'per_level', isset($data['tuition_all']) ? (float) $data['tuition_all'] : null, $data['tuition'] ?? []);
         }
+        if ($request->boolean('mail_present')) {
+            SchoolMail::save($data);
+        }
+        if (isset($data['two_step'])) {
+            if ($data['two_step'] !== 'off' && ! TwoStep::available()) {
+                return back()->withInput()->withErrors(['two_step' => 'Two-step sign-in needs Online mode and working email (SMTP). Set up email first and send a test.']);
+            }
+            Setting::put('two_step', $data['two_step']);
+        }
         if ($request->has('docs') || $request->boolean('docs_present')) {
             Admission::save($request->input('docs', []));
         }
@@ -68,6 +81,27 @@ class AdminController extends Controller
         }
 
         return back()->with('ok', 'Settings saved.');
+    }
+
+    /** Sends a test email with the saved SMTP settings to the signed-in admin. */
+    public function testEmail(Request $request)
+    {
+        if (! School::allows('email_notifications')) {
+            return back()->with('error', 'Email is only available when SmartSchool runs Online.');
+        }
+        if (! SchoolMail::configured()) {
+            return back()->with('error', 'Save the email (SMTP) settings first.');
+        }
+        SchoolMail::apply();
+        try {
+            Mail::raw('This is a test from SmartSchool. Email is working.', fn ($m) => $m->to($request->user()->email)->subject('SmartSchool test email'));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with('error', 'The test email could not be sent. Check the server, port, username and password. ('.Str::limit($e->getMessage(), 140).')');
+        }
+
+        return back()->with('ok', 'Test email sent to '.$request->user()->email.'. Check the inbox (and spam).');
     }
 
     /** The school logo (also the browser-tab icon). Versioned URLs (?v=) are cached for a year. */

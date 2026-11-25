@@ -5,13 +5,10 @@
          'items' => ['Open <b>Backups</b> and click <b>Back up now</b>.', 'Click the newest file to download it. Keep it on a USB drive too.'],
          'link' => [route('backups.index'), 'Open Backups'],
          'note' => $latest ? 'Latest backup: '.$latest : null],
-        ['title' => 'Get a web host and a domain', 'done' => null,
-         'body' => 'The computer on the internet that will run SmartSchool, and its address.',
-         'items' => ['Rent a small VPS (1 GB RAM is enough to start) from a provider such as DigitalOcean, Linode, Vultr or Hostinger VPS. Choose Ubuntu.', 'Buy a domain name, e.g. <b>yourschool.edu.ph</b> or <b>yourschool.com</b>, and point it to the server\'s IP address (an "A record" in the domain settings).', 'Install PHP 8.5, Composer, Node.js, Nginx (or Apache) and Git on the server. Your provider\'s "LEMP" or "Laravel" one-click image does most of this.']],
-        ['title' => 'Install SmartSchool on the host', 'done' => null,
-         'body' => 'Same program, now on the internet.',
-         'items' => ['On the server, download SmartSchool from your GitHub repository.', 'Run the installer and choose <b>Online (web host)</b>.', 'Turn on HTTPS (free with Let\'s Encrypt / Certbot) so logins are encrypted.'],
-         'code' => "git clone <your-repo-url> smartschool && cd smartschool\ncomposer install --no-dev -o && npm ci && npm run build\ncp .env.example .env && php artisan key:generate\nsudo certbot --nginx -d yourschool.edu.ph"],
+        ['title' => 'Choose where to host', 'done' => null, 'partial' => 'help._hosting-choose',
+         'body' => 'Pick the kind of hosting that fits your school. Each option shows its own install steps in step 3.'],
+        ['title' => 'Install SmartSchool on the host', 'done' => null, 'partial' => 'help._hosting-install',
+         'body' => 'Same program, now on the internet. The steps depend on what you picked in step 2.'],
         ['title' => 'Move your data', 'done' => null,
          'body' => 'Put the backup from step 1 on the host.',
          'items' => ['Upload the <b>.sqlite.gz</b> backup to the server.', 'Unzip it into place as the database file, then update the tables.', 'Copy the <b>storage/app/private</b> folder from this computer too – it holds the logo and uploaded application documents.'],
@@ -34,7 +31,19 @@
         <h1 class="h1">Put SmartSchool online</h1>
         <p class="muted mt-1 mb-6">Moving from the school Wi-Fi (LAN) to the internet so parents and students can log in from home. Follow these 6 steps in order. Your data is not lost at any point.</p>
 
-        <ol class="space-y-4">
+        <div class="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p class="font-semibold">Online means internet is required</p>
+            <p class="mt-1">Once SmartSchool runs on a web host, everyone – staff, the gate scanner, parents – needs a working internet connection to use it. If the school's internet goes down, nobody at school can sign in until it is back. Consider a backup connection (e.g. mobile data / pocket Wi-Fi) for the office and the gate.</p>
+            <p class="mt-2 font-semibold">What you get</p>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                <li>Parent and student accounts (grades, attendance, payments from home)</li>
+                <li>Online admission applications</li>
+                <li>Email alerts, set up in <a class="font-semibold underline" href="{{ route('settings.edit') }}#email">School settings → Email (SMTP)</a></li>
+                <li>Two-step sign-in with an email code, in <a class="font-semibold underline" href="{{ route('settings.edit') }}#security">School settings → Sign-in security</a></li>
+            </ul>
+        </div>
+
+        <ol class="space-y-4" x-data="{ host: localStorage.getItem('goOnlineHost') || 'hostinger', pick(h) { this.host = h; localStorage.setItem('goOnlineHost', h) } }">
             @foreach($steps as $i => $s)
                 <li class="card p-0" x-data="{ open: {{ $s['done'] ? 'false' : 'true' }} }">
                     <button type="button" class="flex min-h-11 w-full items-center gap-4 px-5 py-4 text-left" x-on:click="open = !open" :aria-expanded="open">
@@ -46,7 +55,8 @@
                         <x-icon name="chevron" class="h-4 w-4 text-slate-400 transition" ::class="open && 'rotate-90'" />
                     </button>
                     <div x-show="open" x-cloak x-transition.opacity.duration.200ms class="border-t border-slate-100 px-5 py-4 dark:border-white/10">
-                        <ul class="list-disc space-y-1.5 pl-5 text-sm text-slate-700">@foreach($s['items'] as $item)<li>{!! $item !!}</li>@endforeach</ul>
+                        @isset($s['partial'])@include($s['partial'])@endisset
+                        @isset($s['items'])<ul class="list-disc space-y-1.5 pl-5 text-sm text-slate-700">@foreach($s['items'] as $item)<li>{!! $item !!}</li>@endforeach</ul>@endisset
                         @isset($s['code'])
                             <div class="relative mt-3" x-data="{ copied: false }">
                                 <pre class="overflow-x-auto rounded-xl bg-slate-900 p-4 pr-20 text-xs leading-relaxed text-slate-100"><code x-ref="code">{{ $s['code'] }}</code></pre>
