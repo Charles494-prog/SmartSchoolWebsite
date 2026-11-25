@@ -84,4 +84,34 @@ class School
     {
         return (string) Setting::get('school_name');
     }
+
+    /**
+     * A link other devices can open. On LAN, when this page was opened as localhost/127.0.0.1,
+     * swap in this computer's Wi-Fi address so phones and the registrar's PCs can reach it.
+     */
+    public static function shareableUrl(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (self::mode() !== self::LAN || ! in_array($host, ['127.0.0.1', 'localhost', '::1'], true)) {
+            return $url;
+        }
+        $ip = self::lanIp();
+
+        return $ip ? preg_replace('#//(127\.0\.0\.1|localhost|\[::1\])#', '//'.$ip, $url, 1) : $url;
+    }
+
+    private static function lanIp(): ?string
+    {
+        // Opening a UDP "connection" sends nothing; it only asks the OS which local address it would use.
+        $sock = @stream_socket_client('udp://10.255.255.255:1', $errno, $err, 1);
+        $ip = $sock ? explode(':', (string) stream_socket_get_name($sock, false))[0] : null;
+        if ($sock) {
+            fclose($sock);
+        }
+        if (! $ip || ! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || str_starts_with($ip, '127.')) {
+            $ip = gethostbyname(gethostname());
+        }
+
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && ! str_starts_with($ip, '127.') ? $ip : null;
+    }
 }

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Tuition;
 use App\Support\Admission;
 use App\Support\AuditPresenter;
+use App\Support\GradeScale;
 use App\Support\School;
 use App\Support\SchoolMail;
 use App\Support\TwoStep;
@@ -66,6 +67,7 @@ class AdminController extends Controller
             }
             Setting::put('locked_features', json_encode($locked));
         }
+        GradeScale::saveFrom($request);
         if ($request->has('honors_titles_when')) {
             Setting::put('honors_titles_when', $data['honors_titles_when'] ?? 'each_period');
             Setting::put('honors_titles_levels', implode(',', $data['honors_titles_levels'] ?? []));

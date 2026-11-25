@@ -10,6 +10,7 @@ use App\Models\Score;
 use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Support\GradeScale;
 
 /**
  * DepEd K-12 grading (DepEd Order No. 8, s. 2015), configurable per subject:
@@ -76,14 +77,7 @@ class Grading
 
     public static function descriptor(?float $grade): string
     {
-        return match (true) {
-            $grade === null => '',
-            $grade >= 90 => 'Outstanding',
-            $grade >= 85 => 'Very Satisfactory',
-            $grade >= 80 => 'Satisfactory',
-            $grade >= 75 => 'Fairly Satisfactory',
-            default => 'Did Not Meet Expectations',
-        };
+        return GradeScale::descriptor($grade);
     }
 
     public static function honor(?float $average): ?string

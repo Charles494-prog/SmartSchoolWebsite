@@ -13,6 +13,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Services\Tuition;
 use App\Support\Admission;
+use App\Support\GradeScale;
 use App\Support\Role;
 use App\Support\School;
 use App\Support\SchoolMail;
@@ -79,7 +80,7 @@ class SetupWizardController extends Controller
             'teachers' => User::where('role', Role::TEACHER)->orderBy('name')->pluck('name', 'id'),
             'staff' => User::whereNotIn('role', [Role::STUDENT, Role::PARENT])->where('id', '!=', auth()->id())->orderBy('name')->get(),
             'sections' => $year ? Section::with('gradeLevel', 'adviser')->where('school_year_id', $year->id)->get() : collect(),
-            'weights' => Subject::selectRaw('ww_weight, pt_weight, qa_weight, count(*) c')->groupBy('ww_weight', 'pt_weight', 'qa_weight')->orderByDesc('c')->first(),
+            'weights' => Subject::selectRaw('ww_weight, pt_weight, qa_weight, at_weight, count(*) c')->groupBy('ww_weight', 'pt_weight', 'qa_weight', 'at_weight')->orderByDesc('c')->first(),
             'tuition' => Tuition::current(),
         ]);
     }
@@ -198,13 +199,19 @@ class SetupWizardController extends Controller
 
     private function saveSubjects(Request $r): string
     {
-        $d = $r->validate(['ww' => 'required|integer|between:0,100', 'pt' => 'required|integer|between:0,100', 'qa' => 'required|integer|between:0,100',
+        $d = $r->validate(['ww' => 'required|integer|between:0,100', 'pt' => 'required|integer|between:0,100', 'qa' => 'required|integer|between:0,100', 'at' => 'nullable|integer|between:0,100',
             'grading_periods' => 'nullable|in:2,3,4', 'honors_top_n' => 'nullable|integer|between:3,100',
             'honors_titles_when' => 'nullable|in:each_period,year_end', 'honors_titles_levels' => 'nullable|array', 'honors_titles_levels.*' => 'integer']);
-        if ($d['ww'] + $d['pt'] + $d['qa'] !== 100) {
-            throw ValidationException::withMessages(['ww' => 'The three weights must add up to 100%.']);
+        $r->validate(['passing_grade' => 'nullable|numeric|between:50,100']);
+        GradeScale::saveFrom($r);
+        if ($r->filled('passing_grade')) {
+            Setting::put('passing_grade', (string) $r->input('passing_grade'));
         }
-        Subject::query()->update(['ww_weight' => $d['ww'], 'pt_weight' => $d['pt'], 'qa_weight' => $d['qa']]);
+        $d['at'] = (int) ($d['at'] ?? 0);
+        if ($d['ww'] + $d['pt'] + $d['qa'] + $d['at'] !== 100) {
+            throw ValidationException::withMessages(['ww' => 'The weights must add up to 100%.']);
+        }
+        Subject::query()->update(['ww_weight' => $d['ww'], 'pt_weight' => $d['pt'], 'qa_weight' => $d['qa'], 'at_weight' => $d['at']]);
         if (! empty($d['grading_periods']) && ! Assessment::where('term', '>', (int) $d['grading_periods'])->exists()) {
             GradeLevel::query()->update(['terms' => (int) $d['grading_periods']]);
         }
@@ -253,8 +260,8 @@ class SetupWizardController extends Controller
             }
             $room = $s['room'] ?? null;
             $cap = $room ? (Room::where('name', $room)->value('capacity') ?? 40) : 40;
-            Section::updateOrCreate(['name' => trim($s['name']), 'school_year_id' => $year->id],
-                ['grade_level_id' => $s['grade_level_id'], 'adviser_id' => ($s['adviser_id'] ?? null) ?: null, 'room' => $room ?: null, 'capacity' => $cap]);
+            Section::updateOrCreate(['name' => trim($s['name']), 'school_year_id' => $year->id, 'grade_level_id' => $s['grade_level_id']],
+                ['adviser_id' => ($s['adviser_id'] ?? null) ?: null, 'room' => $room ?: null, 'capacity' => $cap]);
             $n++;
         }
 

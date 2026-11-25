@@ -10,7 +10,6 @@
         ]],
         'grading' => ['Grading', 'How grades are computed and who gets honors.', [
             ['use_transmutation', 'Transmutation table', 'toggle', 'Curve raw scores into grades. Off = plain weighted average.'],
-            ['passing_grade', 'Passing grade', 'number', 'Final grades below this are marked Failed.'],
             ['honors_with_highest', 'With Highest Honors', 'number', 'Minimum general average.'],
             ['honors_with_high', 'With High Honors', 'number', 'Minimum general average.'],
             ['honors_with', 'With Honors', 'number', 'Minimum general average.'],
@@ -88,6 +87,9 @@
                                     </div>
                                 </div>
                             @endforeach
+                            @if($id === 'grading')
+                                <div class="px-6 py-5"><div class="mb-3"><div class="text-sm font-medium text-slate-900">Grading scale and passing score</div><p class="text-xs text-slate-500">How grades are shown: 0–100, 1.00–5.00, 4.0 GPA, letters, or your own.</p></div>@include('partials.grade-scale')</div>
+                            @endif
                         </div>
                     </section>
                 @endforeach

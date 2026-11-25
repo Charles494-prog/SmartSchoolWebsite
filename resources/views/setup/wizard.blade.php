@@ -136,14 +136,14 @@
                             @break
 
                         @case('subjects')
-                            <div x-data="{ ww: {{ $weights->ww_weight ?? 30 }}, pt: {{ $weights->pt_weight ?? 50 }}, qa: {{ $weights->qa_weight ?? 20 }} }" class="space-y-4">
-                                @foreach(['ww' => ['Written work', 'Quizzes, seatwork, long tests'], 'pt' => ['Performance tasks', 'Projects, activities, recitation'], 'qa' => ['Quarterly exam', 'The exam at the end of each quarter']] as $k => [$t, $d])
+                            <div x-data="{ ww: {{ $weights->ww_weight ?? 30 }}, pt: {{ $weights->pt_weight ?? 50 }}, qa: {{ $weights->qa_weight ?? 20 }}, at: {{ $weights->at_weight ?? 0 }} }" class="space-y-4">
+                                @foreach(['ww' => ['Written work', 'Quizzes, seatwork, long tests'], 'pt' => ['Performance tasks', 'Projects, activities, recitation'], 'qa' => ['Quarterly exam', 'The exam at the end of each quarter'], 'at' => ['Attendance', 'Days present ÷ school days, from daily attendance. Leave 0 to not count it']] as $k => [$t, $d])
                                     <div class="grid grid-cols-[1fr_6rem] items-center gap-4">
                                         <div><div class="text-sm font-medium text-slate-900">{{ $t }}</div><div class="text-xs text-slate-500">{{ $d }}</div></div>
                                         <div class="relative"><input class="input pr-8" type="number" min="0" max="100" name="{{ $k }}" x-model.number="{{ $k }}" aria-label="{{ $t }} percent"><span class="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-slate-400">%</span></div>
                                     </div>
                                 @endforeach
-                                <p class="text-sm" :class="ww + pt + qa === 100 ? 'text-emerald-700' : 'text-rose-700'">Total: <b x-text="ww + pt + qa"></b>% <span x-show="ww + pt + qa !== 100">– must be 100%</span></p>
+                                <p class="text-sm" :class="ww + pt + qa + at === 100 ? 'text-emerald-700' : 'text-rose-700'">Total: <b x-text="ww + pt + qa + at"></b>% <span x-show="ww + pt + qa + at !== 100">– must be 100%</span></p>
                                 <div class="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 dark:border-white/10">
                                     <label class="block"><span class="label">Grading periods</span>
                                         <select name="grading_periods" class="input">@foreach([4 => 'Quarters (4)', 3 => 'Trimesters (3)', 2 => 'Semesters (2)'] as $n => $l)<option value="{{ $n }}" @selected(\App\Support\School::periods() === $n)>{{ $l }}</option>@endforeach</select>
@@ -165,6 +165,11 @@
                                             <label class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-sm"><input type="checkbox" name="honors_titles_levels[]" value="{{ $gl->id }}" @checked(in_array((string) $gl->id, $hl, true))> {{ $gl->name }}</label>
                                         @endforeach
                                     </div>
+                                </div>
+                                <div class="border-t border-slate-100 pt-4 dark:border-white/10">
+                                    <h3 class="text-sm font-semibold text-slate-900">Grading scale</h3>
+                                    <p class="mb-3 text-xs text-slate-500">How grades look: 0–100 like DepEd, 1.00–5.00, a 4.0 GPA, letters, or your own.</p>
+                                    @include('partials.grade-scale')
                                 </div>
                                 <p class="text-xs text-slate-500">Want to add or rename subjects? Use <a class="link" href="{{ route('crud.index', 'subjects') }}" target="_blank">Subjects</a> after setup.</p>
                             </div>
@@ -204,21 +209,104 @@
                             @break
 
                         @case('sections')
-                            @if($sections->isNotEmpty())<div class="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">Already created: {{ $sections->map(fn ($s) => $s->gradeLevel->name.' – '.$s->name)->implode(', ') }}</div>@endif
-                            @if($teachers->isEmpty())<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">No teachers yet – you can still create sections now and pick advisers later.</p>@endif
-                            <div x-data="{ rows: [{ name: '', grade_level_id: '{{ $levels->first()?->id }}', adviser_id: '', room: '' }] }" class="space-y-3">
-                                <template x-for="(s, i) in rows" :key="i">
-                                    <div class="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-2">
-                                        <select class="input" :name="`sections[${i}][grade_level_id]`" x-model="s.grade_level_id" aria-label="Grade level">@foreach($levels as $gl)<option value="{{ $gl->id }}">{{ $gl->name }}</option>@endforeach</select>
-                                        <input class="input" :name="`sections[${i}][name]`" x-model="s.name" placeholder="Section name, e.g. Mabini" aria-label="Section name">
-                                        <select class="input" :name="`sections[${i}][adviser_id]`" x-model="s.adviser_id" aria-label="Adviser"><option value="">Adviser (optional)</option>@foreach($teachers as $id => $n)<option value="{{ $id }}">{{ $n }}</option>@endforeach</select>
+                            @php
+                                $secByLevel = $sections->groupBy('grade_level_id')->map(fn ($g) => $g->map(fn ($x) => ['name' => $x->name, 'adviser' => $x->adviser?->name, 'room' => $x->room])->values());
+                                $usedRooms = $sections->pluck('room')->filter()->values();
+                            @endphp
+                            @if($teachers->isEmpty())<p class="rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">No teachers yet. You can create sections now and pick advisers later.</p>@endif
+                            <div x-data="{
+                                    level: @js((string) $levels->first()?->id),
+                                    levels: @js($levels->map(fn ($l) => ['id' => (string) $l->id, 'name' => $l->name])->values()),
+                                    existing: @js($secByLevel),
+                                    rooms: @js($rooms->pluck('name')->values()),
+                                    used: @js($usedRooms),
+                                    rows: [],
+                                    draft: '',
+                                    get levelName() { return (this.levels.find(l => l.id === this.level) || {}).name || '' },
+                                    count(id) { return (this.existing[id] || []).length + this.rows.filter(r => r.grade_level_id === id).length },
+                                    mine() { return this.rows.map((r, i) => ({ ...r, i })).filter(r => r.grade_level_id === this.level) },
+                                    taken(n) { n = n.trim().toLowerCase(); return (this.existing[this.level] || []).some(s => s.name.toLowerCase() === n) || this.mine().some(r => r.name.trim().toLowerCase() === n) },
+                                    freeRoom() { const busy = [...this.used, ...this.rows.map(r => r.room)]; return this.rooms.find(r => !busy.includes(r)) || '' },
+                                    add(name) { name = (name || '').trim(); if (!name || this.taken(name)) return; this.rows.push({ name, grade_level_id: this.level, adviser_id: '', room: this.freeRoom() }) },
+                                    addDraft() { this.draft.split(',').forEach(n => this.add(n)); this.draft = '' },
+                                    addLetters(n) { for (const c of 'ABCDEFGHIJ'.slice(0, n)) this.add('Section ' + c) },
+                                 }" class="space-y-4">
+                                {{-- Grade levels --}}
+                                <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Grade levels">
+                                    <template x-for="l in levels" :key="l.id">
+                                        <button type="button" role="tab" :aria-selected="level === l.id" x-on:click="level = l.id"
+                                            class="inline-flex h-11 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition"
+                                            :class="level === l.id ? 'bg-brand-600 text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10'">
+                                            <span x-text="l.name"></span>
+                                            <span class="rounded-full px-2 text-xs" :class="level === l.id ? 'bg-white/20' : (count(l.id) ? 'bg-brand-100 text-brand-800 dark:bg-brand-500/20 dark:text-brand-200' : 'text-slate-400')" x-text="count(l.id) || '–'"></span>
+                                        </button>
+                                    </template>
+                                </div>
+
+                                {{-- Sections of the chosen level --}}
+                                <div class="min-w-0 space-y-4 border-t border-slate-100 pt-4 dark:border-white/10">
+                                    <div class="flex items-baseline justify-between gap-2">
+                                        <h3 class="text-base font-semibold text-slate-900" x-text="levelName"></h3>
+                                        <span class="text-xs text-slate-500" x-text="count(level) === 1 ? '1 section' : count(level) + ' sections'"></span>
+                                    </div>
+
+                                    {{-- Already saved --}}
+                                    <template x-if="(existing[level] || []).length">
+                                        <ul class="grid gap-2 sm:grid-cols-2">
+                                            <template x-for="s in existing[level]" :key="s.name">
+                                                <li class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-white/5">
+                                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><x-icon name="check" class="h-4 w-4" /></span>
+                                                    <span class="min-w-0">
+                                                        <span class="block truncate text-sm font-semibold text-slate-900" x-text="s.name"></span>
+                                                        <span class="block truncate text-xs text-slate-500" x-text="[s.adviser || 'No adviser yet', s.room ? 'Room ' + s.room : 'No room'].join(' · ')"></span>
+                                                    </span>
+                                                </li>
+                                            </template>
+                                        </ul>
+                                    </template>
+
+                                    {{-- New ones --}}
+                                    <template x-for="r in mine()" :key="r.i">
+                                        <div class="rounded-xl border border-brand-200 bg-brand-50/40 p-3 dark:border-brand-500/30 dark:bg-brand-500/5">
+                                            <div class="flex items-center gap-2">
+                                                <span class="rounded-md bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">New</span>
+                                                <input class="input min-w-0 flex-1 font-semibold" x-model="rows[r.i].name" aria-label="Section name">
+                                                <button type="button" class="btn btn-ghost h-11 w-11 shrink-0 p-0" x-on:click="rows.splice(r.i, 1)" aria-label="Remove this section"><x-icon name="x" class="h-4 w-4" /></button>
+                                            </div>
+                                            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                                                <label class="block"><span class="text-xs text-slate-500">Adviser</span>
+                                                    <select class="input" x-model="rows[r.i].adviser_id"><option value="">Pick later</option>@foreach($teachers as $id => $n)<option value="{{ $id }}">{{ $n }}</option>@endforeach</select></label>
+                                                <label class="block"><span class="text-xs text-slate-500">Room</span>
+                                                    <select class="input" x-model="rows[r.i].room"><option value="">Pick later</option>@foreach($rooms as $rm)<option value="{{ $rm->name }}">{{ $rm->name }} · {{ $rm->capacity }} seats</option>@endforeach</select></label>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- Add --}}
+                                    <div class="rounded-xl border border-dashed border-slate-300 p-3 dark:border-white/15">
+                                        <label class="label" for="sec-draft">Add sections to <span x-text="levelName"></span></label>
                                         <div class="flex gap-2">
-                                            <select class="input" :name="`sections[${i}][room]`" x-model="s.room" aria-label="Room"><option value="">Room (optional)</option>@foreach($rooms as $r)<option value="{{ $r->name }}">{{ $r->name }} · {{ $r->capacity }} seats</option>@endforeach</select>
-                                            <button type="button" class="btn h-11 w-11 shrink-0 px-0" x-on:click="rows.splice(i, 1)" aria-label="Remove section"><x-icon name="x" class="h-4 w-4" /></button>
+                                            <input id="sec-draft" class="input min-w-0 flex-1" x-model="draft" x-on:keydown.enter.prevent="addDraft()" placeholder="e.g. Mabini, Rizal, Luna">
+                                            <button type="button" class="btn btn-primary shrink-0" x-on:click="addDraft()" :disabled="!draft.trim()"><x-icon name="plus" class="h-4 w-4" /> Add</button>
+                                        </div>
+                                        <p class="mt-1.5 text-xs text-slate-500">Type one name, or several separated by commas, then press Enter. The next free room is filled in for you.</p>
+                                        <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                                            <span class="text-xs text-slate-500">Quick add:</span>
+                                            @foreach([2, 3, 4, 5] as $n)<button type="button" class="btn btn-sm" x-on:click="addLetters({{ $n }})">{{ $n }} sections (A–{{ chr(64 + $n) }})</button>@endforeach
                                         </div>
                                     </div>
+                                </div>
+
+                                {{-- What gets posted --}}
+                                <template x-for="(r, i) in rows" :key="'h' + i">
+                                    <div class="hidden">
+                                        <input type="hidden" :name="`sections[${i}][name]`" :value="r.name">
+                                        <input type="hidden" :name="`sections[${i}][grade_level_id]`" :value="r.grade_level_id">
+                                        <input type="hidden" :name="`sections[${i}][adviser_id]`" :value="r.adviser_id">
+                                        <input type="hidden" :name="`sections[${i}][room]`" :value="r.room">
+                                    </div>
                                 </template>
-                                <button type="button" class="btn btn-sm" x-on:click="rows.push({ name: '', grade_level_id: '{{ $levels->first()?->id }}', adviser_id: '', room: '' })"><x-icon name="plus" class="h-4 w-4" /> Add section</button>
+                                <p class="text-sm text-slate-600" x-show="rows.length" x-cloak><b x-text="rows.length"></b> new section(s) will be saved when you press <b>Save and continue</b>.</p>
                             </div>
                             @break
 
@@ -295,7 +383,20 @@
                                         <span><span class="block text-sm font-semibold text-slate-900">{{ $t }}</span><span class="block text-sm text-slate-600">{{ $d }}</span></span>
                                     </a>
                                 @endforeach
-                                <p class="text-sm text-slate-600">Families can apply without logging in – put this on a PC at the entrance or share it: <code class="rounded bg-slate-100 px-1.5 py-0.5">{{ route('apply.create') }}</code></p>
+                                @php $applyUrl = \App\Support\School::shareableUrl(route('apply.create')); @endphp
+                                @if(\App\Support\School::mode() === \App\Support\School::LAN)
+                                    <div class="flex gap-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/5">
+                                        <x-icon name="monitor" class="mt-0.5 h-5 w-5 shrink-0 text-brand-700 dark:text-brand-300" />
+                                        <div class="min-w-0 text-sm text-slate-700 dark:text-slate-200">
+                                            <p class="font-semibold text-slate-900">Set up an enrollment computer near the Registrar</p>
+                                            <p class="mt-1">Families don't need internet at home. Put one or two computers near the Registrar's office, connected to the school Wi-Fi, and open this page on them. Families fill in the form there, and the Registrar approves it.</p>
+                                            <p class="mt-2"><code class="rounded bg-white px-1.5 py-0.5 break-all ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10">{{ $applyUrl }}</code></p>
+                                            <p class="mt-1 text-xs text-slate-500">Tip: press F11 on that computer for full screen so it works like a kiosk.</p>
+                                        </div>
+                                    </div>
+                                @else
+                                    <p class="text-sm text-slate-600">Families can apply from home without logging in. Share this link, or open it on a computer near the Registrar: <code class="rounded bg-slate-100 px-1.5 py-0.5 break-all">{{ $applyUrl }}</code></p>
+                                @endif
                             </div>
                             @break
 

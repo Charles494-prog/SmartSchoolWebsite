@@ -60,7 +60,7 @@ class SectionController extends Controller
     private function validated(Request $request, ?Section $s = null): array
     {
         return $request->validate([
-            'name' => ['required', 'max:60', Rule::unique('sections')->where('school_year_id', $request->school_year_id)->ignore($s?->id)],
+            'name' => ['required', 'max:60', Rule::unique('sections')->where('school_year_id', $request->school_year_id)->where('grade_level_id', $request->grade_level_id)->ignore($s?->id)],
             'grade_level_id' => 'required|exists:grade_levels,id',
             'school_year_id' => 'required|exists:school_years,id',
             'adviser_id' => 'nullable|exists:users,id',

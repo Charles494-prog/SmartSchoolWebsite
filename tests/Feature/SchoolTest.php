@@ -23,6 +23,7 @@ use App\Models\Score;
 use App\Models\Section;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\Subject;
 use App\Models\Transfer;
 use App\Models\User;
 use App\Notifications\AttendanceAlert;
@@ -459,6 +460,9 @@ class SchoolTest extends TestCase
         $this->post('/setup-wizard/rooms', ['rooms' => [['name' => 'Lab 1', 'capacity' => 30], ['name' => '', 'capacity' => 40]]]);
         $this->assertSame(30, Room::where('name', 'Lab 1')->value('capacity'));
         $this->post('/setup-wizard/subjects', ['ww' => 40, 'pt' => 40, 'qa' => 10])->assertSessionHasErrors('ww');
+        $this->get('/setup-wizard/subjects')->assertSee('Attendance');
+        $this->post('/setup-wizard/subjects', ['ww' => 25, 'pt' => 45, 'qa' => 20, 'at' => 10])->assertSessionHasNoErrors();
+        $this->assertSame(['ww' => 25, 'pt' => 45, 'qa' => 20, 'at' => 10], Subject::first()->weights());
         $this->post('/setup-wizard/staff', ['people' => [['name' => 'Gina Guard', 'email' => 'gina@school.test', 'role' => 'guard']]])
             ->assertRedirect('/setup-wizard/staff')->assertSessionHas('wizard_accounts');
         $this->get('/setup-wizard/staff')->assertSee('gina@school.test')->assertSee('I wrote them down');

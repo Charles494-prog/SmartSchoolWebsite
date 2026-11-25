@@ -33,6 +33,8 @@ class Setting extends Model
         'logo_path' => '',
         'use_transmutation' => '0',
         'passing_grade' => '75',
+        'grade_scale' => '',
+        'grade_scale_show' => 'number',
         'honors_with_highest' => '98',
         'honors_with_high' => '95',
         'honors_with' => '90',

@@ -85,7 +85,7 @@ class AllocationController extends Controller
     {
         abort_if($section && ($section->school_year_id !== $a->school_year_id || $section->grade_level_id !== $a->grade_level_id), 404);
         $d = $request->validate([
-            'name' => ['required', 'max:60', Rule::unique('sections')->where('school_year_id', $a->school_year_id)->ignore($section?->id)],
+            'name' => ['required', 'max:60', Rule::unique('sections')->where('school_year_id', $a->school_year_id)->where('grade_level_id', $a->grade_level_id)->ignore($section?->id)],
             'capacity' => 'required|integer|min:1|max:'.($request->filled('room') ? (Room::where('name', $request->room)->value('capacity') ?: 500) : 500),
             'adviser_id' => 'nullable|exists:users,id',
             'room' => ['nullable', Rule::exists('rooms', 'name'), Rule::unique('sections', 'room')->where('school_year_id', $a->school_year_id)->ignore($section?->id)],
