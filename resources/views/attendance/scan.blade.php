@@ -79,6 +79,7 @@
                             </div>
                         </div>
                         <p x-show="camera && !(last && flash)" class="text-center text-sm text-white/80">Point the camera at the QR code on the ID card</p>
+                        <p x-show="camera && !(last && flash) && {{ $gate ? 'true' : '!classId' }}" class="mt-1 text-center text-xs text-white/60">Scans must be at least 2 minutes apart for IN and OUT.</p>
                     </div>
                 </div>
             </div>
@@ -101,6 +102,13 @@
                     <p class="mt-1.5 text-xs text-slate-500" x-text="classId ? 'Records who attended this subject today. Late = 15 minutes after the class starts.' : 'First scan = IN. Scan again when leaving (at least 2 minutes later) = OUT.'"></p>
                 </div>
             @endif
+            <div x-show="{{ $gate ? 'true' : '!classId' }}" class="mb-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" role="note">
+                <x-icon name="clock" class="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                    <p class="font-semibold">Scans must be at least 2 minutes apart</p>
+                    <p class="mt-0.5">A second scan within 2 minutes is ignored, so a double-scan won't check a student OUT by mistake. In an emergency a student can still go out and come back in – just wait 2 minutes between scans.</p>
+                </div>
+            </div>
             <p class="muted mb-3">Scan the student's ID card with a USB QR scanner (it types into the box) or this device's camera.</p>
             <form @submit.prevent="send(code)" class="flex gap-2">
                 <input x-ref="box" x-model="code" class="input text-lg" placeholder="Scan or type student no./LRN…" autofocus>
