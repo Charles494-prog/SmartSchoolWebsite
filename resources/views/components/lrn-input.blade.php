@@ -27,7 +27,7 @@
             return {
                 digits: Array.from({ length: 12 }, (_, i) => (initial || '')[i] || ''), taken: null, checked: false, t: null,
                 get value() { return this.digits.join('') },
-                boxes() { return [...this.$el.querySelectorAll('input[data-i]')] },
+                boxes() { return [...this.$root.querySelectorAll('input[data-i]')] },
                 focus(i) { const b = this.boxes()[Math.max(0, Math.min(11, i))]; b && b.focus() },
                 set(v) { v = (v || '').replace(/\D/g, '').slice(0, 12); this.digits = Array.from({ length: 12 }, (_, i) => v[i] || ''); this.check(); },
                 type(i, e) {
