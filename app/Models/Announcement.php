@@ -8,11 +8,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Announcement extends Model
 {
+    public function readers()
+    {
+        return $this->belongsToMany(User::class, 'announcement_reads')->withPivot('read_at');
+    }
+
+    /** Announcements this user can see but hasn't marked as read. */
+    public static function unreadCount(User $u): int
+    {
+        return static::visibleTo($u)->whereDoesntHave('readers', fn ($q) => $q->where('users.id', $u->id))->count();
+    }
+
     use Auditable;
 
     protected $guarded = ['id'];
 
-    protected $casts = ['published_at' => 'datetime', 'is_pinned' => 'boolean'];
+    protected $casts = ['published_at' => 'datetime', 'is_pinned' => 'boolean', 'event_at' => 'datetime'];
 
     public const AUDIENCES = ['all' => 'Everyone', 'staff' => 'All staff', 'teachers' => 'Teachers', 'students' => 'Students', 'parents' => 'Parents'];
 

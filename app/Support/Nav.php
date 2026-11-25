@@ -29,7 +29,7 @@ class Nav
                 School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
                 $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
-                $item('Messages', 'messages.index', 'message', 'Talk to teachers and the school', 'indigo', 'messages.*'),
+                $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
                 $item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet'),
             ]))];
@@ -38,7 +38,6 @@ class Nav
         if ($is(Role::GUARD)) {
             return ['' => [
                 $item('Gate scanner', 'attendance.scan', 'qr', 'Scan students in and out at the gate', 'emerald'),
-                $item('Messages', 'messages.index', 'message', 'Chat with staff', 'indigo', 'messages.*'),
             ]];
         }
 
@@ -106,9 +105,8 @@ class Nav
         }
 
         $comm = [
-            $item('Announcements', 'announcements.index', 'megaphone', 'News for parents, students and staff', 'indigo', 'announcements.*'),
+            $item('Announcements', 'announcements.index', 'megaphone', 'News for parents, students and staff', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
             $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
-            $item('Messages', 'messages.index', 'message', 'Chat with parents and staff', 'indigo', 'messages.*'),
         ];
         if ($is(Role::ADMIN, Role::REGISTRAR)) {
             $comm[] = $crud('Add events', 'events', 'calendar-plus', 'Put dates on the school calendar');

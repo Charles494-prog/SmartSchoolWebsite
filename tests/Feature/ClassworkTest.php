@@ -70,8 +70,11 @@ class ClassworkTest extends TestCase
         $this->actingAs(User::where('email', 'teacher@school.test')->first());
         $this->post('/dev/mode', ['mode' => 'lan'])->assertNotFound();
 
-        config(['smartschool.dev' => true]);
-        $this->get('/dashboard')->assertSee('DEV ·');
+        config(['smartschool.dev' => true, 'smartschool.dev_password_hash' => \Illuminate\Support\Facades\Hash::make('secret-pass')]);
+        $this->get('/dashboard')->assertSee('Developer mode');
+        $this->post('/dev/mode', ['mode' => 'lan'])->assertNotFound();   // locked until the password is given
+        $this->post('/dev/unlock', ['password' => 'wrong'])->assertSessionHas('error');
+        $this->post('/dev/unlock', ['password' => 'secret-pass'])->assertSessionHas('ok');
         $this->post('/dev/mode', ['mode' => 'lan'])->assertRedirect();
         $this->assertTrue(\App\Support\School::isLan());
         $student = User::where('email', 'student@school.test')->first();
@@ -201,5 +204,25 @@ class ClassworkTest extends TestCase
         $this->post("/students/{$b->id}/lrn", ['lrn' => '123456789012'])->assertSessionHasNoErrors();
         $this->assertSame('123456789012', $b->fresh()->lrn);
         $this->actingAs(User::where('email', 'student@school.test')->first())->get('/students/lrn')->assertForbidden();
+    }
+
+    public function test_designed_announcements_with_picture_event_and_seen_by(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $admin = User::where('role', 'admin')->first();
+        $this->actingAs($admin)->post('/announcements', ['title' => 'Family Day', 'body' => 'Join us!', 'audience' => 'all', 'event_at' => '2026-12-12 09:00',
+            'image' => \Illuminate\Http\UploadedFile::fake()->image('fam.jpg'), 'image_caption' => 'Last year', 'body_html' => '<b class="x">Hi</b>'])->assertRedirect();
+        $a = \App\Models\Announcement::where('title', 'Family Day')->first();
+        $this->assertNotNull($a->image_path);
+        $r = $this->get("/announcements/{$a->id}/content")->assertOk();
+        $this->assertStringContainsString('sandbox allow-scripts', $r->headers->get('Content-Security-Policy'));
+
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $this->post('/announcements', ['title' => 'x', 'body' => 'y', 'audience' => 'all'])->assertForbidden();
+        $this->assertGreaterThan(0, \App\Models\Announcement::unreadCount($teacher));
+        $this->get('/announcements')->assertOk()->assertSee('Family Day')->assertSee('Mark as read')->assertSee('Last year')->assertSee('December 12, 2026');
+        $this->post("/announcements/{$a->id}/read")->assertRedirect();
+        $this->actingAs($admin)->get('/announcements')->assertSee('Seen by 1');
     }
 }

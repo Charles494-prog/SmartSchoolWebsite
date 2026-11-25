@@ -6,4 +6,5 @@ return [
 
     // Dev mode: a toolbar to switch LAN/Online and sign in as demo accounts. For testing only.
     'dev' => (bool) env('SMARTSCHOOL_DEV', false),
+    'dev_password_hash' => env('SMARTSCHOOL_DEV_PASSWORD_HASH', ''),
 ];

@@ -77,14 +77,35 @@
                 <kbd class="hidden rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm sm:inline dark:bg-white/10">Ctrl K</kbd>
             </button>
             <div class="ml-auto flex items-center gap-1">
-                @if(\App\Http\Controllers\DevController::enabled())
-                    @php $devLan = \App\Support\School::isLan(); @endphp
-                    <div x-data="{ d:false }" class="relative">
-                        <button @click="d=!d" class="flex items-center gap-1.5 rounded-xl border border-dashed border-fuchsia-400 bg-fuchsia-50 px-3 py-1.5 text-xs font-bold text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-500/10 dark:text-fuchsia-300" :aria-expanded="d">
-                            DEV · {{ $devLan ? 'LAN' : 'Online' }}
+                <a href="{{ route('guide') }}" class="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:flex dark:text-slate-300 dark:hover:bg-white/10"><x-icon name="sparkles" class="h-4 w-4 text-violet-500" /> How it works</a>
+                <a href="{{ route('notifications') }}" class="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700" title="Notifications">
+                    <x-icon name="bell" />
+                    @if($unread)<span class="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $unread > 9 ? '9+' : $unread }}</span>@endif
+                </a>
+                <div x-data="{ o:false }" class="relative">
+                    <button @click="o=!o" class="flex items-center gap-2 rounded-xl p-1.5 pr-2.5 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Account menu" :aria-expanded="o">
+                        @if($u->avatar_path)<img src="{{ route('profile.photo', $u) }}" class="h-8 w-8 rounded-full object-cover" alt="">@else<span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $initials }}</span>@endif
+                        <span class="hidden text-left sm:block"><span class="block max-w-40 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $u->name }}</span><span class="block text-xs text-slate-500">{{ $u->roleLabel() }}</span></span>
+                    </button>
+                    <div x-show="o" x-cloak x-transition @click.outside="o=false" class="absolute right-0 mt-2 max-h-[80vh] w-72 overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
+                        <div class="border-b border-slate-100 px-4 py-3"><div class="text-sm font-semibold">{{ $u->name }}</div><div class="truncate text-xs text-slate-500">{{ $u->email }}</div></div>
+                        <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile</a>
+                        <a href="{{ route('privacy') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="shield" class="h-4 w-4 text-slate-400" /> Privacy</a>
+                        <button type="button" @click="$store.theme.toggle()" class="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5">
+                            <svg x-show="!$store.theme.dark" class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                            <svg x-show="$store.theme.dark" x-cloak class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                            <span x-text="$store.theme.dark ? 'Light mode' : 'Dark mode'">Dark mode</span>
                         </button>
-                        <div x-show="d" x-cloak x-transition @click.outside="d=false" class="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
-                            <div class="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+                        @if(\App\Http\Controllers\DevController::enabled())
+                            @php $devLan = \App\Support\School::isLan(); @endphp
+                            <div class="border-t border-slate-100 dark:border-white/10" x-data="{ dev: false }">
+                                <button type="button" @click="dev = !dev" class="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-fuchsia-700 hover:bg-fuchsia-50 dark:text-fuchsia-300 dark:hover:bg-fuchsia-500/10">
+                                    <x-icon name="key" class="h-4 w-4" /> Developer mode
+                                    @if(session('dev_unlocked'))<span class="ml-auto rounded-full bg-fuchsia-100 px-2 text-[11px] font-bold dark:bg-fuchsia-500/20">{{ $devLan ? 'LAN' : 'Online' }}</span>@else<span class="ml-auto text-xs text-slate-400">locked</span>@endif
+                                </button>
+                                <div x-show="dev" x-cloak>
+                                    @if(session('dev_unlocked'))
+<div class="border-b border-slate-100 px-4 py-3 dark:border-white/10">
                                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Mode</p>
                                 <form method="post" action="{{ route('dev.mode') }}" class="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5">@csrf
                                     <button name="mode" value="lan" class="rounded-lg px-2 py-1.5 text-sm font-semibold {{ $devLan ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500' }}">Offline (LAN)</button>
@@ -105,27 +126,15 @@
                                     </form>
                                 @endforeach
                             </div>
-                        </div>
-                    </div>
-                @endif
-                <a href="{{ route('guide') }}" class="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:flex dark:text-slate-300 dark:hover:bg-white/10"><x-icon name="sparkles" class="h-4 w-4 text-violet-500" /> How it works</a>
-                <button @click="$store.theme.toggle()" class="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" title="Light / dark mode">
-                    <svg x-show="!$store.theme.dark" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-                    <svg x-show="$store.theme.dark" x-cloak class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-                </button>
-                <a href="{{ route('notifications') }}" class="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700" title="Notifications">
-                    <x-icon name="bell" />
-                    @if($unread)<span class="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{{ $unread > 9 ? '9+' : $unread }}</span>@endif
-                </a>
-                <div x-data="{ o:false }" class="relative">
-                    <button @click="o=!o" class="flex items-center gap-2 rounded-xl p-1.5 pr-2.5 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Account menu" :aria-expanded="o">
-                        @if($u->avatar_path)<img src="{{ route('profile.photo', $u) }}" class="h-8 w-8 rounded-full object-cover" alt="">@else<span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $initials }}</span>@endif
-                        <span class="hidden text-left sm:block"><span class="block max-w-40 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{{ $u->name }}</span><span class="block text-xs text-slate-500">{{ $u->roleLabel() }}</span></span>
-                    </button>
-                    <div x-show="o" x-cloak x-transition @click.outside="o=false" class="absolute right-0 mt-2 w-60 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
-                        <div class="border-b border-slate-100 px-4 py-3"><div class="text-sm font-semibold">{{ $u->name }}</div><div class="truncate text-xs text-slate-500">{{ $u->email }}</div></div>
-                        <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile</a>
-                        <a href="{{ route('privacy') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="shield" class="h-4 w-4 text-slate-400" /> Privacy</a>
+                                    @else
+                                        <form method="post" action="{{ route('dev.unlock') }}" class="space-y-2 px-4 pb-3">@csrf
+                                            <input type="password" name="password" class="input h-10" placeholder="Developer password" autocomplete="off" required>
+                                            <button class="btn btn-sm w-full">Unlock</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                         <form method="post" action="{{ route('logout') }}">@csrf<button class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-rose-600 hover:bg-rose-50"><x-icon name="logout" class="h-4 w-4" /> Log out</button></form>
                     </div>
                 </div>

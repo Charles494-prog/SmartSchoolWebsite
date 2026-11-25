@@ -28,9 +28,28 @@ class DevController extends Controller
             ->orderBy('role')->orderBy('email')->get(['id', 'name', 'email', 'role']);
     }
 
-    public function mode(Request $request)
+    /** Developer tools are hidden behind a password (its hash lives in .env as SMARTSCHOOL_DEV_PASSWORD_HASH). */
+    public function unlock(Request $request)
     {
         abort_unless(self::enabled(), 404);
+        $hash = (string) config('smartschool.dev_password_hash');
+        $ok = $hash !== '' && \Illuminate\Support\Facades\Hash::check((string) $request->input('password'), $hash);
+        if (! $ok) {
+            return back()->with('error', 'Wrong developer password.');
+        }
+        $request->session()->put('dev_unlocked', true);
+
+        return back()->with('ok', 'Developer mode unlocked.');
+    }
+
+    private function unlocked(): void
+    {
+        abort_unless(self::enabled() && session('dev_unlocked'), 404);
+    }
+
+    public function mode(Request $request)
+    {
+        $this->unlocked();
         $mode = $request->validate(['mode' => 'required|in:lan,hosted'])['mode'];
         Setting::put('deployment_mode', $mode);
 
@@ -39,10 +58,11 @@ class DevController extends Controller
 
     public function login(Request $request)
     {
-        abort_unless(self::enabled(), 404);
+        $this->unlocked();
         $user = User::whereKey($request->validate(['user_id' => 'required|integer'])['user_id'])->where(fn ($q) => $q->where('email', 'like', '%@school.test')->orWhere('role', 'admin'))->firstOrFail();
         Auth::login($user);
         $request->session()->regenerate();
+        $request->session()->put('dev_unlocked', true);
 
         return redirect('/')->with('ok', 'Dev mode: signed in as '.$user->name.' ('.$user->role.').');
     }
@@ -50,10 +70,11 @@ class DevController extends Controller
     /** Run the setup wizard again from the start (as the Superadmin) to check every step. */
     public function setup(Request $request)
     {
-        abort_unless(self::enabled(), 404);
+        $this->unlocked();
         if ($request->user()->role !== 'admin') {
             Auth::login(User::where('role', 'admin')->where('is_active', true)->orderBy('id')->firstOrFail());
             $request->session()->regenerate();
+            $request->session()->put('dev_unlocked', true);
         }
         Setting::put('setup_completed_at', '');
 

@@ -47,6 +47,7 @@ Route::middleware('guest')->group(function () {
 
 // ---------------------------------------------------------------- signed-in
 Route::middleware(['auth', ThrottleWrites::class])->group(function () {
+    Route::post('/dev/unlock', [\App\Http\Controllers\DevController::class, 'unlock'])->middleware('throttle:5,1')->name('dev.unlock');
     Route::post('/dev/mode', [\App\Http\Controllers\DevController::class, 'mode'])->name('dev.mode');
     Route::post('/dev/login', [\App\Http\Controllers\DevController::class, 'login'])->name('dev.login');
     Route::post('/dev/setup', [\App\Http\Controllers\DevController::class, 'setup'])->name('dev.setup');
@@ -65,6 +66,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/announcements', [CommunicationController::class, 'announcements'])->name('announcements.index');
     Route::post('/announcements', [CommunicationController::class, 'postAnnouncement'])->name('announcements.store');
     Route::delete('/announcements/{announcement}', [CommunicationController::class, 'deleteAnnouncement'])->name('announcements.destroy');
+    Route::post('/announcements/{announcement}/read', [CommunicationController::class, 'readAnnouncement'])->name('announcements.read');
+    Route::get('/announcements/{announcement}/image', [CommunicationController::class, 'announcementImage'])->name('announcements.image');
+    Route::get('/announcements/{announcement}/content', [CommunicationController::class, 'announcementContent'])->name('announcements.content');
     Route::get('/calendar', [CommunicationController::class, 'calendar'])->name('calendar');
     Route::get('/messages', fn () => view('messages.chat'))->name('messages.index');
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');

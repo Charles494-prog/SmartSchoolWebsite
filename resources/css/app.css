@@ -149,3 +149,21 @@ html { scroll-behavior: smooth; }
     .lg\:pl-72 { padding-left: 0 !important; }
     .break-after-page { break-after: page; }
 }
+
+/* Dark mode safety net: pages written for light mode stay readable (no dark-blue text on a dark screen). */
+.dark :is(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-black) { color: rgb(241 245 249); }
+.dark :is(.text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600) { color: rgb(203 213 225); }
+.dark :is(.text-brand-700, .text-brand-800, .text-brand-900, .text-indigo-700, .text-indigo-800, .text-indigo-900, .text-blue-700, .text-blue-800, .text-blue-900) { color: rgb(199 210 254); }
+.dark :is(.text-emerald-700, .text-emerald-800, .text-green-700, .text-green-800) { color: rgb(110 231 183); }
+.dark :is(.text-amber-700, .text-amber-800, .text-amber-900, .text-orange-700, .text-orange-800) { color: rgb(252 211 77); }
+.dark :is(.text-rose-700, .text-rose-800, .text-red-700, .text-red-800) { color: rgb(253 164 175); }
+.dark .bg-white { background-color: rgb(15 23 42); }
+.dark :is(.bg-slate-50, .bg-gray-50) { background-color: rgb(30 41 59 / .5); }
+.dark :is(.bg-slate-100, .bg-gray-100) { background-color: rgb(30 41 59); }
+.dark :is(.bg-brand-50, .bg-indigo-50, .bg-blue-50) { background-color: rgb(99 102 241 / .12); }
+.dark :is(.bg-emerald-50, .bg-green-50, .bg-emerald-100, .bg-green-100) { background-color: rgb(16 185 129 / .15); }
+.dark :is(.bg-amber-50, .bg-amber-100, .bg-orange-50, .bg-yellow-50) { background-color: rgb(245 158 11 / .15); }
+.dark :is(.bg-rose-50, .bg-red-50, .bg-rose-100, .bg-red-100) { background-color: rgb(244 63 94 / .15); }
+.dark :is(.border-slate-100, .border-slate-200, .border-gray-200, .divide-slate-100 > *, .divide-slate-200 > *) { border-color: rgb(30 41 59); }
+.dark .card { background-color: rgb(15 23 42); }
+.dark :is(input, select, textarea).input { background-color: rgb(15 23 42); color: rgb(241 245 249); border-color: rgb(51 65 85); }
