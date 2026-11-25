@@ -91,6 +91,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
         Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
+        Route::get('/services', [\App\Http\Controllers\ServiceController::class, 'index'])->name('portal.services');
+        Route::post('/services/{student}', [\App\Http\Controllers\ServiceController::class, 'request'])->name('portal.services.request');
         Route::get('/shop', [\App\Http\Controllers\ShopController::class, 'store'])->name('portal.shop');
         Route::post('/shop/{student}', [\App\Http\Controllers\ShopController::class, 'checkout'])->name('portal.shop.checkout');
         Route::post('/pay/{student}', [\App\Http\Controllers\OnlinePaymentController::class, 'submit'])->name('portal.pay');
@@ -102,7 +104,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     });
 
     // Students (view rules are checked per student inside the controller)
-    Route::get('/students', [StudentController::class, 'index'])->middleware('role:admin,registrar,cashier,nurse,guidance,librarian')->name('students.index');
+    Route::get('/students', [StudentController::class, 'index'])->middleware('role:admin,registrar,cashier,nurse,guidance')->name('students.index');
     Route::get('/quick/students', [StudentController::class, 'quick'])->name('students.quick');
     Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
     Route::get('/students/lrn', [StudentController::class, 'lrnIndex'])->name('students.lrn');
@@ -249,6 +251,12 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     });
 
     // Administration
+    Route::middleware('role:admin,registrar')->prefix('requests')->group(function () {
+        Route::get('/', [\App\Http\Controllers\ServiceController::class, 'manage'])->name('services.manage');
+        Route::post('/services', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.store');
+        Route::post('/services/{service}', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.update');
+        Route::post('/{req}', [\App\Http\Controllers\ServiceController::class, 'update'])->name('services.requests.update');
+    });
     Route::middleware('role:admin,bookstore')->prefix('bookstore')->group(function () {
         Route::get('/', [\App\Http\Controllers\ShopController::class, 'manage'])->name('shop.manage');
         Route::post('/items', [\App\Http\Controllers\ShopController::class, 'saveItem'])->name('shop.items.store');

@@ -56,6 +56,7 @@ class DemoSeeder extends Seeder
         $mk('Carmen Aquino', 'guidance@school.test', Role::GUIDANCE);
         $mk('Henry Cruz', 'hr@school.test', Role::HR);
         $mk('Mang Jun Dela Rosa', 'guard@school.test', Role::GUARD);
+        $mk('Bookstore Office', 'bookstore@school.test', Role::BOOKSTORE);
         $teachers = collect([
             ['Ana Villanueva', 'teacher@school.test'], ['Mark Bautista', 'teacher2@school.test'], ['Grace Mendoza', 'teacher3@school.test'], ['Paolo Navarro', 'teacher4@school.test'],
             ['Liza Soriano', 'teacher5@school.test'], ['Ramon Dizon', 'teacher6@school.test'], ['Joy Pascual', 'teacher7@school.test'], ['Edwin Salazar', 'teacher8@school.test'],
@@ -255,6 +256,11 @@ class DemoSeeder extends Seeder
             }
         }
 
+        if (! \App\Models\SchoolService::exists()) {
+            foreach (\App\Models\SchoolService::DEFAULTS as [$nm, $desc, $fee, $days]) {
+                \App\Models\SchoolService::create(['name' => $nm, 'description' => $desc, 'fee' => $fee, 'days' => $days]);
+            }
+        }
         // Bookstore
         foreach ([['PE uniform (shirt + jogging pants)', 'uniform', 650, 'XS, S, M, L, XL', 40], ['School uniform – blouse', 'uniform', 450, 'XS, S, M, L', 30], ['School uniform – polo', 'uniform', 450, 'XS, S, M, L, XL', 30],
             ['School ID lace', 'merch', 60, null, 200], ['School tote bag', 'merch', 250, null, 50], ['Foundation Day shirt', 'souvenir', 300, 'S, M, L, XL', 60],

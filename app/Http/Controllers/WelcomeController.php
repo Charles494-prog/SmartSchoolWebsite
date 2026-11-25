@@ -29,6 +29,9 @@ class WelcomeController extends Controller
         if ($u->role === Role::TEACHER) {
             $steps['teaching'] = 'Teaching';
         }
+        if ($u->role === Role::REGISTRAR) {
+            $steps['services'] = 'Documents';
+        }
         if ($u->role === Role::PARENT) {
             $steps['family'] = 'Updates';
         }
@@ -63,7 +66,7 @@ class WelcomeController extends Controller
             'hide_turned_in' => 'boolean', 'todo_home' => 'boolean', 'live_reports' => 'boolean', 'payer' => 'nullable|in:parent,student,in_person',
             'notify_submissions' => 'boolean', 'notify_grades' => 'boolean', 'notify_attendance' => 'boolean',
             'access' => 'array', 'access.*' => 'array', 'new_access' => 'array',
-            'parent_name' => 'nullable|max:120', 'parent_email' => 'nullable|email|max:150', 'parent_relationship' => 'nullable|max:40',
+            'parent_name' => 'nullable|max:120', 'parent_phone' => 'nullable|max:30', 'parent_email' => 'nullable|email|max:150', 'parent_relationship' => 'nullable|max:40',
         ]);
         $hidden = array_values(array_diff(array_intersect($d['hidden'] ?? [], $labels), Nav::locked($u->role)));
         $prefs = array_merge($u->preferences ?? [], [
@@ -73,6 +76,13 @@ class WelcomeController extends Controller
             'notify_grades' => $request->boolean('notify_grades', true), 'notify_attendance' => $request->boolean('notify_attendance', true),
         ]);
         $u->update(['preferences' => $prefs, 'onboarded_at' => now()]);
+        if ($u->role === Role::REGISTRAR) {
+            foreach ((array) $request->input('svc', []) as $row) {
+                if (filled($row['name'] ?? null)) {
+                    \App\Models\SchoolService::updateOrCreate(['name' => $row['name']], ['fee' => (float) ($row['fee'] ?? 0), 'days' => (int) ($row['days'] ?? 3), 'is_active' => ! empty($row['on'])]);
+                }
+            }
+        }
 
         $keys = array_keys(\App\Support\ParentAccess::LABELS);
         $clean = fn ($list) => array_values(array_intersect((array) $list, $keys));
@@ -86,12 +96,17 @@ class WelcomeController extends Controller
         // A student invites a parent: the account is made here and linked to the student.
         $msg = 'All set! You can change any of this later in My profile → Personal setup.';
         if ($u->role === Role::STUDENT && ! empty($d['parent_email']) && ($student = $u->student) && School::allows('parent_accounts')) {
+            $logins = $student->guardians()->whereNotNull('user_id')->count();
+            abort_if($logins >= 2, 422, 'A student can set up at most 2 parent accounts.');
             $existing = User::where('email', $d['parent_email'])->first();
             abort_if($existing && $existing->role !== Role::PARENT, 422, 'That email belongs to a staff or student account.');
             $temp = Str::password(10, symbols: false);
             $parent = $existing ?? User::create(['name' => $d['parent_name'] ?: 'Parent of '.$student->first_name, 'email' => $d['parent_email'], 'password' => $temp, 'role' => Role::PARENT, 'must_change_password' => true]);
-            $g = Guardian::firstOrCreate(['user_id' => $parent->id], ['name' => $parent->name, 'email' => $parent->email]);
-            $student->guardians()->syncWithoutDetaching([$g->id => ['relationship' => $d['parent_relationship'] ?: 'Parent', 'is_primary' => $student->guardians()->doesntExist(),
+            $g = Guardian::firstOrCreate(['user_id' => $parent->id], ['name' => $parent->name, 'email' => $parent->email, 'phone' => $d['parent_phone'] ?? null]);
+            if (! empty($d['parent_phone']) && ! $g->phone) {
+                $g->update(['phone' => $d['parent_phone']]);
+            }
+            $student->guardians()->syncWithoutDetaching([$g->id => ['relationship' => ($d['parent_relationship'] ?? null) ?: 'Parent', 'is_primary' => $student->guardians()->doesntExist(),
                 'access' => json_encode($clean($d['new_access'] ?? $keys))]]);
             $msg = $existing ? $parent->name.' is now linked to your account.' : 'Parent account made for '.$parent->email.' – temporary password: '.$temp.' (they change it on first sign-in).';
         }

@@ -114,11 +114,16 @@
                         <div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                             <p class="font-semibold">Give a parent their own account <span class="font-normal text-slate-500">(optional)</span></p>
                             <p class="mb-3 text-sm text-slate-500">You choose what they can see and do. They can never change your grades or records.</p>
-                            <div class="grid gap-2 sm:grid-cols-3">
+                            @php $parentLogins = $parents->filter(fn ($g) => $g->user)->count(); @endphp
+                            @if($parentLogins >= 2)<p class="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-white/5 dark:text-slate-300">You already have 2 parent accounts – that's the most allowed. Ask the registrar if one needs to be changed.</p>@else
+                            <p class="mb-2 text-xs text-slate-600">You can add up to 2 parent accounts ({{ 2 - $parentLogins }} left).</p>
+                            <div class="grid gap-2 sm:grid-cols-2">
                                 <input name="parent_name" class="input" placeholder="Name">
+                                <input name="parent_phone" class="input" placeholder="Mobile number (for emergencies)" inputmode="tel">
                                 <input name="parent_email" type="email" class="input" placeholder="Email">
                                 <select name="parent_relationship" class="input"><option>Mother</option><option>Father</option><option>Guardian</option></select>
                             </div>
+                            @endif
                             <p class="mt-3 text-sm font-medium">What they can do</p>
                             <div class="mt-1 grid gap-1.5 sm:grid-cols-2">
                                 @foreach(\App\Support\ParentAccess::LABELS as $k => $label)
@@ -150,6 +155,23 @@
                     <h2 class="text-xl font-bold">Teaching</h2>
                     <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"><input type="hidden" name="notify_submissions" value="0"><input type="checkbox" name="notify_submissions" value="1" class="mt-1" @checked($u->pref('notify_submissions', true))>
                         <span><b class="block">Tell me when students turn in work</b><span class="text-sm text-slate-500">A notice in the bell at the top.</span></span></label>
+                </section>
+            @endif
+            @if(isset($steps['services']))
+                @php $svcs = \App\Models\SchoolService::count() ? \App\Models\SchoolService::orderBy('name')->get()->map(fn ($x) => [$x->name, $x->fee, $x->days, $x->is_active])->all() : collect(\App\Models\SchoolService::DEFAULTS)->map(fn ($x) => [$x[0], $x[2], $x[3], true])->all(); @endphp
+                <section x-show="keys[i] === 'services'" x-cloak class="space-y-3" x-data="{ rows: @js($svcs) }">
+                    <h2 class="text-xl font-bold">Which documents can students request?</h2>
+                    <p class="text-sm text-slate-500">Students and parents request these from their portal. A fee is added to their balance; you release the document once it's paid.</p>
+                    <div class="grid grid-cols-[auto_1fr_7rem_5rem] items-center gap-2 text-xs font-semibold text-slate-500"><span>On</span><span>Document</span><span>Fee ₱</span><span>Days</span></div>
+                    <template x-for="(r, n) in rows" :key="n">
+                        <div class="grid grid-cols-[auto_1fr_7rem_5rem] items-center gap-2">
+                            <input type="checkbox" :name="`svc[${n}][on]`" value="1" :checked="r[3]">
+                            <input :name="`svc[${n}][name]`" x-model="r[0]" class="input h-10">
+                            <input type="number" min="0" step="0.01" :name="`svc[${n}][fee]`" x-model="r[1]" class="input h-10">
+                            <input type="number" min="0" :name="`svc[${n}][days]`" x-model="r[2]" class="input h-10">
+                        </div>
+                    </template>
+                    <button type="button" class="btn btn-sm" x-on:click="rows.push(['', 0, 3, true])">+ Add another</button>
                 </section>
             @endif
             @if(isset($steps['family']))

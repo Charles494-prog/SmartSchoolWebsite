@@ -105,10 +105,15 @@
                                             <span class="font-semibold tabular-nums" x-text="peso(o.amount)"></span>
                                         </label>
                                     </template>
-                                    <label class="flex cursor-pointer flex-wrap items-center gap-3 rounded-xl border-2 p-3.5" :class="pick === 'other' ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
+                                    <label class="block cursor-pointer rounded-xl border-2 p-3.5" :class="pick === 'other' ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'" x-on:click="pick = 'other'; $nextTick(() => $refs.oth.focus())">
                                         <input type="radio" class="sr-only" value="other" x-model="pick">
-                                        <span class="flex-1"><span class="block font-medium">Another amount</span><span class="text-xs text-slate-500">Pay part of the balance</span></span>
-                                        <span class="flex items-center gap-1">₱<input type="number" step="0.01" min="1" :max="max" x-model="other" x-on:focus="pick = 'other'" class="input h-10 w-32 text-right" placeholder="0.00"></span>
+                                        <span class="block font-medium">Another amount</span>
+                                        <span class="text-xs text-slate-600 dark:text-slate-400">Pay any part of the balance (up to <span x-text="peso(max)"></span>)</span>
+                                        <span x-show="pick === 'other'" x-cloak class="mt-3 flex items-center rounded-xl border border-slate-300 bg-white px-4 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900">
+                                            <span class="text-2xl font-semibold text-slate-500">₱</span>
+                                            <input x-ref="oth" type="text" inputmode="decimal" x-model="other" class="h-14 w-full border-0 bg-transparent px-2 text-2xl font-bold tabular-nums focus:ring-0" placeholder="0.00" aria-label="Amount to pay">
+                                        </span>
+                                        <span x-show="pick === 'other' && other !== '' && (Number(other) <= 0 || Number(other) > max)" class="mt-1 block text-xs font-medium text-rose-700" x-text="Number(other) > max ? 'That is more than the balance.' : 'Enter an amount above ₱0.'"></span>
                                     </label>
                                 </div>
                                 {{-- 2: pay --}}

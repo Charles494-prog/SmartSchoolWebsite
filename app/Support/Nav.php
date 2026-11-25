@@ -12,7 +12,7 @@ class Nav
     /** Features each role can never hide (the admin can change this in Settings → Personal setup). */
     public const LOCKED_DEFAULT = [
         'guard' => ['Gate scanner'], 'bookstore' => ['Bookstore'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Transactions'],
-        'student' => ['Grades', 'My classes'], 'parent' => ['Grades'], 'registrar' => ['Applications', 'Students'], 'nurse' => ['Clinic'],
+        'student' => ['Grades', 'My classes'], 'parent' => ['Grades'], 'registrar' => ['Applications', 'Students', 'Grade approvals'], 'nurse' => ['Clinic'],
         'guidance' => ['Guidance'], 'librarian' => ['Library'], 'hr' => ['Payroll', 'Employees'],
     ];
 
@@ -56,6 +56,7 @@ class Nav
                 School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
                 $item('Bookstore', 'portal.shop', 'tag', 'Order books, uniforms and school merch', 'amber'),
+                $item('Request documents', 'portal.services', 'file', 'TOR, certificates and other documents', 'sky', 'portal.services*'),
                 $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
                 $item('Announcements', 'announcements.index', 'megaphone', 'News from the school', 'indigo', 'announcements.*') + ['badge' => \App\Models\Announcement::unreadCount($u)],
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
@@ -83,7 +84,7 @@ class Nav
         if ($is(Role::ADMIN, Role::REGISTRAR)) {
             $students[] = $item('Applications', 'applications.index', 'inbox', 'Review online admission forms', 'violet', 'applications.*');
         }
-        if ($is(Role::ADMIN, Role::REGISTRAR, Role::CASHIER, Role::NURSE, Role::GUIDANCE, Role::LIBRARIAN)) {
+        if ($is(Role::ADMIN, Role::REGISTRAR, Role::CASHIER, Role::NURSE, Role::GUIDANCE)) {
             $students[] = $item('Students', 'students.index', 'users', 'Find a student, profiles and guardians', 'indigo', 'students.*');
         }
         if ($is(Role::ADMIN, Role::REGISTRAR)) {
@@ -91,6 +92,7 @@ class Nav
             if ($r === Role::REGISTRAR) {
                 $students[] = $crud('Rooms', 'rooms', 'home', 'Classrooms and how many seats each has');
             }
+            $students[] = $item('Document requests', 'services.manage', 'file', 'TOR, certificates – set fees and release', 'sky', 'services.*') + ['badge' => \App\Models\ServiceRequest::where('status', 'requested')->count()];
             $students[] = $item('Enter LRNs', 'students.lrn', 'key', 'Type or paste each student\'s DepEd LRN', 'indigo');
             $students[] = $item('QR ID cards', 'qr.cards', 'qr', 'Print students\' QR ID cards to hand out', 'emerald');
             $students[] = $item('Move up a grade', 'promotion.index', 'trending', 'End-of-year promotion', 'emerald', 'promotion.*');
@@ -101,7 +103,12 @@ class Nav
         }
 
         $acad = [];
-        if ($is(Role::TEACHER, Role::ADMIN, Role::REGISTRAR)) {
+        if ($r === Role::REGISTRAR) {
+            // Registrar: records only – approve submitted grades, keep schedules and subjects. No teaching tools.
+            $acad[] = $item('Grade approvals', 'gradebook.index', 'check-square', 'Approve grades teachers submitted', 'amber', 'gradebook.*');
+            $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
+        }
+        if ($is(Role::TEACHER, Role::ADMIN)) {
             if ($r === Role::TEACHER && School::allows('classwork')) {
                 // Online: one place per class – posts, classwork and its gradebook.
                 $acad[] = $item('My classes', 'assignments.index', 'book-open', 'Class cards: posts, classwork and grades', 'amber', ['assignments.*', 'gradebook.*']);
@@ -118,10 +125,10 @@ class Nav
             $acad[] = $crud('Subjects', 'subjects', 'book', 'Subjects and grading weights');
         }
         if ($acad) {
-            $g['Teaching'] = $acad;
+            $g[$r === Role::REGISTRAR ? 'Records' : 'Teaching'] = $acad;
         }
 
-        if ($is(Role::TEACHER, Role::ADMIN, Role::REGISTRAR)) {
+        if ($is(Role::TEACHER, Role::ADMIN)) {   // registrar keeps records, not attendance
             $g['Attendance'] = [
                 $item($r === Role::TEACHER ? 'Advisory attendance' : 'Daily attendance', 'attendance.sheet', 'check-square', 'Daily attendance list of a section (advisers)', 'emerald', 'attendance.sheet'),
                 $item($r === Role::TEACHER ? 'Scan QR in my class' : 'QR scanner', 'attendance.scan', 'qr', $r === Role::TEACHER ? 'Scan students into the subject you are teaching' : 'Gate check-in/out or a class', 'emerald'),
@@ -191,7 +198,7 @@ class Nav
         $all = collect(self::for($u))->flatten(1)->keyBy('label');
         $pick = match ($u->role) {
             Role::ADMIN => ['Home', 'Students', 'Classes & sections', 'Grades', 'Transactions', 'School settings'],
-            Role::REGISTRAR => ['Home', 'Applications', 'Students', 'Classes & sections', 'Grades', 'Messages'],
+            Role::REGISTRAR => ['Home', 'Applications', 'Students', 'Classes & sections', 'Document requests', 'Grade approvals'],
             Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'My classes', 'Class cards', 'Messages'],
             Role::GUARD => ['Gate scanner', 'Messages'],
             Role::CASHIER => ['Home', 'Transactions', 'Online payments', 'Students'],

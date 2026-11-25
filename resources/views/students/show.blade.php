@@ -56,7 +56,10 @@
                                 <b>{{ $g->name }}</b> · {{ $g->pivot->relationship }}
                                 @if($g->pivot->is_primary)<span class="badge bg-brand-100 text-brand-700">Primary</span>@endif
                                 @if($g->pivot->is_emergency_contact)<span class="badge bg-red-100 text-red-700">Emergency</span>@endif
-                                <div class="muted">{{ $g->phone }} {{ $g->email }} {{ $g->user ? '· has portal login' : '' }}</div>
+                                <div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                                    @if($g->phone)<a href="tel:{{ $g->phone }}" class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200">Call {{ $g->phone }}</a>@else<span class="text-xs font-medium text-amber-700">No phone number – add one so the clinic can call in an emergency</span>@endif
+                                    <span class="text-slate-600 dark:text-slate-400">{{ $g->email }} {{ $g->user ? '· has portal login' : '' }}</span>
+                                </div>
                             </div>
                             @if($canEdit)
                                 <form x-data method="post" action="{{ route('students.guardians.remove', [$s, $g]) }}" x-on:submit="if (!confirm('Remove this guardian from the student?')) $event.preventDefault()">@csrf @method('delete')<button class="btn btn-sm">Remove</button></form>
