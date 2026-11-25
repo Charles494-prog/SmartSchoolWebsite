@@ -35,7 +35,7 @@
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><x-icon name="cap" class="h-5 w-5" /></div>
         @endif
         <div class="min-w-0" :class="mini && 'lg:hidden'">
-            <div class="truncate text-sm font-bold text-slate-900 dark:text-white">{{ $school }}</div>
+            <div class="line-clamp-2 text-sm leading-tight font-bold text-slate-900 dark:text-white" title="{{ $school }}">{{ $school }}</div>
             <div class="text-xs text-slate-500">{{ $isPortal ? ($u->role === 'parent' ? 'Parent portal' : 'Student portal') : 'Staff portal' }}</div>
         </div>
         <button @click.prevent="menu=false" class="ml-auto rounded-lg p-1 text-slate-400 hover:bg-slate-100 lg:hidden"><x-icon name="x" /></button>

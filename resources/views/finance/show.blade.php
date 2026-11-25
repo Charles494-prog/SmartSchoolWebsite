@@ -3,11 +3,15 @@
     $isAdmin = auth()->user()->isAdmin();
 @endphp
 <x-layouts.app :title="'Account · '.$e->student->full_name" :hideErrorSummary="true">
-    <x-page-header :title="$e->student->full_name" :back="route('finance.index')" backLabel="Student balances"
+    <x-page-header :title="$e->student->full_name" :back="route('finance.index')" backLabel="Transactions"
                    :subtitle="$e->gradeLevel->name.($e->section ? ' – '.$e->section->name : '').' · S.Y. '.$e->schoolYear->name.' · School ID '.$e->student->student_no">
         @if($a)<a href="{{ route('finance.soa', $e) }}" target="_blank" class="btn"><x-icon name="file" class="h-4 w-4" /> Statement (PDF)</a>@endif
     </x-page-header>
 
+    <div class="sticky top-16 z-20 -mx-4 mb-4 border-b border-slate-200 bg-slate-50/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 dark:border-slate-800 dark:bg-slate-950/95">
+        <nav class="text-xs text-slate-600 dark:text-slate-400"><a href="{{ route('finance.index') }}" class="hover:underline">Transactions</a> <span aria-hidden="true">›</span> <span class="font-semibold text-slate-900 dark:text-white">{{ $e->student->full_name }}</span> · School ID {{ $e->student->student_no }}</nav>
+    </div>
+    <div class="pb-24">
     @if(session('receipt'))
         <div class="mb-6 flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
             <x-icon name="check-circle" class="h-5 w-5" /> <span class="flex-1">Payment saved.</span>
@@ -23,14 +27,19 @@
             @include('finance._assess-form')
         </div>
     @else
-        @php $pct = $a->net_amount > 0 ? min(100, round($paid / $a->net_amount * 100)) : 100; $overdue = $a->overdueAmount(); @endphp
+        @php
+            $pct = $a->net_amount > 0 ? min(100, round($paid / $a->net_amount * 100)) : 100; $overdue = $a->overdueAmount();
+            $covered = $a->tuitionPaid(); $firstLate = null;
+            foreach ($a->installments->sortBy('due_on') as $ins) { if ($covered >= $ins->amount - 0.005) { $covered -= $ins->amount; continue; } if ($ins->due_on->lt(today())) { $firstLate = $ins; } break; }
+            $daysLate = $firstLate ? (int) $firstLate->due_on->diffInDays(today()) : 0;
+        @endphp
         {{-- Summary --}}
         <div class="card mb-6">
             <div class="grid gap-6 sm:grid-cols-3">
-                <div><div class="muted">Total due</div><div class="mt-1 text-2xl font-bold">{{ $peso($a->net_amount) }}</div><div class="text-xs text-slate-500">{{ $a->planName() }}</div></div>
-                <div><div class="muted">Paid</div><div class="mt-1 text-2xl font-bold text-emerald-700">{{ $peso($paid) }}</div><div class="text-xs text-slate-500">{{ $pct }}% paid</div></div>
+                <div><div class="muted">Total due</div><div class="mt-1 text-2xl font-bold">{{ $peso($a->net_amount) }}</div><div class="text-xs text-slate-600 dark:text-slate-400">{{ $a->planName() }}</div></div>
+                <div><div class="muted">Paid</div><div class="mt-1 text-2xl font-bold {{ $paid > 0 ? 'text-emerald-700' : 'text-slate-700 dark:text-slate-200' }}">{{ $peso($paid) }}</div><div class="text-xs text-slate-600 dark:text-slate-400">{{ $pct }}% paid</div></div>
                 <div><div class="muted">Balance</div><div class="mt-1 text-2xl font-bold {{ $a->balance() > 0 ? 'text-slate-900' : 'text-emerald-700' }}">{{ $peso($a->balance()) }}</div>
-                    @if($overdue > 0)<div class="text-xs font-semibold text-rose-600">{{ $peso($overdue) }} overdue</div>@else<div class="text-xs text-slate-500">Nothing overdue</div>@endif</div>
+                    @if($overdue > 0)<div class="text-xs font-semibold text-rose-700">{{ $peso($overdue) }} · {{ $daysLate }} {{ str('day')->plural($daysLate) }} overdue</div>@else<div class="text-xs text-slate-600 dark:text-slate-400">Nothing overdue</div>@endif</div>
             </div>
             <div class="mt-5 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-2 rounded-full bg-emerald-500" style="width: {{ $pct }}%"></div></div>
         </div>
@@ -79,10 +88,11 @@
                 <div class="card" x-data="{ change: false }">
                     <div class="mb-4 flex items-center gap-3"><h2 class="h2 flex-1">Fees</h2>
                         <button @click="change=!change" class="btn btn-sm" x-text="change ? 'Cancel' : 'Change plan or discounts'"></button>
-                        @if($isAdmin || auth()->user()->hasRole('cashier'))<a href="{{ route('crud.index', ['fee-items', 'grade_level_id' => $e->grade_level_id]) }}" class="btn btn-sm">Edit {{ $e->gradeLevel->name }} fees</a>@endif</div>
+                        @if($isAdmin || auth()->user()->hasRole('cashier'))<a href="{{ route('crud.index', ['fee-items', 'grade_level_id' => $e->grade_level_id]) }}" class="text-xs font-medium text-slate-600 underline-offset-2 hover:underline dark:text-slate-300"
+                           x-on:click="if (!confirm(@js('This changes the fees for ALL '.$e->gradeLevel->name.' students assessed from now on. Students already assessed (like this one) keep what they were charged. Continue?'))) $event.preventDefault()">Edit fees for all {{ $e->gradeLevel->name }}</a>@endif</div>
                     <div x-show="change" x-cloak class="mb-5 rounded-xl bg-slate-50 p-4 dark:bg-white/5">@include('finance._assess-form')</div>
                     <dl class="divide-y divide-slate-100 text-sm dark:divide-white/5">
-                        @foreach($fees as $f)<div class="flex justify-between py-2.5"><dt>{{ $f->name }} <span class="text-slate-400">{{ $f->category }}</span></dt><dd>{{ $peso($f->amount) }}</dd></div>@endforeach
+                        @foreach($fees as $f)<div class="flex justify-between py-2.5"><dt>{{ $f->name }}@if($f->category && ! str_contains(strtolower($f->name), strtolower($f->category))) <span class="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $f->category }}</span>@endif</dt><dd>{{ $peso($f->amount) }}</dd></div>@endforeach
                         @foreach($a->discounts as $d)<div class="flex justify-between py-2.5 text-emerald-700"><dt>{{ $d->discount->name }}</dt><dd>−{{ $peso($d->amount) }}</dd></div>@endforeach
                         @if(round($a->net_amount - ($a->gross_amount - $a->discount_amount), 2) > 0)<div class="flex justify-between py-2.5"><dt>Installment surcharge</dt><dd>{{ $peso($a->net_amount - ($a->gross_amount - $a->discount_amount)) }}</dd></div>@endif
                         <div class="flex justify-between py-2.5 font-semibold"><dt>Total due</dt><dd>{{ $peso($a->net_amount) }}</dd></div>
@@ -114,52 +124,66 @@
 
             {{-- Receive payment --}}
             <div>
-                <div class="card lg:sticky lg:top-20">
+                <div class="card lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
                     <h2 class="h2 mb-4">Receive payment</h2>
                     @if($a->balance() <= 0)
                         <div class="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800"><x-icon name="check-circle" class="mb-1 h-6 w-6" /> Fully paid.</div>
                     @else
-                        @php $opts = \App\Support\PayOptions::for($a); @endphp
-                        <form method="post" action="{{ route('finance.pay', $e) }}" class="space-y-4"
-                              x-data="{ method: '{{ old('method', 'cash') }}', pick: @js($opts[0]['key'] ?? 'other'), other: '{{ old('amount') }}', opts: @js($opts),
-                                        get chosen() { return this.opts.find((o) => o.key === this.pick) }, get amount() { return this.pick === 'other' ? this.other : (this.chosen?.amount ?? '') },
-                                        get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label } }">
+                        @php $opts = \App\Support\PayOptions::for($a); $bal = $a->balance(); @endphp
+                        <form method="post" action="{{ route('finance.pay', $e) }}" class="flex flex-col" x-ref="pay"
+                              x-data="{ method: '{{ old('method', 'cash') }}', pick: @js(old('pay_key', $opts[0]['key'] ?? 'other')), other: '{{ old('amount') }}', opts: @js($opts), bal: {{ $bal }}, busy: false, ref: '{{ old('reference') }}',
+                                        get chosen() { return this.opts.find((o) => o.key === this.pick) },
+                                        get amount() { return this.pick === 'other' ? Number(this.other || 0) : (this.chosen?.amount ?? 0) },
+                                        get purpose() { return this.pick === 'other' ? 'Partial payment' : this.chosen?.label },
+                                        get otherError() { if (this.pick !== 'other' || this.other === '') return ''; const v = Number(this.other); if (!(v > 0)) return 'Enter an amount above ₱0.'; if (v > this.bal + 0.001) return 'That is more than the balance (' + this.peso(this.bal) + ').'; if (!/^\d+(\.\d{1,2})?$/.test(String(this.other))) return 'Use at most 2 decimal places.'; return '' },
+                                        get refNeeded() { return this.method !== 'cash' },
+                                        get ok() { return this.amount > 0 && !this.otherError && (!this.refNeeded || this.ref.trim() !== '') },
+                                        peso(v) { return '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+                                        submit() { if (!this.ok || this.busy) return; const m = { cash: 'Cash', gcash: 'GCash', bank: 'Bank transfer', check: 'Check' }[this.method] || this.method;
+                                            if (!confirm('Record ' + this.peso(this.amount) + ' by ' + m + ' for {{ addslashes($e->student->full_name) }}?')) return; this.busy = true; $refs.pay.submit() } }"
+                              x-on:submit.prevent="submit()">
                             @csrf
-                            <input type="hidden" name="amount" :value="amount"><input type="hidden" name="purpose" :value="purpose"><input type="hidden" name="pay_key" :value="pick">
-                            <div>
-                                <div class="label">Paying for</div>
-                                <div class="space-y-1.5">
-                                    <template x-for="o in opts" :key="o.key">
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1" :class="pick === o.key ? 'bg-brand-50 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
-                                            <input type="radio" class="sr-only" :value="o.key" x-model="pick">
-                                            <span class="flex-1"><span class="block font-medium" x-text="o.label"></span><span class="text-xs text-slate-500" x-text="o.hint"></span></span>
-                                            <span class="font-semibold tabular-nums" x-text="Number(o.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })"></span>
-                                        </label>
-                                    </template>
-                                    <label class="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1" :class="pick === 'other' ? 'bg-brand-50 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
-                                        <input type="radio" class="sr-only" value="other" x-model="pick">
-                                        <span class="flex-1 font-medium">Other amount</span>
-                                        <input type="number" step="0.01" min="1" max="{{ $a->balance() }}" x-model="other" x-on:focus="pick = 'other'" class="input h-9 w-28 text-right" placeholder="0.00">
+                            <input type="hidden" name="amount" :value="amount.toFixed(2)"><input type="hidden" name="purpose" :value="purpose"><input type="hidden" name="pay_key" :value="pick">
+                            <fieldset class="space-y-1.5">
+                                <legend class="label">Paying for</legend>
+                                @foreach($opts as $o)
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 focus-within:ring-2 focus-within:ring-brand-500" :class="pick === @js($o['key']) ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
+                                        <input type="radio" name="pick_ui" class="h-4 w-4 shrink-0 accent-brand-600" value="{{ $o['key'] }}" x-model="pick">
+                                        <span class="min-w-0 flex-1"><span class="block font-medium">{{ $o['label'] }}</span><span class="block text-xs text-slate-600 dark:text-slate-400">{{ $o['hint'] }}</span></span>
+                                        <span class="font-semibold tabular-nums">{{ $peso($o['amount']) }}</span>
                                     </label>
-                                </div>
+                                @endforeach
+                                <label class="flex cursor-pointer flex-wrap items-center gap-3 rounded-xl px-3 py-2 text-sm ring-1 focus-within:ring-2 focus-within:ring-brand-500" :class="pick === 'other' ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10' : 'ring-slate-200 dark:ring-slate-700'">
+                                    <input type="radio" name="pick_ui" class="h-4 w-4 shrink-0 accent-brand-600" value="other" x-model="pick">
+                                    <span class="flex-1 font-medium">Other amount</span>
+                                    <span class="flex items-center gap-1">₱<input type="text" inputmode="decimal" x-model="other" x-on:focus="pick = 'other'" class="input h-9 w-28 text-right placeholder:text-slate-500" placeholder="0.00" aria-label="Other amount" :aria-invalid="!!otherError" aria-describedby="other-err"></span>
+                                    <p id="other-err" x-show="otherError" x-text="otherError" class="w-full text-xs font-medium text-rose-700" role="alert"></p>
+                                </label>
                                 @error('amount')<p class="field-error">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <div class="label">Method</div>
+                            </fieldset>
+                            <fieldset class="mt-4">
+                                <legend class="label">Method</legend>
                                 <div class="grid grid-cols-2 gap-2">
                                     @foreach(\App\Models\Payment::METHODS as $k => $v)
-                                        <label class="cursor-pointer rounded-xl px-3 py-2 text-center text-sm ring-1" :class="method==='{{ $k }}' ? 'bg-brand-50 font-semibold text-brand-700 ring-brand-500' : 'ring-slate-200 hover:bg-slate-50'">
-                                            <input type="radio" name="method" value="{{ $k }}" x-model="method" class="sr-only">{{ \Illuminate\Support\Str::before($v, ' /') }}</label>
+                                        <label class="flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm ring-1 focus-within:ring-2 focus-within:ring-brand-500" :class="method==='{{ $k }}' ? 'bg-brand-50 font-semibold text-brand-800 ring-2 ring-brand-500 dark:bg-brand-500/10 dark:text-brand-200' : 'ring-slate-200 hover:bg-slate-50 dark:ring-slate-700'">
+                                            <input type="radio" name="method" value="{{ $k }}" x-model="method" class="h-4 w-4 accent-brand-600">{{ \Illuminate\Support\Str::before($v, ' /') }}</label>
                                     @endforeach
                                 </div>
+                            </fieldset>
+                            <label class="mt-4 block" x-show="refNeeded" x-cloak><span class="label">Reference / check no. <span class="text-rose-600">*</span></span>
+                                <input name="reference" x-model="ref" class="input" :required="refNeeded" placeholder="From the GCash / bank slip / check">
+                                @error('reference')<span class="field-error">{{ $message }}</span>@enderror</label>
+                            <div class="mt-4"><x-field name="paid_on" label="Date" type="date" :value="now()->toDateString()" required /></div>
+                            <div class="sticky bottom-0 -mx-6 mt-5 border-t border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900">
+                                <div class="mb-2 flex items-baseline justify-between"><span class="text-sm text-slate-600 dark:text-slate-400">Amount to receive</span><span class="text-2xl font-bold tabular-nums" x-text="peso(amount)"></span></div>
+                                <button class="btn btn-primary min-h-12 w-full text-base" :disabled="!ok || busy" x-text="busy ? 'Recording…' : 'Record payment'">Record payment</button>
+                                <p x-show="refNeeded && !ref.trim()" class="mt-1.5 text-xs text-slate-600">Enter the reference number to continue.</p>
                             </div>
-                            <div x-show="method !== 'cash'" x-cloak><x-field name="reference" label="Reference / check no." /></div>
-                            <x-field name="paid_on" label="Date" type="date" :value="now()->toDateString()" required />
-                            <button class="btn btn-primary w-full">Save payment & print receipt</button>
                         </form>
                     @endif
                 </div>
             </div>
         </div>
     @endif
+    </div>
 </x-layouts.app>

@@ -102,7 +102,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     });
 
     // Students (view rules are checked per student inside the controller)
-    Route::get('/students', [StudentController::class, 'index'])->middleware('role:admin,registrar,teacher,cashier,nurse,guidance,librarian')->name('students.index');
+    Route::get('/students', [StudentController::class, 'index'])->middleware('role:admin,registrar,cashier,nurse,guidance,librarian')->name('students.index');
     Route::get('/quick/students', [StudentController::class, 'quick'])->name('students.quick');
     Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
     Route::get('/students/lrn', [StudentController::class, 'lrnIndex'])->name('students.lrn');

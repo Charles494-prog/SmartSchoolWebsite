@@ -38,6 +38,8 @@ class Billing
         $account->payment_plan = $plan;
         $account->gross_amount = $gross;
         $account->save();
+        $account->fees()->delete();
+        $account->fees()->createMany($fees->map(fn ($f) => ['name' => $f->name, 'category' => $f->category, 'amount' => $f->amount])->all());
 
         $account->discounts()->delete();
         $discountTotal = 0.0;

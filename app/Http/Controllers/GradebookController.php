@@ -357,13 +357,14 @@ class GradebookController extends Controller
         $d = $request->validate(['award_id' => 'required|exists:awards,id', 'student_id' => 'required|exists:students,id', 'term' => 'nullable|integer|min:1|max:6', 'reason' => 'nullable|max:1000']);
         $student = \App\Models\Student::findOrFail($d['student_id']);
         abort_unless($u->hasRole(Role::ADMIN, Role::REGISTRAR) || $student->currentEnrollment()?->section?->adviser_id === $u->id, 403, 'Only the adviser can suggest awards for this student.');
-        $isAdmin = $u->hasRole(Role::ADMIN, Role::REGISTRAR);
-        \App\Models\AwardNomination::create($d + ['school_year_id' => SchoolYear::current()->id, 'nominated_by' => $u->id, 'status' => $isAdmin ? 'approved' : 'pending', 'reviewed_by' => $isAdmin ? $u->id : null]);
+        // Advisers give section awards themselves – no approval needed.
+        $isAdmin = true;
+        \App\Models\AwardNomination::create($d + ['school_year_id' => SchoolYear::current()->id, 'nominated_by' => $u->id, 'status' => 'approved', 'reviewed_by' => $u->id]);
         if (! $isAdmin) {
             Notification::send(User::whereIn('role', [Role::ADMIN, Role::REGISTRAR])->where('is_active', true)->get(), new GeneralNotice('Award suggestion', $u->name.' suggested '.$student->full_name.' for an award.', route('honors', ['tab' => 'awards'], false)));
         }
 
-        return back()->with('ok', $isAdmin ? 'Award given.' : 'Suggestion sent to the admin for approval.');
+        return back()->with('ok', 'Award given to '.$student->full_name.'.');
     }
 
     public function reviewNomination(Request $request, \App\Models\AwardNomination $nomination)

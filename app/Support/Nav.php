@@ -83,7 +83,7 @@ class Nav
         if ($is(Role::ADMIN, Role::REGISTRAR)) {
             $students[] = $item('Applications', 'applications.index', 'inbox', 'Review online admission forms', 'violet', 'applications.*');
         }
-        if ($is(Role::ADMIN, Role::REGISTRAR, Role::TEACHER, Role::CASHIER, Role::NURSE, Role::GUIDANCE, Role::LIBRARIAN)) {
+        if ($is(Role::ADMIN, Role::REGISTRAR, Role::CASHIER, Role::NURSE, Role::GUIDANCE, Role::LIBRARIAN)) {
             $students[] = $item('Students', 'students.index', 'users', 'Find a student, profiles and guardians', 'indigo', 'students.*');
         }
         if ($is(Role::ADMIN, Role::REGISTRAR)) {

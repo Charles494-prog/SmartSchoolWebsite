@@ -15,7 +15,7 @@
             </div>
             @php
                 $ens = $enrollment;
-                $feeItems = \App\Models\FeeItem::where('school_year_id', $ens->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $ens->grade_level_id))->orderBy('name')->get();
+                $feeItems = $a->fees()->orderBy('name')->get();
                 $orderCharges = $a->charges()->with('order.lines')->orderBy('created_at')->get();
                 $tPaid = $a->tuitionPaid(); $tBal = $a->tuitionBalance();
             @endphp

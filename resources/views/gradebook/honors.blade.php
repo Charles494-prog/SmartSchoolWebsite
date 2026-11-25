@@ -223,7 +223,7 @@
         {{-- SPECIAL AWARDS --}}
         <div x-show="tab === 'awards'" x-cloak x-data="{ give: null }">
             <div class="mb-5 flex flex-wrap items-center gap-3">
-                <p class="mr-auto text-sm text-slate-500">{{ $section?->label() }} · {{ $period }}. {{ $isAdmin ? 'Give an award, or approve what advisers suggest.' : 'Suggest an award for a student in your advisory class – the admin approves it.' }}</p>
+                <p class="mr-auto text-sm text-slate-500">{{ $section?->label() }} · {{ $period }}. {{ $isAdmin ? 'Give an award to a student.' : 'Give an award to a student in your advisory class.' }}</p>
             </div>
 
             @if($pending->isNotEmpty())
@@ -267,12 +267,12 @@
                         </div>
                         @if($a->is_active && $nominees->isNotEmpty())
                             <div class="border-t border-slate-100 p-4 dark:border-slate-800">
-                                <button type="button" x-show="give !== {{ $a->id }}" class="w-full rounded-xl border border-brand-200 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-300" x-on:click="give = {{ $a->id }}">{{ $isAdmin ? '+ Give this award' : '+ Suggest a student' }}</button>
+                                <button type="button" x-show="give !== {{ $a->id }}" class="w-full rounded-xl border border-brand-200 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-300" x-on:click="give = {{ $a->id }}">+ Give this award</button>
                                 <form x-show="give === {{ $a->id }}" x-cloak method="post" action="{{ route('honors.nominate') }}" class="space-y-2">@csrf
                                     <input type="hidden" name="award_id" value="{{ $a->id }}"><input type="hidden" name="term" value="{{ $term }}">
                                     <select name="student_id" class="input" required>@foreach($nominees as $st)<option value="{{ $st->id }}">{{ $st->full_name }}</option>@endforeach</select>
                                     <input name="reason" class="input" placeholder="Why? (optional)">
-                                    <div class="flex gap-2"><button class="btn btn-primary btn-sm flex-1">{{ $isAdmin ? 'Give award' : 'Send to admin' }}</button><button type="button" class="btn btn-sm" x-on:click="give = null">Cancel</button></div>
+                                    <div class="flex gap-2"><button class="btn btn-primary btn-sm flex-1">Give award</button><button type="button" class="btn btn-sm" x-on:click="give = null">Cancel</button></div>
                                 </form>
                             </div>
                         @endif

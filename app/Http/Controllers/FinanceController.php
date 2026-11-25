@@ -69,7 +69,9 @@ class FinanceController extends Controller
             'e' => $enrollment,
             'a' => $enrollment->account,
             'discounts' => Discount::orderBy('name')->get(),
-            'fees' => FeeItem::where('school_year_id', $enrollment->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $enrollment->grade_level_id))->get(),
+            // Assessed accounts show the lines the student was charged; before assessment, the grade's current fees.
+            'fees' => $enrollment->account ? $enrollment->account->fees()->orderBy('name')->get()
+                : FeeItem::where('school_year_id', $enrollment->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $enrollment->grade_level_id))->get(),
         ]);
     }
 
@@ -155,7 +157,8 @@ class FinanceController extends Controller
         abort_unless(auth()->user()->hasRole('admin', 'cashier') || auth()->user()->canViewStudent($enrollment->student), 403);
         $enrollment->load('student', 'gradeLevel', 'schoolYear', 'section', 'account.installments', 'account.payments', 'account.discounts.discount');
         abort_unless($enrollment->account, 404);
-        $fees = FeeItem::where('school_year_id', $enrollment->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $enrollment->grade_level_id))->get();
+        $fees = $enrollment->account ? $enrollment->account->fees()->orderBy('name')->get()
+            : FeeItem::where('school_year_id', $enrollment->school_year_id)->where(fn ($q) => $q->whereNull('grade_level_id')->orWhere('grade_level_id', $enrollment->grade_level_id))->get();
 
         return Pdf::loadView('pdf.soa', ['e' => $enrollment, 'a' => $enrollment->account, 'fees' => $fees])->setPaper('a4')->stream('SOA-'.$enrollment->student->student_no.'.pdf');
     }

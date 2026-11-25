@@ -42,6 +42,12 @@ class StudentAccount extends Model
         return $this->hasMany(AccountDiscount::class);
     }
 
+    /** The fee lines this student was charged – the one source for every fee figure. */
+    public function fees()
+    {
+        return $this->hasMany(AccountFee::class);
+    }
+
     public function charges()
     {
         return $this->hasMany(AccountCharge::class)->where('is_void', false);

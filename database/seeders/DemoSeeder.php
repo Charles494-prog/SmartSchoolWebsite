@@ -85,18 +85,28 @@ class DemoSeeder extends Seeder
             }
         }
         $n = 0;
+        $secIndex = 0;
+        $busy = [];
         foreach ($plan as [$levelName, $secName, $adv]) {
             $level = GradeLevel::where('name', $levelName)->first();
-            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'room' => 'Room '.(101 + $adv % 6), 'capacity' => 40]);
+            $roomName = 'Room '.(101 + $secIndex);   // one homeroom per section – no two sections share a room
+            Room::firstOrCreate(['name' => $roomName], ['building' => 'Main building', 'capacity' => 40]);
+            $section = Section::firstOrCreate(['name' => $secName, 'school_year_id' => $sy->id], ['grade_level_id' => $level->id, 'adviser_id' => $teachers[$adv]->id, 'room' => $roomName, 'capacity' => 40]);
             $times = [['07:30', '08:30'], ['08:30', '09:30'], ['09:45', '10:45'], ['10:45', '11:45'], ['13:00', '14:00'], ['14:00', '15:00'], ['15:00', '16:00'], ['16:00', '17:00']];
+            // Give each subject a time and a teacher who is free then (no teacher teaches two classes at once).
             foreach ($level->subjects as $i => $sub) {
-                $cs = ClassSubject::firstOrCreate(['section_id' => $section->id, 'subject_id' => $sub->id], ['teacher_id' => $teachers[($i + $adv) % count($teachers)]->id]);
-                if ($cs->slots()->doesntExist()) {
+                $cs = ClassSubject::where(['section_id' => $section->id, 'subject_id' => $sub->id])->first();
+                if (! $cs) {
+                    $slot = ($i + $secIndex) % 8;
+                    $t = collect(range(0, count($teachers) - 1))->map(fn ($k) => ($i + $secIndex * 5 + $k) % count($teachers))->first(fn ($k) => empty($busy[$k][$slot])) ?? 0;
+                    $busy[$t][$slot] = true;
+                    $cs = ClassSubject::create(['section_id' => $section->id, 'subject_id' => $sub->id, 'teacher_id' => $teachers[$t]->id]);
                     foreach ([1, 2, 3, 4, 5] as $d) {
-                        $cs->slots()->create(['day_of_week' => $d, 'starts_at' => $times[$i % 8][0], 'ends_at' => $times[$i % 8][1], 'room' => $section->room]);
+                        $cs->slots()->create(['day_of_week' => $d, 'starts_at' => $times[$slot][0], 'ends_at' => $times[$slot][1], 'room' => $section->room]);
                     }
                 }
             }
+            $secIndex++;
             for ($k = 0; $k < 12; $k++, $n++) {
                 $sex = $n % 2 ? 'Female' : 'Male';
                 $st = Student::firstOrCreate(['lrn' => '1'.str_pad((string) (40000000000 + $n), 11, '0', STR_PAD_LEFT)], [
