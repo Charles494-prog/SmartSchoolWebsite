@@ -25,7 +25,8 @@ class DevController extends Controller
         // Demo accounts, plus the Superadmin/admin accounts so their screens can be checked too.
         return User::where('is_active', true)->where(fn ($q) => $q->where('role', 'admin')->orWhere(fn ($d) => $d->where('email', 'like', '%@school.test')
             ->where(fn ($w) => $w->where('role', '!=', 'parent')->orWhere('email', 'parent@school.test'))))
-            ->orderBy('role')->orderBy('email')->get(['id', 'name', 'email', 'role']);
+            ->get(['id', 'name', 'email', 'role'])
+            ->sortBy(fn ($u) => [array_search($u->role, ['admin', 'student', 'parent', 'teacher', 'registrar', 'cashier', 'guard', 'nurse', 'guidance', 'librarian', 'hr'], true), $u->name])->values();
     }
 
     /** Developer tools are hidden behind a password (its hash lives in .env as SMARTSCHOOL_DEV_PASSWORD_HASH). */

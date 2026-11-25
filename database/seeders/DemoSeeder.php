@@ -109,8 +109,9 @@ class DemoSeeder extends Seeder
                 $pu = $mk('Parent of '.$st->first_name.' '.$st->last_name, $email, Role::PARENT);
                 $g = Guardian::firstOrCreate(['user_id' => $pu->id], ['name' => $pu->name, 'phone' => '0917'.str_pad((string) (1000000 + $n), 7, '0'), 'email' => $email]);
                 $st->guardians()->syncWithoutDetaching([$g->id => ['relationship' => $n % 3 ? 'Mother' : 'Father', 'is_primary' => true, 'is_emergency_contact' => true]]);
-                if ($n === 0) {
-                    $su = $mk($st->first_name.' '.$st->last_name, 'student@school.test', Role::STUDENT);
+                if ($k === 0 || $k === 1) {
+                    // A couple of student logins per section (student@school.test is the first one).
+                    $su = $mk($st->first_name.' '.$st->last_name, $n === 0 ? 'student@school.test' : 'student'.$n.'@school.test', Role::STUDENT);
                     $st->update(['user_id' => $su->id]);
                 }
             }
