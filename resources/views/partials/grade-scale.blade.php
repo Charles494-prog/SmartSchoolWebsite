@@ -1,8 +1,11 @@
+<div id="grade-scale" class="scroll-mt-24"></div>
 {{-- Grading scale editor (Settings + setup wizard). Posts grade_scale[i][min|label|desc] and grade_scale_show. --}}
 @php
-    $gsRows = old('grade_scale', \App\Support\GradeScale::rows());
+    $gsLevels = \App\Models\GradeLevel::orderBy('sort_order')->get(['id', 'name', 'grade_scale']);
+    $gsLevel = $gsLevels->firstWhere('id', (int) request('scale_level'));
+    $gsRows = old('grade_scale', \App\Support\GradeScale::rows($gsLevel?->id));
     $gsPresets = collect(\App\Support\GradeScale::PRESETS)->map(fn ($p, $k) => ['name' => $p[0], 'rows' => \App\Support\GradeScale::preset($k)]);
-    $gsPass = (float) old('passing_grade', \App\Models\Setting::get('passing_grade') ?: 75);
+    $gsPass = (float) old('passing_grade', \App\Support\GradeScale::passing($gsLevel?->id));
 @endphp
 <div x-data="{
         rows: @js(array_values($gsRows)),
@@ -21,6 +24,27 @@
             return '';
         },
      }" class="space-y-3">
+    <input type="hidden" name="grade_scale_level" value="{{ $gsLevel?->id }}">
+    @if($gsLevel)<input type="hidden" name="passing_grade" value="{{ \App\Models\Setting::get('passing_grade') ?: 75 }}">@endif
+    <div>
+        <span class="label">Which grade levels use this scale?</span>
+        <div class="flex flex-wrap gap-1.5">
+            <a href="{{ request()->fullUrlWithQuery(['scale_level' => null]) }}#grade-scale" class="inline-flex h-9 items-center rounded-full px-3 text-sm font-medium {{ $gsLevel ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-200' : 'bg-brand-600 text-white' }}">Whole school</a>
+            @foreach($gsLevels as $gl)
+                <a href="{{ request()->fullUrlWithQuery(['scale_level' => $gl->id]) }}#grade-scale" class="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium {{ $gsLevel?->id === $gl->id ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-200' }}">{{ $gl->name }}@if(! empty($gl->grade_scale))<span class="h-1.5 w-1.5 rounded-full {{ $gsLevel?->id === $gl->id ? 'bg-white' : 'bg-brand-600' }}" title="Has its own scale"></span>@endif</a>
+            @endforeach
+        </div>
+        <p class="mt-1.5 text-xs text-slate-500">
+            @if($gsLevel)
+                @if(! empty($gsLevel->grade_scale)) <b>{{ $gsLevel->name }}</b> has its own scale. @else <b>{{ $gsLevel->name }}</b> uses the whole-school scale now. Edit below and save to give it its own scale and passing score. Useful for college programs. @endif
+            @else
+                Levels with a dot have their own scale; the rest use this one.
+            @endif
+        </p>
+        @if($gsLevel && ! empty($gsLevel->grade_scale))
+            <label class="mt-2 inline-flex items-center gap-2 text-sm"><input type="checkbox" name="grade_scale_reset" value="1"> Go back to the whole-school scale for {{ $gsLevel->name }}</label>
+        @endif
+    </div>
     <div class="flex flex-wrap items-end gap-3">
         <label class="block min-w-0 flex-1"><span class="label">Start from a ready-made scale</span>
             <select class="input" x-on:change="use($event.target.value); $event.target.value = ''">
@@ -58,8 +82,8 @@
     </div>
     <div class="flex flex-wrap items-center justify-between gap-3">
         <button type="button" class="btn btn-sm" x-on:click="add()" :disabled="rows.length >= 20"><x-icon name="plus" class="h-4 w-4" /> Add a row</button>
-        <label class="flex items-center gap-2 text-sm"><span class="font-medium text-slate-700 dark:text-slate-200">Passing score</span>
-            <input type="number" name="passing_grade" min="50" max="100" step="0.01" class="input w-24" x-model.number="pass" aria-label="Passing score out of 100">
+        <label class="flex items-center gap-2 text-sm"><span class="font-medium text-slate-700 dark:text-slate-200">Passing score{{ $gsLevel ? ' for '.$gsLevel->name : '' }}</span>
+            <input type="number" name="{{ $gsLevel ? 'level_passing_grade' : 'passing_grade' }}" min="50" max="100" step="0.01" class="input w-24" x-model.number="pass" aria-label="Passing score out of 100">
         </label>
     </div>
     <p class="text-sm text-rose-700 dark:text-rose-400" x-show="problem()" x-text="problem()" role="alert"></p>

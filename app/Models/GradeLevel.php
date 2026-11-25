@@ -13,7 +13,7 @@ class GradeLevel extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['numeric_grades' => 'boolean'];
+    protected $casts = ['numeric_grades' => 'boolean', 'grade_scale' => 'array'];
 
     public const DEPARTMENTS = ['kinder' => 'Kindergarten', 'elementary' => 'Elementary', 'jhs' => 'Junior High School', 'shs' => 'Senior High School', 'college' => 'College', 'other' => 'Other'];
 

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\GradeLevel;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -36,8 +37,22 @@ class GradeScale
     public const SHOW = ['number' => 'Number only (e.g. 95)', 'scale' => 'Scale only (e.g. 1.25)', 'both' => 'Both (e.g. 1.25 · 95)'];
 
     /** @return list<array{min: float, label: string, desc: string}> highest band first */
-    public static function rows(): array
+    /** @var array<int, ?array> per-request copy of level scales */
+    private static array $levelRows = [];
+
+    public static function rows(?int $levelId = null): array
     {
+        if ($levelId) {
+            if (! array_key_exists($levelId, self::$levelRows) || app()->runningUnitTests()) {
+                self::$levelRows[$levelId] = GradeLevel::whereKey($levelId)->value('grade_scale');
+                if (is_string(self::$levelRows[$levelId])) {
+                    self::$levelRows[$levelId] = json_decode(self::$levelRows[$levelId], true);
+                }
+            }
+            if (is_array(self::$levelRows[$levelId]) && self::$levelRows[$levelId] !== []) {
+                return self::normalize(self::$levelRows[$levelId]);
+            }
+        }
         try {
             $rows = json_decode((string) Setting::get('grade_scale'), true);
         } catch (\Throwable) {
@@ -47,8 +62,26 @@ class GradeScale
             $rows = self::preset('deped');
         }
 
+        return self::normalize($rows);
+    }
+
+    private static function normalize(array $rows): array
+    {
         return collect($rows)->map(fn ($r) => ['min' => (float) $r['min'], 'label' => (string) ($r['label'] ?? ''), 'desc' => (string) ($r['desc'] ?? '')])
             ->sortByDesc('min')->values()->all();
+    }
+
+    /** Passing score (out of 100) for a level, falling back to the school's. */
+    public static function passing(?int $levelId = null): float
+    {
+        $own = $levelId ? GradeLevel::whereKey($levelId)->value('passing_grade') : null;
+
+        return (float) ($own ?? (Setting::get('passing_grade') ?: 75));
+    }
+
+    public static function hasOwn(int $levelId): bool
+    {
+        return ! empty(GradeLevel::whereKey($levelId)->value('grade_scale'));
     }
 
     public static function preset(string $key): array
@@ -63,12 +96,12 @@ class GradeScale
         return isset(self::SHOW[$s]) ? $s : 'number';
     }
 
-    public static function band(?float $grade): ?array
+    public static function band(?float $grade, ?int $levelId = null): ?array
     {
         if ($grade === null) {
             return null;
         }
-        foreach (self::rows() as $r) {
+        foreach (self::rows($levelId) as $r) {
             if ($grade >= $r['min']) {
                 return $r;
             }
@@ -77,29 +110,29 @@ class GradeScale
         return null;
     }
 
-    public static function descriptor(?float $grade): string
+    public static function descriptor(?float $grade, ?int $levelId = null): string
     {
-        return self::band($grade)['desc'] ?? '';
+        return self::band($grade, $levelId)['desc'] ?? '';
     }
 
     /** The scale value alone (falls back to the number when the band has no label). */
-    public static function label(?float $grade): string
+    public static function label(?float $grade, ?int $levelId = null): string
     {
         if ($grade === null) {
             return '';
         }
-        $l = self::band($grade)['label'] ?? '';
+        $l = self::band($grade, $levelId)['label'] ?? '';
 
         return $l !== '' ? $l : self::num($grade);
     }
 
     /** What people see for a grade, following the school's "show" choice. */
-    public static function format(?float $grade): string
+    public static function format(?float $grade, ?int $levelId = null): string
     {
         if ($grade === null) {
             return '';
         }
-        $l = self::band($grade)['label'] ?? '';
+        $l = self::band($grade, $levelId)['label'] ?? '';
 
         return match (true) {
             $l === '' || self::show() === 'number' => self::num($grade),
@@ -116,6 +149,12 @@ class GradeScale
     /** Validate and store the scale from a form (grade_scale[i][min|label|desc], grade_scale_show). */
     public static function saveFrom(Request $r): void
     {
+        $level = $r->filled('grade_scale_level') ? GradeLevel::findOrFail((int) $r->input('grade_scale_level')) : null;
+        if ($level && $r->boolean('grade_scale_reset')) {
+            $level->update(['grade_scale' => null, 'passing_grade' => null]);
+
+            return;
+        }
         if (! $r->has('grade_scale')) {
             return;
         }
@@ -134,7 +173,12 @@ class GradeScale
         if ((float) $rows->last()['min'] !== 0.0) {
             throw ValidationException::withMessages(['grade_scale' => 'The last row must start at 0 so every grade has a place on the scale.']);
         }
-        Setting::put('grade_scale', $rows->toJson());
+        if ($level) {
+            $pass = $r->validate(['level_passing_grade' => 'nullable|numeric|between:50,100'])['level_passing_grade'] ?? null;
+            $level->update(['grade_scale' => $rows->all(), 'passing_grade' => $pass]);
+        } else {
+            Setting::put('grade_scale', $rows->toJson());
+        }
         Setting::put('grade_scale_show', $d['grade_scale_show']);
     }
 }

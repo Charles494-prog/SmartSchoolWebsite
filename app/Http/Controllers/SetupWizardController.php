@@ -155,10 +155,29 @@ class SetupWizardController extends Controller
         return "School year {$d['name']} is now the current school year.";
     }
 
+    private const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+
+    /** "BSIT – 2nd Year" → "BSIT" */
+    private static function program(string $name): string
+    {
+        return trim(explode(' – ', $name)[0]);
+    }
+
     private function saveLevels(Request $r): string
     {
-        $d = $r->validate(['offered' => 'array', 'offered.*' => 'integer|exists:grade_levels,id']);
+        $d = $r->validate([
+            'offered' => 'array', 'offered.*' => 'integer|exists:grade_levels,id',
+            'names' => 'array', 'names.*' => 'nullable|string|max:60',
+            'new_levels' => 'array|max:30', 'new_levels.*.name' => 'nullable|string|max:60', 'new_levels.*.department' => 'nullable|in:'.implode(',', array_keys(GradeLevel::DEPARTMENTS)),
+            'programs' => 'array|max:30', 'programs.*.name' => 'nullable|string|max:45', 'programs.*.code' => 'nullable|string|max:12', 'programs.*.years' => 'nullable|integer|between:1,6',
+        ]);
         $keep = collect($d['offered'] ?? [])->map(fn ($v) => (int) $v);
+        foreach ($d['names'] ?? [] as $id => $name) {
+            $name = trim((string) $name);
+            if ($name !== '' && $keep->contains((int) $id)) {
+                GradeLevel::whereKey((int) $id)->where('name', '!=', $name)->first()?->update(['name' => $name]);
+            }
+        }
         // Hide levels the school doesn't offer by removing only those that are not used anywhere yet.
         $removed = 0;
         foreach (GradeLevel::whereNotIn('id', $keep)->get() as $gl) {
@@ -172,11 +191,35 @@ class SetupWizardController extends Controller
                 $removed++;
             }
         }
-        // Re-link promotion order among the remaining levels.
+        $order = (int) GradeLevel::max('sort_order');
+        $terms = School::periods();
+        $added = 0;
+        $make = function (string $name, string $dept) use (&$order, &$added, $terms) {
+            if ($name === '' || GradeLevel::where('name', $name)->exists()) {
+                return;
+            }
+            GradeLevel::create(['name' => $name, 'department' => $dept, 'sort_order' => ++$order, 'terms' => $terms, 'numeric_grades' => $dept !== 'kinder']);
+            $added++;
+        };
+        foreach ($d['new_levels'] ?? [] as $l) {
+            $make(trim((string) ($l['name'] ?? '')), $l['department'] ?? 'other');
+        }
+        foreach ($d['programs'] ?? [] as $p) {
+            $label = trim((string) ($p['code'] ?? '')) ?: trim((string) ($p['name'] ?? ''));
+            for ($y = 1; $label !== '' && $y <= (int) ($p['years'] ?? 4); $y++) {
+                $make($label.' – '.self::ORDINALS[$y - 1].' Year', 'college');
+            }
+        }
+        // Re-link promotion order: basic ed in sequence; each college program only within itself.
         $prev = null;
         foreach (GradeLevel::orderBy('sort_order')->get() as $gl) {
-            $prev?->update(['next_grade_level_id' => $gl->id]);
+            $link = $prev && ($gl->department !== 'college' || ($prev->department === 'college' && self::program($prev->name) === self::program($gl->name)));
+            $prev?->update(['next_grade_level_id' => $link ? $gl->id : null]);
             $prev = $gl;
+        }
+        $prev?->update(['next_grade_level_id' => null]);
+        if ($added) {
+            return "Added {$added} level(s)".($removed ? ", removed {$removed}" : '').'.';
         }
 
         return $removed ? "Removed {$removed} grade level(s) your school doesn't offer." : 'Grade levels saved.';

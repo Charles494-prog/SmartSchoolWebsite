@@ -114,10 +114,53 @@
                             @break
 
                         @case('levels')
-                            <div class="grid gap-2 sm:grid-cols-2">
-                                @foreach($levels as $gl)
-                                    <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50"><input type="checkbox" name="offered[]" value="{{ $gl->id }}" checked class="h-4 w-4 rounded"> {{ $gl->name }}</label>
+                            @php $depts = \App\Models\GradeLevel::DEPARTMENTS; @endphp
+                            <div x-data="{ adds: [], programs: [] }" class="space-y-5">
+                                @foreach($levels->groupBy('department') as $dept => $group)
+                                    <div>
+                                        <h3 class="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">{{ $depts[$dept] ?? 'Other' }}</h3>
+                                        <div class="grid gap-2 sm:grid-cols-2">
+                                            @foreach($group as $gl)
+                                                <div x-data="{ on: true }" class="flex min-h-11 items-center gap-2 rounded-xl border px-3 py-1.5" :class="on ? 'border-slate-200 bg-white dark:border-white/10 dark:bg-white/5' : 'border-dashed border-slate-200 opacity-60 dark:border-white/10'">
+                                                    <input type="checkbox" name="offered[]" value="{{ $gl->id }}" x-model="on" class="h-4 w-4 shrink-0 rounded" aria-label="Offer {{ $gl->name }}">
+                                                    <input class="min-w-0 flex-1 border-0 bg-transparent px-1 py-1.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-brand-500 rounded-md" name="names[{{ $gl->id }}]" value="{{ $gl->name }}" maxlength="60" aria-label="Name of {{ $gl->name }}" :disabled="!on">
+                                                    <span class="shrink-0 text-xs text-slate-400" x-show="!on">Not offered</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 @endforeach
+                                <p class="text-xs text-slate-500">Click a name to rename it. Untick levels you don't offer; levels that already have sections or students are kept.</p>
+
+                                {{-- Add a single level --}}
+                                <div class="space-y-2 rounded-xl border border-dashed border-slate-300 p-3 dark:border-white/15">
+                                    <p class="text-sm font-semibold text-slate-900">Add a grade level</p>
+                                    <template x-for="(l, i) in adds" :key="i">
+                                        <div class="grid grid-cols-[1fr_2.75rem] gap-2 sm:grid-cols-[1fr_11rem_2.75rem]">
+                                            <input class="input" :name="`new_levels[${i}][name]`" x-model="l.name" placeholder="e.g. Nursery or Grade 13" aria-label="Level name" maxlength="60">
+                                            <select class="input col-start-1 sm:col-start-auto" :name="`new_levels[${i}][department]`" x-model="l.department" aria-label="Department">@foreach($depts as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select>
+                                            <button type="button" class="btn btn-ghost row-start-1 h-11 w-11 p-0 sm:row-start-auto col-start-2 sm:col-start-auto" x-on:click="adds.splice(i, 1)" aria-label="Remove"><x-icon name="x" class="h-4 w-4" /></button>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="btn btn-sm" x-on:click="adds.push({ name: '', department: 'other' })"><x-icon name="plus" class="h-4 w-4" /> Add a level</button>
+                                </div>
+
+                                {{-- College programs --}}
+                                <div class="space-y-2 rounded-xl border border-dashed border-slate-300 p-3 dark:border-white/15">
+                                    <p class="text-sm font-semibold text-slate-900">Offer college courses or programs</p>
+                                    <p class="text-xs text-slate-500">Each program gets a level per year, e.g. "BSIT – 1st Year" to "BSIT – 4th Year". Students move up within their program.</p>
+                                    <template x-for="(p, i) in programs" :key="i">
+                                        <div class="grid grid-cols-[1fr_2.75rem] gap-2 sm:grid-cols-[1fr_8rem_9rem_2.75rem]">
+                                            <input class="input" :name="`programs[${i}][name]`" x-model="p.name" placeholder="e.g. BS Information Technology" aria-label="Program name" maxlength="45">
+                                            <input class="input col-start-1 sm:col-start-auto" :name="`programs[${i}][code]`" x-model="p.code" placeholder="Short: BSIT" aria-label="Short name" maxlength="12">
+                                            <select class="input col-start-1 sm:col-start-auto" :name="`programs[${i}][years]`" x-model="p.years" aria-label="Years">@foreach([1, 2, 3, 4, 5, 6] as $y)<option value="{{ $y }}">{{ $y }} {{ $y === 1 ? 'year' : 'years' }}</option>@endforeach</select>
+                                            <button type="button" class="btn btn-ghost row-start-1 col-start-2 h-11 w-11 p-0 sm:row-start-auto sm:col-start-auto" x-on:click="programs.splice(i, 1)" aria-label="Remove program"><x-icon name="x" class="h-4 w-4" /></button>
+                                            <p class="col-span-full -mt-1 text-xs text-slate-500" x-show="p.name || p.code" x-text="'Creates: ' + Array.from({ length: Number(p.years) }, (_, k) => (p.code || p.name) + ' – ' + ['1st','2nd','3rd','4th','5th','6th'][k] + ' Year').join(', ')"></p>
+                                        </div>
+                                    </template>
+                                    <button type="button" class="btn btn-sm" x-on:click="programs.push({ name: '', code: '', years: '4' })"><x-icon name="plus" class="h-4 w-4" /> Add a program</button>
+                                    <p class="text-xs text-slate-500">College grades often use 1.00–5.00. Set that per level in the next step (Subjects &amp; grading → Grading scale).</p>
+                                </div>
                             </div>
                             @break
 
@@ -177,15 +220,33 @@
 
                         @case('staff')
                             @if($staff->isNotEmpty())
-                                <div class="rounded-xl bg-slate-50 p-3 text-sm dark:bg-white/5">
-                                    <p class="mb-2 font-medium text-slate-700">Already added</p>
-                                    <ul class="divide-y divide-slate-200 dark:divide-white/10">
-                                        @foreach($staff as $p)
-                                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2"><span class="font-medium text-slate-900">{{ $p->name }}</span><span class="text-slate-500">{{ $p->roleLabel() }} · {{ $p->email }}</span>
-                                                @unless($p->isAdmin())<button type="submit" form="reset-{{ $p->id }}" class="ml-auto text-sm font-medium text-brand-700 hover:underline">New temporary password</button>@endunless
-                                            </li>
-                                        @endforeach
-                                    </ul>
+                                @php $staffJs = $staff->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'role' => $p->roleLabel(), 'email' => $p->email, 'admin' => $p->isAdmin()])->values(); @endphp
+                                <div x-data="{ open: false, q: '', role: '', people: @js($staffJs),
+                                        get roles() { return [...new Set(this.people.map(p => p.role))].sort() },
+                                        get list() { const q = this.q.toLowerCase(); return this.people.filter(p => (!this.role || p.role === this.role) && (!q || (p.name + ' ' + p.email).toLowerCase().includes(q))) },
+                                     }" class="rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
+                                    <button type="button" class="flex min-h-14 w-full items-center gap-3 px-4 text-left" x-on:click="open = !open" :aria-expanded="open">
+                                        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"><x-icon name="check" class="h-4 w-4" /></span>
+                                        <span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-slate-900">{{ $staff->count() }} staff already have accounts</span>
+                                            <span class="block truncate text-xs text-slate-500">{{ $staff->groupBy(fn ($p) => $p->roleLabel())->map(fn ($g, $r) => $g->count().' '.$r)->implode(' · ') }}</span></span>
+                                        <span class="text-sm font-medium text-brand-700" x-text="open ? 'Hide' : 'View'"></span>
+                                    </button>
+                                    <div x-show="open" x-cloak class="border-t border-slate-100 p-3 dark:border-white/10">
+                                        <div class="flex flex-wrap gap-2">
+                                            <input type="search" class="input min-w-0 flex-1" x-model="q" placeholder="Search name or email" aria-label="Search staff">
+                                            <select class="input w-auto" x-model="role" aria-label="Filter by role"><option value="">All roles</option><template x-for="r in roles" :key="r"><option :value="r" x-text="r"></option></template></select>
+                                        </div>
+                                        <ul class="mt-2 max-h-72 divide-y divide-slate-100 overflow-y-auto dark:divide-white/10">
+                                            <template x-for="p in list" :key="p.id">
+                                                <li class="flex items-center gap-3 py-2">
+                                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200" x-text="p.name.split(' ').map(w => w[0]).slice(0, 2).join('')"></span>
+                                                    <span class="min-w-0 flex-1"><span class="block truncate text-sm font-medium text-slate-900" x-text="p.name"></span><span class="block truncate text-xs text-slate-500" x-text="p.role + ' · ' + p.email"></span></span>
+                                                    <button type="submit" x-show="!p.admin" :form="'reset-' + p.id" class="btn btn-sm shrink-0" :aria-label="'New temporary password for ' + p.name">Reset password</button>
+                                                </li>
+                                            </template>
+                                            <li x-show="!list.length" class="py-6 text-center text-sm text-slate-500">No one matches.</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             @endif
                             <div x-data="{ rows: [{ name: '', email: '', role: 'teacher' }] }" class="space-y-3">
@@ -384,19 +445,28 @@
                                     </a>
                                 @endforeach
                                 @php $applyUrl = \App\Support\School::shareableUrl(route('apply.create')); @endphp
-                                @if(\App\Support\School::mode() === \App\Support\School::LAN)
-                                    <div class="flex gap-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-500/30 dark:bg-brand-500/5">
-                                        <x-icon name="monitor" class="mt-0.5 h-5 w-5 shrink-0 text-brand-700 dark:text-brand-300" />
-                                        <div class="min-w-0 text-sm text-slate-700 dark:text-slate-200">
-                                            <p class="font-semibold text-slate-900">Set up an enrollment computer near the Registrar</p>
-                                            <p class="mt-1">Families don't need internet at home. Put one or two computers near the Registrar's office, connected to the school Wi-Fi, and open this page on them. Families fill in the form there, and the Registrar approves it.</p>
-                                            <p class="mt-2"><code class="rounded bg-white px-1.5 py-0.5 break-all ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10">{{ $applyUrl }}</code></p>
-                                            <p class="mt-1 text-xs text-slate-500">Tip: press F11 on that computer for full screen so it works like a kiosk.</p>
+                                @php $isLan = \App\Support\School::mode() === \App\Support\School::LAN; @endphp
+                                <div class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-white/5">
+                                    <p class="text-sm font-semibold text-slate-900">Two ways families can apply</p>
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div class="flex gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
+                                            <x-icon name="monitor" class="mt-0.5 h-5 w-5 shrink-0 text-brand-700 dark:text-brand-300" />
+                                            <div class="text-sm"><p class="font-medium text-slate-900">At school, near the Registrar</p><p class="mt-0.5 text-slate-600 dark:text-slate-300">For families without a phone or who aren't comfortable online. Set up one or two computers near the Registrar with the form open. Your IT person or any staff can do it.</p></div>
+                                        </div>
+                                        <div class="flex gap-3 rounded-lg bg-slate-50 p-3 {{ $isLan ? 'opacity-70' : '' }} dark:bg-white/5">
+                                            <x-icon name="home" class="mt-0.5 h-5 w-5 shrink-0 text-brand-700 dark:text-brand-300" />
+                                            <div class="text-sm"><p class="font-medium text-slate-900">From home</p><p class="mt-0.5 text-slate-600 dark:text-slate-300">{{ $isLan ? 'Only on the school Wi-Fi while SmartSchool runs offline. Switch to Online mode to allow this.' : 'Share the link on your Facebook page or group chat. No login needed.' }}</p></div>
                                         </div>
                                     </div>
-                                @else
-                                    <p class="text-sm text-slate-600">Families can apply from home without logging in. Share this link, or open it on a computer near the Registrar: <code class="rounded bg-slate-100 px-1.5 py-0.5 break-all">{{ $applyUrl }}</code></p>
-                                @endif
+                                    <div>
+                                        <span class="label">Application form link</span>
+                                        <div class="flex gap-2" x-data="{ copied: false }">
+                                            <code class="input flex min-w-0 flex-1 items-center overflow-x-auto font-mono text-sm whitespace-nowrap">{{ $applyUrl }}</code>
+                                            <button type="button" class="btn shrink-0" x-on:click="navigator.clipboard.writeText(@js($applyUrl)); copied = true; setTimeout(() => copied = false, 1500)"><span x-text="copied ? 'Copied' : 'Copy'"></span></button>
+                                        </div>
+                                        <p class="mt-1.5 text-xs text-slate-500">On the Registrar's computer: open the link, then press F11 for full screen so it works like a kiosk.</p>
+                                    </div>
+                                </div>
                             </div>
                             @break
 

@@ -94,7 +94,7 @@ class Enrollment
         $enrollments = EnrollmentModel::with(['gradeLevel', 'section', 'student'])->where('school_year_id', $fromYearId)->where('status', 'enrolled')->get();
         foreach ($enrollments as $e) {
             $ga = $e->general_average ?? ($e->section ? Grading::reportCard($e)['general_average'] : null);
-            $passed = $ga !== null && $ga >= $passing;
+            $passed = $ga !== null && $ga >= (float) ($e->gradeLevel->passing_grade ?? $passing);
             $next = $passed ? $e->gradeLevel->next : $e->gradeLevel;
             if ($passed && ! $next) {
                 $e->update(['status' => 'graduated', 'general_average' => $ga]);

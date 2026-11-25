@@ -227,12 +227,13 @@ class Grading
     public static function reportCard(Enrollment $e, $classSubjects = null): array
     {
         $subjects = [];
+        $pass = GradeScale::passing($e->grade_level_id ?? $e->section?->grade_level_id);
         if ($e->section) {
             $classSubjects ??= $e->section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments'])->get();
             foreach ($classSubjects->sortBy('subject.name') as $cs) {
                 $terms = self::studentTerms($cs, $e->student);
                 $final = self::finalGrade($terms);
-                $subjects[] = ['name' => $cs->subject->name, 'terms' => $terms, 'final' => $final, 'remark' => $final === null ? '' : ($final >= (float) Setting::get('passing_grade') ? 'Passed' : 'Failed')];
+                $subjects[] = ['name' => $cs->subject->name, 'terms' => $terms, 'final' => $final, 'remark' => $final === null ? '' : ($final >= $pass ? 'Passed' : 'Failed')];
             }
         }
         $finals = array_filter(array_column($subjects, 'final'), fn ($g) => $g !== null);
@@ -266,7 +267,7 @@ class Grading
             } else {
                 $avg = $grades !== [] && ! in_array(null, $grades, true) ? round(array_sum($grades) / count($grades), 2) : null;
             }
-            $pass = (float) (Setting::get('passing_grade') ?: 75);
+            $pass = GradeScale::passing($section->grade_level_id);
             // 'failed' rows are never shown on public lists – kept private for the adviser and parents.
             $failed = collect($grades)->filter(fn ($g) => $g !== null && $g < $pass)->isNotEmpty();
             $rows[] = ['enrollment' => $e, 'average' => $avg, 'honor' => $failed ? null : self::honor($avg), 'failed' => $failed, 'grades' => $grades];

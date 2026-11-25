@@ -79,12 +79,47 @@ class GradeScaleTest extends TestCase
         $this->assertSame(2, Section::where('name', 'Section Z')->where('school_year_id', SchoolYear::current()->id)->count());
     }
 
-    public function test_students_step_explains_registrar_computer_on_lan(): void
+    public function test_students_step_explains_registrar_computer_in_both_modes(): void
     {
-        Setting::put('deployment_mode', 'lan');
-        $this->get('/setup-wizard/students')->assertOk()->assertSee('enrollment computer near the Registrar');
-        Setting::put('deployment_mode', 'hosted');
-        $this->get('/setup-wizard/students')->assertOk()->assertDontSee('enrollment computer near the Registrar');
+        foreach (['lan', 'hosted'] as $mode) {
+            Setting::put('deployment_mode', $mode);
+            $this->get('/setup-wizard/students')->assertOk()->assertSee('At school, near the Registrar')->assertSee('/apply');
+        }
+    }
+
+    public function test_levels_step_renames_adds_levels_and_college_programs(): void
+    {
+        $levels = GradeLevel::orderBy('sort_order')->get();
+        $g1 = $levels->firstWhere('name', 'Grade 1');
+        $this->post('/setup-wizard/levels', [
+            'offered' => $levels->pluck('id')->all(),
+            'names' => [$g1->id => 'Grade One'],
+            'new_levels' => [['name' => 'Nursery', 'department' => 'kinder']],
+            'programs' => [['name' => 'BS Information Technology', 'code' => 'BSIT', 'years' => 4], ['name' => 'BS Nursing', 'code' => 'BSN', 'years' => 2]],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('Grade One', $g1->fresh()->name);
+        $this->assertTrue(GradeLevel::where('name', 'Nursery')->exists());
+        $y1 = GradeLevel::where('name', 'BSIT – 1st Year')->firstOrFail();
+        $y4 = GradeLevel::where('name', 'BSIT – 4th Year')->firstOrFail();
+        $this->assertSame('college', $y1->department);
+        $this->assertSame('BSIT – 2nd Year', $y1->next->name);
+        $this->assertNull($y4->next_grade_level_id); // never promoted into another program
+        $this->assertNull(GradeLevel::where('name', 'BSN – 2nd Year')->value('next_grade_level_id'));
+        $this->get('/setup-wizard/levels')->assertOk()->assertSee('College');
+    }
+
+    public function test_each_level_can_have_its_own_scale_and_passing_score(): void
+    {
+        $level = GradeLevel::where('name', 'Grade 12')->firstOrFail();
+        $this->get('/setup-wizard/subjects?scale_level='.$level->id)->assertOk()->assertSee('Passing score for Grade 12');
+        $this->post('/setup-wizard/subjects', ['ww' => 30, 'pt' => 50, 'qa' => 20, 'grade_scale_level' => $level->id, 'level_passing_grade' => 80] + $this->scale('college', 'scale'))->assertSessionHasNoErrors();
+        $this->assertSame('1.25', GradeScale::format(95, $level->id));
+        $this->assertSame('95', GradeScale::label(95)); // rest of the school unchanged
+        $this->assertSame(80.0, GradeScale::passing($level->id));
+        $this->assertSame(75.0, GradeScale::passing());
+        $this->post('/setup-wizard/subjects', ['ww' => 30, 'pt' => 50, 'qa' => 20, 'grade_scale_level' => $level->id, 'grade_scale_reset' => 1])->assertSessionHasNoErrors();
+        $this->assertSame('95', GradeScale::label(95, $level->id));
+        $this->assertSame(75.0, GradeScale::passing($level->id));
     }
 
     private function settingsBase(): array
