@@ -11,7 +11,7 @@ class Nav
 {
     /** Features each role can never hide (the admin can change this in Settings → Personal setup). */
     public const LOCKED_DEFAULT = [
-        'guard' => ['Gate scanner'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Student balances'],
+        'guard' => ['Gate scanner'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Transactions'],
         'student' => ['Grades', 'My classes'], 'parent' => ['Grades'], 'registrar' => ['Applications', 'Students'], 'nurse' => ['Clinic'],
         'guidance' => ['Guidance'], 'librarian' => ['Library'], 'hr' => ['Payroll', 'Employees'],
     ];
@@ -122,10 +122,8 @@ class Nav
 
         if ($is(Role::CASHIER, Role::ADMIN)) {
             $g['Payments'] = [
-                $item('Student balances', 'finance.index', 'wallet', 'Fees, balances and collecting payments', 'rose', 'finance.index'),
+                $item('Transactions', 'finance.index', 'wallet', 'Find a student, take a payment, receipts and balances', 'rose', ['finance.index', 'finance.show', 'finance.payments', 'finance.overdue']),
                 ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => \App\Models\PaymentProof::where('status', 'pending')->count()]] : []),
-                $item('Receipts', 'finance.payments', 'receipt', 'All payments received', 'rose'),
-                $item('Overdue', 'finance.overdue', 'alert', 'Late payments and reminders', 'rose'),
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
                 $crud('Discounts & scholarships', 'discounts', 'percent', 'Discounts and scholarships'),
                 $crud('Payment plans', 'payment-plans', 'calendar', 'How tuition is divided into payments'),
@@ -182,11 +180,11 @@ class Nav
     {
         $all = collect(self::for($u))->flatten(1)->keyBy('label');
         $pick = match ($u->role) {
-            Role::ADMIN => ['Home', 'Students', 'Classes & sections', 'Grades', 'Student balances', 'School settings'],
+            Role::ADMIN => ['Home', 'Students', 'Classes & sections', 'Grades', 'Transactions', 'School settings'],
             Role::REGISTRAR => ['Home', 'Applications', 'Students', 'Classes & sections', 'Grades', 'Messages'],
             Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'My classes', 'Class cards', 'Messages'],
             Role::GUARD => ['Gate scanner', 'Messages'],
-            Role::CASHIER => ['Home', 'Student balances', 'Receipts', 'Overdue', 'Students', 'Messages'],
+            Role::CASHIER => ['Home', 'Transactions', 'Online payments', 'Students'],
             Role::STUDENT, Role::PARENT => ['Home', 'Grades', 'Attendance', 'Class schedule', 'Payments', 'Messages'],
             default => [],
         };

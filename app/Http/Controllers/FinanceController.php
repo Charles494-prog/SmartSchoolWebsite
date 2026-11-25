@@ -18,27 +18,42 @@ use Illuminate\Support\Facades\DB;
 
 class FinanceController extends Controller
 {
+    /** Transactions: find a student, see their balance, take a payment. Overdue/settled are filters; receipts are a tab. */
     public function index(Request $request)
     {
         $sy = SchoolYear::current();
-        $q = Enrollment::with(['student', 'gradeLevel', 'section', 'account.payments'])->where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained']);
+        $view = in_array($request->query('view'), ['balances', 'receipts'], true) ? $request->query('view') : 'balances';
+        $filter = in_array($request->query('filter'), ['all', 'overdue', 'settled', 'unassessed'], true) ? $request->query('filter') : 'balance';
+        $q = Enrollment::with(['student', 'gradeLevel', 'section', 'account.payments', 'account.installments'])->where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained']);
         if ($t = trim((string) $request->query('q'))) {
-            $q->whereHas('student', fn ($s) => $s->where('last_name', 'like', "%$t%")->orWhere('first_name', 'like', "%$t%")->orWhere('student_no', 'like', "%$t%"));
+            $q->whereHas('student', fn ($s) => $s->where('last_name', 'like', "%$t%")->orWhere('first_name', 'like', "%$t%")->orWhere('student_no', 'like', "%$t%")->orWhere('lrn', 'like', "%$t%"));
         }
-        if ($request->query('filter') === 'unassessed') {
-            $q->doesntHave('account');
-        }
-        $rows = $q->get()->sortBy('student.last_name');
-        $accounts = StudentAccount::whereHas('enrollment', fn ($e) => $e->where('school_year_id', $sy?->id))->get();
+        $all = $q->get()->sortBy('student.last_name')->values();
+        $rows = $all->filter(fn ($e) => match ($filter) {
+            'overdue' => $e->account && $e->account->overdueAmount() > 0,
+            'settled' => $e->account && $e->account->balance() <= 0,
+            'unassessed' => ! $e->account,
+            'all' => true,
+            default => ! $e->account || $e->account->balance() > 0,       // default: hide settled balances
+        })->values();
+        $accounts = StudentAccount::whereHas('enrollment', fn ($e) => $e->where('school_year_id', $sy?->id))->with('payments', 'installments')->get();
         $billed = $accounts->sum('net_amount');
         $collected = (float) Payment::where('is_void', false)->whereIn('student_account_id', $accounts->pluck('id'))->sum('amount');
 
         return view('finance.index', [
-            'rows' => $rows,
-            'billed' => $billed,
-            'collected' => $collected,
-            'rate' => $billed > 0 ? round($collected / $billed * 100, 1) : 0,
-            'unassessed' => $rows->filter(fn ($e) => ! $e->account)->count(),
+            'rows' => $rows, 'view' => $view, 'filter' => $filter,
+            'billed' => $billed, 'collected' => $collected, 'rate' => $billed > 0 ? round($collected / $billed * 100, 1) : 0,
+            'counts' => [
+                'balance' => $accounts->filter(fn ($a) => $a->balance() > 0)->count() + $all->filter(fn ($e) => ! $e->account)->count(),
+                'overdue' => $accounts->filter(fn ($a) => $a->overdueAmount() > 0)->count(),
+                'settled' => $accounts->filter(fn ($a) => $a->balance() <= 0)->count(),
+                'unassessed' => Enrollment::where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained'])->doesntHave('account')->count(),
+            ],
+            'overdueTotal' => $accounts->sum(fn ($a) => $a->overdueAmount()),
+            'pendingOnline' => \App\Models\PaymentProof::where('status', 'pending')->count(),
+            'receipts' => $view === 'receipts' ? Payment::with('account.enrollment.student', 'receiver')->latest('paid_on')->latest('id')
+                ->when($t ?? null, fn ($r, $t) => $r->whereHas('account.enrollment.student', fn ($s) => $s->where('last_name', 'like', "%$t%")->orWhere('first_name', 'like', "%$t%"))->orWhere('or_number', 'like', "%$t%"))
+                ->paginate(30)->withQueryString() : null,
         ]);
     }
 

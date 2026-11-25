@@ -17,7 +17,7 @@
             [['QR ID cards', $link('qr.cards')]]],
         ['Fees and payments', 'cashier', 'Cashier', 'wallet',
             'For each student, choose a payment plan and any discount, then record payments to issue an official receipt. Parents see their balance on their phone.',
-            [['Student balances', $link('finance.index')]]],
+            [['Transactions', $link('finance.index')]]],
         ['Attendance every day', 'teacher', 'Guard · Teachers · Adviser', 'check-square',
             'At the gate the guard scans each QR card: first scan = IN, scan again when leaving = OUT. Each subject teacher scans the class in their own subject. The adviser checks the daily list and fixes anyone who forgot their card. Parents of late or absent students are notified automatically.',
             [['Scan QR in my class', $link('attendance.scan')], ['Advisory attendance', $link('attendance.sheet')]]],
