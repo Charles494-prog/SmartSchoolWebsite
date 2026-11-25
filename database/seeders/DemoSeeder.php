@@ -191,6 +191,9 @@ class DemoSeeder extends Seeder
         if (\App\Models\AwardNomination::doesntExist()) {
             foreach (Section::where('school_year_id', $sy->id)->get() as $si => $sec) {
                 $kids = $sec->students()->get();
+                if ($kids->count() < 5) {
+                    continue;
+                }
                 \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Best in Conduct')->value('id'), 'student_id' => $kids[3]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Always respectful and kind to classmates.', 'status' => 'approved', 'nominated_by' => $sec->adviser_id]);
                 \App\Models\AwardNomination::create(['award_id' => \App\Models\Award::where('name', 'Leadership Award')->value('id'), 'student_id' => $kids[4]->id, 'school_year_id' => $sy->id, 'term' => 1, 'reason' => 'Led the class clean-up drive.', 'status' => 'pending', 'nominated_by' => $sec->adviser_id]);
             }
