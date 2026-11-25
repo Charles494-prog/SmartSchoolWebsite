@@ -1,5 +1,5 @@
 @php $peso = fn ($v) => \App\Services\Billing::peso($v); @endphp
-<x-layouts.app title="Bookstore orders awaiting payment">
+<x-layouts.app :ajaxForms="true" title="Bookstore orders awaiting payment">
     <x-page-header title="Bookstore orders awaiting payment" subtitle="Receive the payment with the usual official receipt. Walk-in students are listed first. This list refreshes by itself." />
     <div x-data="{ n: {{ $orders->count() }} }" x-init="setInterval(async () => { if (document.hidden) return; try { const r = await fetch(@js(route('finance.bookstore')), { headers: { Accept: 'application/json' } }); const j = await r.json(); if (j.count !== n) location.reload() } catch (e) {} }, 5000)">
         @if($orders->isEmpty())

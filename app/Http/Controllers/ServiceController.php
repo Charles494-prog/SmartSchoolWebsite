@@ -62,10 +62,12 @@ class ServiceController extends Controller
         $req->update(['status' => $d['status'], 'note' => $d['note'] ?? $req->note]);
         if ($d['status'] === 'ready') {
             if ($req->isPaid()) {
-                return back()->with('ok', 'Marked ready. It is paid – you can release it, or notify the family to come get it.');
+                $n = $req->tellFamilyReady();
+
+                return back()->with('ok', 'Papers ready and paid – told '.$n.' '.str('account')->plural($n).' to come get it. Release it when they pick it up.');
             }
 
-            return back()->with('ok', 'Marked ready. Not paid yet – you will be notified when finance confirms the payment.');
+            return back()->with('ok', 'Papers ready. Not paid yet – the family is told automatically once finance confirms the payment.');
         }
         $msg = ['processing' => 'is being prepared', 'released' => 'was released to you', 'declined' => 'was not accepted: '.($d['note'] ?? '')][$d['status']];
         $req->requester?->notify(new GeneralNotice('Request update', $req->service->name.' '.$msg, '/portal/services'));
@@ -77,6 +79,11 @@ class ServiceController extends Controller
     public function notify(ServiceRequest $req)
     {
         abort_unless(in_array($req->status, ['ready', 'processing'], true), 422);
+        if ($req->status === 'ready' && $req->isPaid()) {
+            $n = $req->tellFamilyReady();
+
+            return back()->with('ok', 'Reminded '.$n.' '.str('account')->plural($n).' to come get it.');
+        }
         $paid = $req->isPaid();
         $due = $paid ? '' : Billing::peso($req->charge->remaining());
         $name = $req->service->name;
@@ -118,8 +125,9 @@ class ServiceController extends Controller
         $d = $request->validate(['school_service_id' => 'required|exists:school_services,id', 'copies' => 'required|integer|min:1|max:10', 'purpose' => 'nullable|max:255']);
         $service = SchoolService::where('is_active', true)->findOrFail($d['school_service_id']);
         $total = round($service->fee * $d['copies'], 2);
-        $account = $student->currentEnrollment()?->account;
-        abort_if($total > 0 && ! $account, 422, 'Your school fees are not set up yet – ask the cashier.');
+        $en = $student->currentEnrollment();
+        abort_if($total > 0 && ! $en, 422, 'You are not enrolled this school year – ask the registrar.');
+        $account = $total > 0 ? Billing::accountFor($en) : $en?->account;
         DB::transaction(function () use ($d, $service, $student, $u, $total, $account) {
             $req = ServiceRequest::create($d + ['student_id' => $student->id, 'requested_by' => $u->id]);
             if ($total > 0) {

@@ -19,14 +19,15 @@
         </div>
     @endif
 
-    @if(! $a)
+    @if(! $a?->assessed_at)
         <div class="card max-w-xl">
             <h2 class="h2">Set up this student's fees</h2>
             <p class="muted mt-1">Choose how they'll pay and any discount or scholarship.</p>
             @if($fees->isEmpty())<p class="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">No fees are set for {{ $e->gradeLevel->name }} yet. <a class="link" href="{{ route('crud.index', 'fee-items') }}">Add fees</a> first.</p>@endif
             @include('finance._assess-form')
         </div>
-    @else
+    @endif
+    @if($a)
         @php
             $pct = $a->net_amount > 0 ? min(100, round($paid / $a->net_amount * 100)) : 100; $overdue = $a->overdueAmount();
             $covered = $a->tuitionPaid(); $firstLate = null;

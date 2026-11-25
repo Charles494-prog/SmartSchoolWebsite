@@ -40,7 +40,10 @@ class ServicesTest extends TestCase
         $this->assertTrue($student->user->notifications()->get()->contains(fn ($n) => str_contains(json_encode($n->data), 'still unpaid')));
         $this->actingAs(User::where('role', 'cashier')->first())->post("/finance/accounts/{$account->enrollment_id}/pay", ['amount' => $tor->fee, 'method' => 'cash', 'paid_on' => today()->toDateString(), 'pay_key' => 'order:'.$req->account_charge_id]);
         $this->assertTrue($reg->notifications()->get()->contains(fn ($n) => str_contains(json_encode($n->data), 'ready for releasing')), 'registrar told it is paid');
-        $this->actingAs($reg)->post("/requests/{$req->id}", ['status' => 'released'])->assertSessionHas('ok');
+        $this->assertTrue($student->user->notifications()->get()->contains(fn ($n) => str_contains(json_encode($n->data), 'paid and ready')), 'family told automatically once paid + ready');
+        $this->assertSame(0, ServiceRequest::whereIn('status', ['requested', 'processing'])->whereKey($req->id)->count());
+        $this->actingAs($reg)->post("/requests/{$req->id}/notify")->assertSessionHas('ok', fn ($m) => str_starts_with($m, 'Reminded'));
+        $this->post("/requests/{$req->id}", ['status' => 'released'])->assertSessionHas('ok');
         $this->assertSame('released', $req->fresh()->status);
     }
 

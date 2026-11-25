@@ -33,7 +33,7 @@ class FinanceController extends Controller
         $rows = $all->filter(fn ($e) => match ($filter) {
             'overdue' => $e->account && $e->account->overdueAmount() > 0,
             'settled' => $e->account && $e->account->balance() <= 0,
-            'unassessed' => ! $e->account,
+            'unassessed' => ! $e->account?->assessed_at,
             'all' => true,
             default => ! $e->account || $e->account->balance() > 0,       // default: hide settled balances
         })->values();
@@ -48,7 +48,7 @@ class FinanceController extends Controller
                 'balance' => $accounts->filter(fn ($a) => $a->balance() > 0)->count() + $all->filter(fn ($e) => ! $e->account)->count(),
                 'overdue' => $accounts->filter(fn ($a) => $a->overdueAmount() > 0)->count(),
                 'settled' => $accounts->filter(fn ($a) => $a->balance() <= 0)->count(),
-                'unassessed' => Enrollment::where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained'])->doesntHave('account')->count(),
+                'unassessed' => Enrollment::where('school_year_id', $sy?->id)->whereIn('status', ['enrolled', 'promoted', 'retained'])->where(fn ($q) => $q->doesntHave('account')->orWhereHas('account', fn ($a) => $a->whereNull('assessed_at')))->count(),
             ],
             'overdueTotal' => $accounts->sum(fn ($a) => $a->overdueAmount()),
             'pendingOnline' => PaymentProof::where('status', 'pending')->count(),

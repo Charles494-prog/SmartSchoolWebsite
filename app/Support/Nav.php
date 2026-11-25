@@ -3,6 +3,9 @@
 namespace App\Support;
 
 use App\Models\Announcement;
+use App\Models\Application;
+use App\Models\Assignment;
+use App\Models\GradeSubmission;
 use App\Models\PaymentProof;
 use App\Models\ServiceRequest;
 use App\Models\Setting;
@@ -26,6 +29,23 @@ class Nav
         $set = json_decode((string) Setting::get('locked_features'), true);
 
         return array_merge(['Home', 'How it works'], is_array($set) && isset($set[$role]) ? $set[$role] : (self::LOCKED_DEFAULT[$role] ?? []));
+    }
+
+    /** Classwork and quizzes with a due date the student hasn't turned in yet (same rule as the Home to-do list). */
+    private static function pendingWork(User $u): int
+    {
+        $section = $u->student?->currentEnrollment()?->section_id;
+
+        return $section ? Assignment::whereNotNull('due_at')
+            ->whereHas('classSubject', fn ($q) => $q->where('section_id', $section))
+            ->whereDoesntHave('submissions', fn ($q) => $q->where('student_id', $u->student->id))->count() : 0;
+    }
+
+    /** Bookstore orders approved or ready that still have something left to pay (one query). */
+    private static function ordersToPay(): int
+    {
+        return ShopOrder::whereIn('status', ['approved', 'ready'])->whereHas('charge', fn ($q) => $q->where('is_void', false)
+            ->whereRaw('amount > (select coalesce(sum(pa.amount), 0) from payment_allocations pa join payments p on p.id = pa.payment_id and p.is_void = 0 where pa.account_charge_id = account_charges.id)'))->count();
     }
 
     /** The menu with the person's own hidden features taken out (never the locked ones). */
@@ -60,7 +80,7 @@ class Nav
                     $item('Grades', 'portal.grades', 'award', 'Grades per subject and report card', 'amber'),
                     $item('Attendance', 'portal.attendance', 'check-square', 'Days present, late and absent', 'emerald'),
                     $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
-                    School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
+                    School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') + ['badge' => $r === Role::STUDENT ? self::pendingWork($u) : 0] : null,
                 ])),
                 'Finance' => [$item('Payments', 'portal.account', 'wallet', 'Balance, pay online, receipts', 'rose')],
                 'Registrar' => [
@@ -94,7 +114,7 @@ class Nav
 
         $students = [];
         if ($is(Role::ADMIN, Role::REGISTRAR)) {
-            $students[] = $item('Applications', 'applications.index', 'inbox', 'Review online admission forms', 'violet', 'applications.*');
+            $students[] = $item('Applications', 'applications.index', 'inbox', 'Review online admission forms', 'violet', 'applications.*') + ['badge' => Application::whereIn('status', ['pending', 'for_review'])->count()];
         }
         if ($is(Role::ADMIN, Role::REGISTRAR, Role::CASHIER, Role::NURSE, Role::GUIDANCE)) {
             $students[] = $item('Students', 'students.index', 'users', 'Find a student, profiles and guardians', 'indigo', 'students.*');
@@ -104,7 +124,7 @@ class Nav
             if ($r === Role::REGISTRAR) {
                 $students[] = $crud('Rooms', 'rooms', 'home', 'Classrooms and how many seats each has');
             }
-            $students[] = $item('Document requests', 'services.manage', 'file', 'TOR, certificates – set fees and release', 'sky', 'services.*') + ['badge' => ServiceRequest::where('status', 'requested')->count()];
+            $students[] = $item('Document requests', 'services.manage', 'file', 'TOR, certificates – set fees and release', 'sky', 'services.*') + ['badge' => ServiceRequest::whereIn('status', ['requested', 'processing'])->count()];
             $students[] = $item('Enter LRNs', 'students.lrn', 'key', 'Type or paste each student\'s DepEd LRN', 'indigo');
             $students[] = $item('QR ID cards', 'qr.cards', 'qr', 'Print students\' QR ID cards to hand out', 'emerald');
             $students[] = $item('Move up a grade', 'promotion.index', 'trending', 'End-of-year promotion', 'emerald', 'promotion.*');
@@ -118,7 +138,7 @@ class Nav
         $acad = [];
         if ($r === Role::REGISTRAR) {
             // Registrar: records only – approve submitted grades, keep schedules and subjects. No teaching tools.
-            $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', ['approvals.*', 'gradebook.*']);
+            $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', ['approvals.*', 'gradebook.*']) + ['badge' => GradeSubmission::where('status', 'submitted')->count()];
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
         }
         if ($is(Role::TEACHER, Role::ADMIN)) {
@@ -132,7 +152,7 @@ class Nav
                 }
             }
             if ($r === Role::ADMIN) {
-                $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', 'approvals.*');
+                $acad[] = $item('Grade approvals', 'approvals.index', 'check-square', 'Approve grades teachers submitted', 'amber', 'approvals.*') + ['badge' => GradeSubmission::where('status', 'submitted')->count()];
             }
             $acad[] = $item('Honor roll', 'honors', 'award', 'Ranking and honors per section', 'amber');
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
@@ -156,7 +176,7 @@ class Nav
             $g['Payments'] = [
                 $item('Transactions', 'finance.index', 'wallet', 'Find a student, take a payment, receipts and balances', 'rose', ['finance.index', 'finance.show', 'finance.payments', 'finance.overdue']),
                 ...(School::allows('parent_accounts') ? [$item('Online payments', 'finance.proofs', 'receipt', 'Check payments families sent online', 'emerald', 'finance.proofs*') + ['badge' => PaymentProof::where('status', 'pending')->count()]] : []),
-                $item('Bookstore orders to pay', 'finance.bookstore', 'tag', 'Bookstore orders waiting for payment (walk-ins first)', 'amber', 'finance.bookstore'),
+                $item('Bookstore orders to pay', 'finance.bookstore', 'tag', 'Bookstore orders waiting for payment (walk-ins first)', 'amber', 'finance.bookstore') + ['badge' => self::ordersToPay()],
                 $crud('Fees', 'fee-items', 'tag', 'Tuition and other fees'),
                 $crud('Discounts & scholarships', 'discounts', 'percent', 'Discounts and scholarships'),
                 $crud('Payment plans', 'payment-plans', 'calendar', 'How tuition is divided into payments'),

@@ -41,7 +41,7 @@
         <button @click.prevent="menu=false" class="ml-auto rounded-lg p-1 text-slate-400 hover:bg-slate-100 lg:hidden"><x-icon name="x" /></button>
     </a>
 
-    <nav class="flex-1 overflow-y-auto px-4 py-4">
+    <nav id="app-nav" class="flex-1 overflow-y-auto px-4 py-4">
         <div class="space-y-1">
             @foreach($nav as $group => $items)
                 @php $hasActive = collect($items)->contains('active', true); @endphp
@@ -51,6 +51,8 @@
                     <div x-data="{ open: {{ $hasActive ? 'true' : 'false' }} || localStorage.getItem('nav:{{ $group }}') === '1' }" class="pt-2">
                         <button type="button" :class="mini && 'lg:hidden'" class="flex min-h-9 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wider text-slate-400 uppercase hover:text-slate-600" :aria-expanded="open" x-on:click="open = !open; localStorage.setItem('nav:{{ $group }}', open ? '1' : '0')">
                             {{ $group }}
+                            @php $groupBadge = collect($items)->sum(fn ($i) => (int) ($i['badge'] ?? 0)); @endphp
+                            @if($groupBadge)<span x-show="!open" class="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold tracking-normal text-white" title="{{ $groupBadge }} need attention">{{ $groupBadge > 99 ? '99+' : $groupBadge }}</span>@endif
                             <x-icon name="chevron" class="ml-auto h-3.5 w-3.5 transition" ::class="open ? 'rotate-90' : ''" />
                         </button>
                         <div x-show="open || mini" x-cloak class="mt-0.5 space-y-0.5">
@@ -154,7 +156,7 @@
     </header>
 
     {{-- Toast messages --}}
-    <div class="pointer-events-none fixed inset-x-0 top-20 z-50 flex flex-col items-center gap-2 px-4">
+    <div id="app-toasts" class="pointer-events-none fixed inset-x-0 top-20 z-50 flex flex-col items-center gap-2 px-4">
         @foreach(['ok' => ['bg-emerald-600', 'check'], 'error' => ['bg-rose-600', 'alert']] as $key => [$bg, $icon])
             @if(session($key))
                 <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, {{ strlen(session($key)) > 90 ? 15000 : 5000 }})" x-transition
@@ -166,7 +168,7 @@
         @endforeach
     </div>
 
-    <main class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 {{ $isPortal ? 'pb-28 lg:pb-8' : '' }}">
+    <main id="app-main" @if($ajaxForms ?? false) data-ajax-forms @endif class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 {{ $isPortal ? 'pb-28 lg:pb-8' : '' }}">
         @if($errors->any() && ! ($hideErrorSummary ?? false))
             <div class="mb-6 flex items-center gap-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-rose-200"><x-icon name="alert" class="h-5 w-5" /> Some fields need your attention – they are marked in red below.</div>
         @endif

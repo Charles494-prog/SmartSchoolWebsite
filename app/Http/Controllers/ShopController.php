@@ -94,8 +94,9 @@ class ShopController extends Controller
         $user = $order->student->user;
         if ($status === 'approved') {
             abort_unless($order->status === 'placed', 422, 'Only new orders can be approved.');
-            $account = $order->student->currentEnrollment()?->account;
-            abort_unless($account, 422, 'This student has no fee account yet – ask finance to set it up.');
+            $en = $order->student->currentEnrollment();
+            abort_unless($en, 422, 'This student is not enrolled this school year.');
+            $account = Billing::accountFor($en);
             AccountCharge::create(['student_account_id' => $account->id, 'shop_order_id' => $order->id, 'description' => 'Bookstore order #'.$order->id, 'amount' => $order->total]);
             $order->update(['status' => 'approved', 'student_account_id' => $account->id]);
             foreach (array_filter([$user, ...$order->student->guardians()->with('user')->get()->pluck('user')->all()]) as $u) {
@@ -107,8 +108,13 @@ class ShopController extends Controller
         if ($status === 'ready') {
             abort_unless($order->status === 'approved', 422, 'Approve the order first.');
             $order->update(['status' => 'ready']);
+            if ($order->isPaid()) {
+                $n = $order->tellFamilyReady();
 
-            return back()->with('ok', $order->isPaid() ? 'Prepared. It is paid – release it, or notify the family to come get it.' : 'Prepared. Not paid yet – you will be notified when finance confirms the payment.');
+                return back()->with('ok', 'Prepared and paid – told '.$n.' '.str('account')->plural($n).' to come claim it. Release it when they pick it up.');
+            }
+
+            return back()->with('ok', 'Prepared. Not paid yet – the family is told automatically once finance confirms the payment.');
         }
         if ($status === 'released') {
             abort_unless($order->isPaid(), 422, 'Not paid yet – finance must confirm the payment before you release it.');
@@ -139,6 +145,11 @@ class ShopController extends Controller
     public function notify(ShopOrder $order)
     {
         abort_unless(in_array($order->status, ['approved', 'ready'], true), 422);
+        if ($order->status === 'ready' && $order->isPaid()) {
+            $n = $order->tellFamilyReady();
+
+            return back()->with('ok', 'Reminded '.$n.' '.str('account')->plural($n).' to come claim it.');
+        }
         $paid = $order->isPaid();
         $body = $paid ? 'Bookstore order #'.$order->id.' ('.$order->summary().') is ready. You can claim it at the bookstore now.'
             : 'Bookstore order #'.$order->id.' is ready, but '.Billing::peso($order->charge->remaining()).' is still unpaid. Please pay first (Payments), then claim it.';
@@ -175,9 +186,10 @@ class ShopController extends Controller
         $d = $request->validate(['student_id' => 'required|integer|exists:students,id', 'cart' => 'required|array|min:1|max:50', 'cart.*.id' => 'required|exists:shop_items,id', 'cart.*.qty' => 'required|integer|min:1|max:50', 'cart.*.size' => 'nullable|max:20'],
             ['student_id.required' => 'Pick a student from the list first.', 'student_id.exists' => 'Pick a student from the list first.']);
         $student = Student::findOrFail($d['student_id']);
-        $account = $student->currentEnrollment()?->account;
+        $en = $student->currentEnrollment();
+        $account = $en ? Billing::accountFor($en) : null;
         if (! $account) {
-            return back()->with('error', $student->full_name.' has no fee account this year – ask Finance to set it up first.');
+            return back()->with('error', $student->full_name.' is not enrolled this school year.');
         }
         $order = DB::transaction(function () use ($d, $student, $account, $request) {
             $order = $this->placeOrder($d['cart'], $student, $account, $request->user());

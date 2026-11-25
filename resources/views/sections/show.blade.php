@@ -127,14 +127,41 @@
                     action="Add a teacher" :href="route('crud.create', 'employees')"
                     :steps="['Open <b>Employees</b> and click <b>Add employee</b>.', 'Fill in the name and position (e.g. Teacher I) and the monthly salary.', 'Under <b>SmartSchool login</b>, type their email and choose <b>Teacher</b>.', 'Save. Write down the temporary password shown – they change it at first login.', 'Come back here and choose them in the <b>Teacher</b> column.']" /></div>
             @endif
-            @if($subjects->isNotEmpty())
-                <form method="post" action="{{ route('classes.store', $section) }}" class="card mt-4 flex flex-wrap items-end gap-3">
-                    @csrf
-                    <x-field name="subject_id" label="Add subject" type="select" :options="$subjects" required class="min-w-48 flex-1" />
-                    <x-field name="teacher_id" label="Teacher" type="select" :options="$teachers" class="min-w-48 flex-1" />
-                    <button class="btn btn-primary">Add</button>
-                </form>
-            @endif
+            <form method="post" action="{{ route('classes.store', $section) }}" class="card mt-4 space-y-4" x-data="{ mode: @js($subjects->isNotEmpty() ? 'pick' : 'new'), picked: [] }">
+                @csrf
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="text-base font-semibold text-slate-900">Add subjects to this section</h3>
+                    <div class="inline-flex rounded-xl bg-slate-100 p-1 text-sm dark:bg-white/5" role="tablist">
+                        <button type="button" role="tab" :aria-selected="mode === 'pick'" x-on:click="mode = 'pick'" class="min-h-9 rounded-lg px-3 font-medium" :class="mode === 'pick' ? 'bg-white shadow-sm dark:bg-white/10' : 'text-slate-600'" @disabled($subjects->isEmpty())>From {{ $section->gradeLevel->name }} subjects</button>
+                        <button type="button" role="tab" :aria-selected="mode === 'new'" x-on:click="mode = 'new'" class="min-h-9 rounded-lg px-3 font-medium" :class="mode === 'new' ? 'bg-white shadow-sm dark:bg-white/10' : 'text-slate-600'">New subject</button>
+                    </div>
+                </div>
+                <input type="hidden" name="mode" :value="mode">
+                <div x-show="mode === 'pick'" class="space-y-2">
+                    @if($subjects->isNotEmpty())
+                        <div class="flex items-center justify-between text-sm"><span class="text-slate-500">Tick the subjects this section takes.</span>
+                            <button type="button" class="link text-sm" x-on:click="picked = picked.length === {{ $subjects->count() }} ? [] : @js($subjects->keys()->map(fn ($k) => (string) $k)->values())" x-text="picked.length === {{ $subjects->count() }} ? 'Clear' : 'Select all'"></button></div>
+                        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach($subjects as $id => $name)
+                                <label class="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm" :class="picked.includes('{{ $id }}') ? 'border-brand-600 bg-brand-50/50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-white/10'"><input type="checkbox" name="subject_ids[]" value="{{ $id }}" x-model="picked" class="h-4 w-4 rounded"> {{ $name }}</label>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-sm text-slate-500">Every {{ $section->gradeLevel->name }} subject is already in this section. Use <b>New subject</b> to add another.</p>
+                    @endif
+                </div>
+                <div x-show="mode === 'new'" x-cloak class="grid gap-3 sm:grid-cols-[1fr_9rem_8rem]">
+                    <label class="block"><span class="label">Subject name</span><input class="input" name="new_name" maxlength="100" placeholder="e.g. Robotics, Data Structures" :required="mode === 'new'"></label>
+                    <label class="block"><span class="label">Code (optional)</span><input class="input" name="new_code" maxlength="20" placeholder="e.g. CS201"></label>
+                    <label class="block"><span class="label">Hours a week</span><input class="input" type="number" name="new_hours" min="1" max="20" placeholder="e.g. 3"></label>
+                    <p class="text-xs text-slate-500 sm:col-span-3">It's added to {{ $section->gradeLevel->name }}, so other sections of this level can use it too. Grading weights follow the school's setup; change them in Subjects.</p>
+                </div>
+                <div class="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4 dark:border-white/10">
+                    <label class="block min-w-56 flex-1"><span class="label">Teacher (optional)</span>
+                        <select name="teacher_id" class="input"><option value="">Assign later</option>@foreach($teachers as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></label>
+                    <button class="btn btn-primary" :disabled="mode === 'pick' && !picked.length"><x-icon name="plus" class="h-4 w-4" /> <span x-text="mode === 'new' ? 'Create and add' : (picked.length > 1 ? 'Add ' + picked.length + ' subjects' : 'Add subject')"></span></button>
+                </div>
+            </form>
         </div>
 
         {{-- ============ STUDENTS ============ --}}

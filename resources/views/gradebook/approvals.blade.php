@@ -3,7 +3,7 @@
               'in_progress' => ['In progress', 'bg-amber-50 text-amber-900 ring-amber-200'], 'not_started' => ['Not started', 'bg-slate-100 text-slate-700 ring-slate-200']];
     $period = \App\Support\School::periodName($maxTerms);
 @endphp
-<x-layouts.app title="Grade approvals">
+<x-layouts.app :ajaxForms="true" title="Grade approvals">
     <x-page-header title="Grade approvals" subtitle="Teachers submit each {{ strtolower($period) }}'s grades. Review and approve them, or return them with a comment.">
         <label class="sr-only" for="term-pick">{{ $period }}</label>
         <select id="term-pick" x-data class="input min-h-11 w-auto font-medium" x-on:change="location='?tab={{ $tab }}&term='+$el.value">
@@ -29,7 +29,7 @@
     @if($sections->isEmpty())
         <div class="card"><x-empty icon="check-circle" :title="$tab === 'submitted' ? 'Nothing waiting for approval' : 'Nothing here'" :text="$tab === 'submitted' ? 'When teachers submit '.$period.' '.$term.' grades, they show up here.' : 'Try another tab or '.strtolower($period).'.'" /></div>
     @else
-        <form method="post" action="{{ route('approvals.bulk') }}" x-data="{ ids: [], busy: false }" x-on:submit="if (!confirm('Approve ' + ids.length + ' classes?')) { $event.preventDefault(); return } busy = true">@csrf
+        <form method="post" action="{{ route('approvals.bulk') }}" x-data="{ ids: [], busy: false }" x-on:ajax-done.window="ids = []" x-on:submit="if (!confirm('Approve ' + ids.length + ' classes?')) { $event.preventDefault(); return } busy = true">@csrf
             <div class="space-y-3">
                 @foreach($sections as $sec)
                     @php $pct = $sec['total'] ? round($sec['approved'] / $sec['total'] * 100) : 0; @endphp

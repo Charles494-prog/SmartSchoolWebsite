@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Notifications\GeneralNotice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Notification;
 
 class ShopOrder extends Model
 {
@@ -51,5 +53,20 @@ class ShopOrder extends Model
     public function summary(): string
     {
         return $this->lines->map(fn ($l) => $l->name.($l->size ? ' ('.$l->size.')' : '').($l->qty > 1 ? ' ×'.$l->qty : ''))->implode(', ');
+    }
+
+    /** The student's own account plus their parents' accounts. */
+    public function family()
+    {
+        return collect([$this->student->user])->merge($this->student->guardians()->with('user')->get()->pluck('user'))->filter()->unique('id');
+    }
+
+    /** Paid and ready: tell the family to come get it. Returns how many accounts were told. */
+    public function tellFamilyReady(): int
+    {
+        $people = $this->family();
+        Notification::send($people, new GeneralNotice('Your order is ready', 'Bookstore order #'.$this->id.' ('.$this->summary().') is paid and ready. You can claim it at the bookstore now.', '/portal/shop'));
+
+        return $people->count();
     }
 }

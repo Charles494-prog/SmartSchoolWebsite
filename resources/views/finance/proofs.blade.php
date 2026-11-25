@@ -1,4 +1,4 @@
-<x-layouts.app title="Online payments">
+<x-layouts.app :ajaxForms="true" title="Online payments">
     <div class="mb-5"><h1 class="h1">Online payments</h1><p class="muted">Payments families made through GCash or the bank. Check the screenshot against your account, then approve to issue the official receipt.</p></div>
     <div class="mb-4 inline-flex rounded-xl bg-slate-100 p-1 text-sm dark:bg-slate-800">
         @foreach(['pending' => 'To check', 'approved' => 'Approved', 'rejected' => 'Not accepted'] as $k => $label)

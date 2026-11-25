@@ -6,6 +6,7 @@ use App\Models\GradeLevel;
 use App\Models\SchoolYear;
 use App\Models\Section;
 use App\Models\Setting;
+use App\Models\Subject;
 use App\Models\User;
 use App\Services\Grading;
 use App\Support\GradeScale;
@@ -120,6 +121,19 @@ class GradeScaleTest extends TestCase
         $this->post('/setup-wizard/subjects', ['ww' => 30, 'pt' => 50, 'qa' => 20, 'grade_scale_level' => $level->id, 'grade_scale_reset' => 1])->assertSessionHasNoErrors();
         $this->assertSame('95', GradeScale::label(95, $level->id));
         $this->assertSame(75.0, GradeScale::passing($level->id));
+    }
+
+    public function test_section_can_add_several_subjects_or_create_a_new_one(): void
+    {
+        $section = Section::where('school_year_id', SchoolYear::current()->id)->firstOrFail();
+        $section->classSubjects()->delete();
+        $ids = Subject::where('grade_level_id', $section->grade_level_id)->take(2)->pluck('id')->all();
+        $this->post(route('classes.store', $section), ['mode' => 'pick', 'subject_ids' => $ids])->assertSessionHas('ok', '2 subjects added.');
+        $this->assertSame(2, $section->classSubjects()->count());
+        $this->post(route('classes.store', $section), ['mode' => 'new', 'new_name' => 'Robotics', 'new_hours' => 2])->assertSessionHas('ok');
+        $this->assertTrue($section->classSubjects()->whereHas('subject', fn ($q) => $q->where('name', 'Robotics')->where('grade_level_id', $section->grade_level_id))->exists());
+        $this->post(route('classes.store', $section), ['mode' => 'new'])->assertSessionHasErrors('new_name');
+        $this->get(route('sections.show', $section))->assertOk()->assertSee('Add subjects to this section');
     }
 
     private function settingsBase(): array

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Notifications\GeneralNotice;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Notification;
 
 class ServiceRequest extends Model
 {
@@ -34,5 +36,20 @@ class ServiceRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    /** The student's own account plus their parents' accounts. */
+    public function family()
+    {
+        return collect([$this->student->user])->merge($this->student->guardians()->with('user')->get()->pluck('user'))->filter()->unique('id');
+    }
+
+    /** Paid and ready: tell the family to come get it. Returns how many accounts were told. */
+    public function tellFamilyReady(): int
+    {
+        $people = $this->family();
+        Notification::send($people, new GeneralNotice('Your document is ready', $this->service->name.' is paid and ready. You can get it at the registrar\'s office now.', '/portal/services'));
+
+        return $people->count();
     }
 }

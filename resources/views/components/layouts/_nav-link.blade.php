@@ -2,5 +2,5 @@
     <x-icon :name="$i['icon']" class="h-5 w-5 shrink-0 {{ $i['active'] ? 'text-brand-600 dark:text-brand-300' : 'text-slate-400 group-hover:text-slate-600' }}" />
     <span class="truncate" :class="mini && 'lg:hidden'">{{ $i['label'] }}</span>
     @if($i['icon'] === 'message' && $unread)<span class="ml-auto h-2 w-2 rounded-full bg-rose-500"></span>@endif
-    @if(! empty($i['badge']))<span class="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white" :class="mini && 'lg:hidden'" title="{{ $i['badge'] }} unread">{{ $i['badge'] > 9 ? '9+' : $i['badge'] }}</span>@endif
+    @if(! empty($i['badge']))<span class="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white" :class="mini && 'lg:hidden'" title="{{ $i['badge'] }} need attention">{{ $i['badge'] > 9 ? '9+' : $i['badge'] }}</span>@endif
 </a>

@@ -25,6 +25,18 @@ class Billing
      *
      * @param  array<int>  $discountIds
      */
+    /**
+     * The student's fee account for this enrollment, made empty (₱0 tuition, fees not set yet) if missing,
+     * so bookstore orders and document fees can go on the balance before tuition is set – or at a public school.
+     */
+    public static function accountFor(Enrollment $e): StudentAccount
+    {
+        return $e->account ?? StudentAccount::firstOrCreate(['enrollment_id' => $e->id], [
+            'payment_plan' => (string) PaymentPlan::orderBy('installments')->value('id'),
+            'gross_amount' => 0, 'discount_amount' => 0, 'net_amount' => 0,
+        ]);
+    }
+
     public static function assess(Enrollment $e, string|int|null $plan = null, array $discountIds = []): StudentAccount
     {
         $planModel = self::plan((string) ($plan ?? '')) ?? PaymentPlan::orderBy('installments')->first();
@@ -39,6 +51,7 @@ class Billing
         $account = StudentAccount::firstOrNew(['enrollment_id' => $e->id]);
         $account->payment_plan = $plan;
         $account->gross_amount = $gross;
+        $account->assessed_at ??= now();
         $account->save();
         $account->fees()->delete();
         $account->fees()->createMany($fees->map(fn ($f) => ['name' => $f->name, 'category' => $f->category, 'amount' => $f->amount])->all());

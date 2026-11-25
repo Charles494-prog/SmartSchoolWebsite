@@ -1,6 +1,9 @@
 import Alpine from 'alpinejs';
+import morph from '@alpinejs/morph';
 import { Html5Qrcode } from 'html5-qrcode';
 import bookstore from './bookstore';
+import { initCombobox } from './combobox';
+import { initAjaxForms } from './ajax-forms';
 
 window.Alpine = Alpine;
 window.Html5Qrcode = Html5Qrcode;
@@ -14,5 +17,9 @@ Alpine.store('theme', {
         document.documentElement.classList.toggle('dark', this.dark);
     },
 });
+Alpine.plugin(morph);
 Alpine.data('bookstore', bookstore);
 Alpine.start();
+// After Alpine renders x-for rows, long dropdowns get type-to-filter.
+queueMicrotask(() => initCombobox());
+initAjaxForms();

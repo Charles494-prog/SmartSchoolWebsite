@@ -1,4 +1,4 @@
-<x-layouts.app title="Transactions">
+<x-layouts.app :ajaxForms="true" title="Transactions">
     @php $peso = fn ($v) => \App\Services\Billing::peso($v); $q = request('q'); @endphp
     <div class="mb-5 flex flex-wrap items-end gap-3">
         <div class="mr-auto"><h1 class="h1">Transactions</h1><p class="muted">Find a student to take a payment, print a statement or set up their payment plan.</p></div>
@@ -44,10 +44,11 @@
                     @php $a = $e->account; $bal = $a?->balance(); $od = $a?->overdueAmount() ?? 0; @endphp
                     <li><a href="{{ route('finance.show', $e) }}" class="flex flex-wrap items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/5">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ strtoupper(substr($e->student->first_name, 0, 1).substr($e->student->last_name, 0, 1)) }}</span>
-                        <span class="min-w-0 flex-1"><span class="block font-medium">{{ $e->student->full_name }}</span><span class="text-xs text-slate-500">{{ $e->gradeLevel->name }} {{ $e->section?->name }} · {{ $a ? $a->planName() : 'fees not set yet' }}</span></span>
+                        <span class="min-w-0 flex-1"><span class="block font-medium">{{ $e->student->full_name }}</span><span class="text-xs text-slate-500">{{ $e->gradeLevel->name }} {{ $e->section?->name }} · {{ $a?->assessed_at ? $a->planName() : 'fees not set yet' }}</span></span>
                         @if($od > 0)<span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">Overdue {{ $peso($od) }}</span>@endif
                         <span class="w-32 text-right">
-                            @if(! $a)<span class="text-sm font-medium text-amber-600">Set fees →</span>
+                            @if($a && $bal > 0)<span class="block text-lg font-bold tabular-nums">{{ $peso($bal) }}</span><span class="text-xs text-slate-500">{{ $a->assessed_at ? 'balance' : 'orders & documents' }}</span>
+                            @elseif(! $a?->assessed_at)<span class="text-sm font-medium text-amber-600">Set fees →</span>
                             @elseif($bal <= 0)<span class="text-sm font-semibold text-emerald-600">Settled</span>
                             @else<span class="block text-lg font-bold tabular-nums">{{ $peso($bal) }}</span><span class="text-xs text-slate-500">balance</span>@endif
                         </span>

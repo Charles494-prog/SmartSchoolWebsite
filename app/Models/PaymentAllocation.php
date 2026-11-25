@@ -26,11 +26,17 @@ class PaymentAllocation extends Model
             if ($order && $order->isPaid()) {
                 Notification::send(User::whereIn('role', ['bookstore', 'admin'])->where('is_active', true)->get(),
                     new GeneralNotice('Paid – ready for releasing', 'Bookstore order #'.$order->id.' for '.$order->student->full_name.' is paid.', route('shop.manage', [], false)));
+                if ($order->status === 'ready') {
+                    $order->tellFamilyReady(); // prepared + paid: the family can come now
+                }
             }
             $req = ServiceRequest::with('service', 'student', 'charge')->where('account_charge_id', $a->account_charge_id)->whereIn('status', ['processing', 'ready'])->first();
             if ($req && $req->isPaid()) {
                 Notification::send(User::whereIn('role', ['registrar', 'admin'])->where('is_active', true)->get(),
                     new GeneralNotice('Paid – ready for releasing', $req->service->name.' for '.$req->student->full_name.' is paid.', route('services.manage', ['status' => $req->status], false)));
+                if ($req->status === 'ready') {
+                    $req->tellFamilyReady(); // papers ready + paid: the family can come now
+                }
             }
         });
     }

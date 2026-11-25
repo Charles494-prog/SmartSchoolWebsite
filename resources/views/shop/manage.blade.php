@@ -4,10 +4,11 @@
     $walk = session('walkin') ? \App\Models\ShopOrder::with('lines', 'student')->find(session('walkin')) : null;
     $tabs = ['new' => 'New', 'payment' => 'Waiting for payment', 'release' => 'Paid – release', 'done' => 'Done'];
 @endphp
-<x-layouts.app title="Bookstore">
+<x-layouts.app :ajaxForms="true" title="Bookstore">
     @error('cart')<p class="mb-4 rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-800" role="alert">{{ $message }}</p>@enderror
     @error('student_id')<p class="mb-4 rounded-xl bg-rose-50 p-3 text-sm font-medium text-rose-800" role="alert">{{ $message }}</p>@enderror
-    <div x-data="bookstore(@js($data), { walkIn: true })">
+    <script type="application/json" id="shop-items" nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">@json($data)</script>
+    <div x-data="bookstore(@js($data), { walkIn: true })" x-on:ajax-done.window="const j = $event.detail.doc.getElementById('shop-items'); if (j) items = JSON.parse(j.textContent)">
         <div x-data="{ shopping: {{ old('student_id') ? 'true' : 'false' }}, student: null }" x-on:shop-for.window="student = $event.detail; shopping = true">
             <div class="mb-4 flex flex-wrap items-center gap-2">
                 <div class="mr-auto"><h1 class="h1">Bookstore</h1><p class="muted text-sm">Your items as students see them. Use Shopping mode for a student at the counter.</p></div>
@@ -72,7 +73,7 @@
     </div>
 
     {{-- Add / edit item side panel --}}
-    <div x-data="{ open: {{ $errors->hasAny(['name', 'price', 'category', 'stock', 'sizes', 'image', 'description']) ? 'true' : 'false' }}, it: null }" x-on:item-edit.window="it = $event.detail; open = true" x-on:keydown.escape.window="open = false">
+    <div x-data="{ open: {{ $errors->hasAny(['name', 'price', 'category', 'stock', 'sizes', 'image', 'description']) ? 'true' : 'false' }}, it: null }" x-on:item-edit.window="it = $event.detail; open = true" x-on:ajax-done.window="if (!$event.detail.doc.querySelector('.field-error')) open = false" x-on:keydown.escape.window="open = false">
         <div x-show="open" x-cloak class="fixed inset-0 z-40 bg-slate-900/40" x-on:click="open = false"></div>
         <aside x-show="open" x-cloak x-transition class="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl dark:bg-slate-900" role="dialog" aria-modal="true" aria-labelledby="item-title">
             <header class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
@@ -99,7 +100,7 @@
     </div>
 
     {{-- Delete confirmation --}}
-    <div x-data="{ it: null }" x-on:item-delete.window="it = $event.detail" x-on:keydown.escape.window="it = null">
+    <div x-data="{ it: null }" x-on:item-delete.window="it = $event.detail" x-on:ajax-done.window="it = null" x-on:keydown.escape.window="it = null">
         <div x-show="it" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
             <form method="post" :action="it ? @js(url('/bookstore/items')) + '/' + it.id : '#'" class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900" role="alertdialog" aria-modal="true" aria-labelledby="del-title" x-on:click.outside="it = null">@csrf @method('DELETE')
                 <h2 id="del-title" class="h2" x-text="'Delete ' + (it?.name ?? '') + '?'"></h2>
@@ -110,7 +111,7 @@
     </div>
 
     {{-- Orders panel (polls every 5 s) --}}
-    <div x-data="ordersPanel(@js(route('shop.orders')), {{ json_encode($orderCounts) }})" x-on:orders-open.window="open = true; load()" x-on:keydown.escape.window="open = false">
+    <div x-data="ordersPanel(@js(route('shop.orders')), {{ json_encode($orderCounts) }})" x-on:orders-open.window="open = true; load()" x-on:ajax-done.window="load()" x-on:keydown.escape.window="open = false">
         <div x-show="open" x-cloak class="fixed inset-0 z-40 bg-slate-900/40" x-on:click="open = false"></div>
         <aside x-show="open" x-cloak x-transition class="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-slate-900" role="dialog" aria-modal="true" aria-label="Orders">
             <header class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">

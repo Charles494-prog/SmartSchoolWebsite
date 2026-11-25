@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Application;
+use App\Models\Enrollment;
+use App\Models\GradeSubmission;
+use App\Models\SchoolYear;
 use App\Models\ShopItem;
 use App\Models\ShopOrder;
 use App\Models\ShopOrderLine;
 use App\Models\Student;
 use App\Models\StudentAccount;
 use App\Models\User;
+use App\Support\Nav;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -53,6 +58,36 @@ class BookstoreWalkInTest extends TestCase
 
         $this->actingAs($staff)->post("/bookstore/orders/{$order->id}", ['status' => 'released'])->assertSessionHas('ok');
         $this->assertSame('released', $order->fresh()->status);
+    }
+
+    public function test_student_without_fees_can_buy_and_pay_at_finance(): void
+    {
+        $staff = User::where('role', 'bookstore')->first() ?? User::where('role', 'admin')->first();
+        $item = ShopItem::whereNull('sizes')->first();
+        $item->update(['stock' => 5]);
+        $e = Enrollment::where('school_year_id', SchoolYear::current()->id)->where('status', 'enrolled')->firstOrFail();
+        $e->account?->delete(); // a student whose fees aren't set yet
+
+        $this->actingAs($staff)->post('/bookstore/walk-in', ['student_id' => $e->student_id, 'cart' => [['id' => $item->id, 'qty' => 1]]])->assertSessionHas('walkin');
+        $account = $e->fresh()->account;
+        $this->assertNotNull($account);
+        $this->assertNull($account->assessed_at); // tuition still "not set"
+        $order = ShopOrder::latest('id')->first();
+
+        $cashier = User::where('role', 'cashier')->first();
+        $this->actingAs($cashier)->get("/finance/accounts/{$e->id}")->assertOk()->assertSee('Set up this student')->assertSee('Receive payment')->assertSee('Bookstore order #'.$order->id);
+        $this->get('/finance?filter=unassessed')->assertOk()->assertSee($e->student->last_name);
+        $this->post("/finance/accounts/{$e->id}/pay", ['amount' => $order->total, 'method' => 'cash', 'pay_key' => 'order:'.$order->charge->id, 'purpose' => 'Bookstore'])->assertSessionHasNoErrors();
+        $this->assertSame('paid', $order->fresh()->shownStatus());
+    }
+
+    public function test_menu_shows_counts_that_need_attention(): void
+    {
+        $admin = User::where('email', 'admin@school.test')->firstOrFail();
+        $nav = collect(Nav::full($admin))->flatten(1)->keyBy('label');
+        $this->assertSame(Application::whereIn('status', ['pending', 'for_review'])->count(), $nav['Applications']['badge']);
+        $this->assertSame(GradeSubmission::where('status', 'submitted')->count(), $nav['Grade approvals']['badge']);
+        $this->assertArrayHasKey('badge', $nav['Bookstore orders to pay']);
     }
 
     public function test_delete_archives_items_used_in_orders(): void

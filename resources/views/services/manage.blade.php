@@ -1,4 +1,4 @@
-<x-layouts.app title="Document requests">
+<x-layouts.app :ajaxForms="true" title="Document requests">
     @php
         $peso = fn ($v) => \App\Services\Billing::peso($v);
         $steps = ['requested' => 'Requested', 'processing' => 'Being prepared', 'ready' => 'Papers ready', 'released' => 'Released'];

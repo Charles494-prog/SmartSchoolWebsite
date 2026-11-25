@@ -193,10 +193,34 @@ class SectionController extends Controller
 
     public function addClass(Request $request, Section $section)
     {
-        $data = $request->validate(['subject_id' => 'required|exists:subjects,id', 'teacher_id' => 'nullable|exists:users,id']);
-        ClassSubject::firstOrCreate(['section_id' => $section->id, 'subject_id' => $data['subject_id']], ['teacher_id' => $data['teacher_id'] ?? null]);
+        $data = $request->validate([
+            'mode' => 'nullable|in:pick,new',
+            'subject_id' => 'nullable|exists:subjects,id',
+            'subject_ids' => 'nullable|array', 'subject_ids.*' => 'integer|exists:subjects,id',
+            'new_name' => 'nullable|required_if:mode,new|string|max:100',
+            'new_code' => 'nullable|string|max:20',
+            'new_hours' => 'nullable|integer|between:1,20',
+            'teacher_id' => 'nullable|exists:users,id',
+        ], ['new_name.required_if' => 'Type the subject name.']);
+        $ids = collect($data['subject_ids'] ?? [])->push($data['subject_id'] ?? null)->filter()->map(fn ($v) => (int) $v);
+        if (($data['mode'] ?? null) === 'new') {
+            $name = trim($data['new_name']);
+            $w = Subject::where('grade_level_id', $section->grade_level_id)->first() ?? Subject::first();
+            $subject = Subject::firstOrCreate(['grade_level_id' => $section->grade_level_id, 'name' => $name], [
+                'code' => ($data['new_code'] ?? null) ?: strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 6)),
+                'ww_weight' => $w->ww_weight ?? 30, 'pt_weight' => $w->pt_weight ?? 50, 'qa_weight' => $w->qa_weight ?? 20, 'at_weight' => $w->at_weight ?? 0,
+                'hours_per_week' => $data['new_hours'] ?? null, 'is_active' => true,
+            ]);
+            $ids = collect([$subject->id]);
+        }
+        if ($ids->isEmpty()) {
+            return back()->with('error', 'Pick at least one subject.');
+        }
+        foreach ($ids->unique() as $id) {
+            ClassSubject::firstOrCreate(['section_id' => $section->id, 'subject_id' => $id], ['teacher_id' => $data['teacher_id'] ?? null]);
+        }
 
-        return back()->with('ok', 'Subject added.');
+        return back()->with('ok', $ids->count() > 1 ? $ids->count().' subjects added.' : 'Subject added.');
     }
 
     public function updateClass(Request $request, ClassSubject $class)
