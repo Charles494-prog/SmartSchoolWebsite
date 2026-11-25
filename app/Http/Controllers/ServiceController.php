@@ -25,7 +25,7 @@ class ServiceController extends Controller
 
     public function manage(Request $request)
     {
-        $status = in_array($request->query('status'), ['requested', 'processing', 'released', 'declined'], true) ? $request->query('status') : 'requested';
+        $status = in_array($request->query('status'), array_keys(ServiceRequest::STATUSES), true) ? $request->query('status') : 'requested';
 
         return view('services.manage', [
             'services' => SchoolService::orderBy('name')->get(),
@@ -46,7 +46,7 @@ class ServiceController extends Controller
 
     public function update(Request $request, ServiceRequest $req)
     {
-        $d = $request->validate(['status' => 'required|in:processing,released,declined', 'note' => 'nullable|required_if:status,declined|max:255'],
+        $d = $request->validate(['status' => 'required|in:processing,ready,released,declined', 'note' => 'nullable|required_if:status,declined|max:255'],
             ['note.required_if' => 'Tell the student why.']);
         if ($d['status'] === 'released') {
             abort_if($req->charge && $req->charge->remaining() > 0, 422, 'Not paid yet – finance must confirm the payment first.');
@@ -56,10 +56,30 @@ class ServiceController extends Controller
             $req->charge?->update(['is_void' => true]);
         }
         $req->update(['status' => $d['status'], 'note' => $d['note'] ?? $req->note]);
-        $msg = ['processing' => 'is being prepared', 'released' => 'is ready – you can get it at the registrar', 'declined' => 'was not accepted: '.($d['note'] ?? '')][$d['status']];
+        if ($d['status'] === 'ready') {
+            if ($req->isPaid()) {
+                return back()->with('ok', 'Marked ready. It is paid – you can release it, or notify the family to come get it.');
+            }
+
+            return back()->with('ok', 'Marked ready. Not paid yet – you will be notified when finance confirms the payment.');
+        }
+        $msg = ['processing' => 'is being prepared', 'released' => 'was released to you', 'declined' => 'was not accepted: '.($d['note'] ?? '')][$d['status']];
         $req->requester?->notify(new GeneralNotice('Request update', $req->service->name.' '.$msg, '/portal/services'));
 
         return back()->with('ok', 'Updated.');
+    }
+
+    /** Tell the student and their parents the document is ready (and whether it still needs to be paid). */
+    public function notify(ServiceRequest $req)
+    {
+        abort_unless(in_array($req->status, ['ready', 'processing'], true), 422);
+        $paid = $req->isPaid();
+        $body = $paid ? $req->service->name.' is ready. You can get it at the registrar\'s office now.'
+            : $req->service->name.' is ready, but '.Billing::peso($req->charge->remaining()).' is still unpaid. Please pay first (Payments), then get it at the registrar.';
+        $people = collect([$req->student->user])->merge($req->student->guardians()->with('user')->get()->pluck('user'))->filter()->unique('id');
+        Notification::send($people, new GeneralNotice('Your document is ready', $body, $paid ? '/portal/services' : '/portal/account'));
+
+        return back()->with('ok', 'Notified '.$people->count().' '.str('account')->plural($people->count()).'.');
     }
 
     // ------------------------------------------------------------ students / parents

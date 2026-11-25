@@ -22,13 +22,19 @@
                             <span class="text-sm {{ $paid ? 'text-emerald-700' : 'text-amber-700' }}">{{ $r->charge ? ($paid ? 'Paid' : $peso($r->charge->remaining()).' unpaid') : 'Free' }}</span>
                             <form method="post" action="{{ route('services.requests.update', $r) }}" class="flex flex-wrap items-center gap-2">@csrf
                                 @if($r->status === 'requested')<button name="status" value="processing" class="btn btn-sm" x-show="!no">Start preparing</button>@endif
-                                @if(in_array($r->status, ['requested', 'processing'], true))
-                                    @if($paid)<button name="status" value="released" class="btn btn-primary btn-sm" x-show="!no">Release</button>@else<span class="text-xs text-slate-500">Release after payment</span>@endif
-                                    <button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>
+                                @if(in_array($r->status, ['requested', 'processing'], true))<button name="status" value="ready" class="btn btn-sm" x-show="!no">Papers ready</button>@endif
+                                @if(in_array($r->status, ['requested', 'processing', 'ready'], true))
+                                    @if($paid)<button name="status" value="released" class="btn btn-primary btn-sm" x-show="!no">Release</button>@endif
+                                    @if(! $r->charge || $r->charge->paid() == 0)<button type="button" class="btn btn-sm text-rose-600" x-show="!no" x-on:click="no = true">Decline…</button>@endif
                                     <span x-show="no" x-cloak class="flex gap-2"><input name="note" class="input h-9 w-56" placeholder="Reason"><button name="status" value="declined" class="btn btn-sm text-rose-600">Send</button></span>
                                 @endif
                                 @if($r->note)<span class="text-xs text-rose-700">“{{ $r->note }}”</span>@endif
                             </form>
+                            @if(in_array($r->status, ['processing', 'ready'], true))
+                                <form method="post" action="{{ route('services.requests.notify', $r) }}" x-show="!no">@csrf
+                                    <button class="btn btn-sm" title="{{ $paid ? 'Tell them to come get it' : 'Tell them it is ready but still needs to be paid' }}">Notify student &amp; parents</button>
+                                </form>
+                            @endif
                         </li>
                     @empty
                         <li class="px-5 py-10 text-center text-slate-500">No requests here.</li>

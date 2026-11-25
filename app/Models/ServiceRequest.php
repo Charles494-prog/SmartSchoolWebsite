@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ServiceRequest extends Model
 {
-    public const STATUSES = ['requested' => 'Requested', 'processing' => 'Being prepared', 'released' => 'Released', 'declined' => 'Not accepted'];
+    public const STATUSES = ['requested' => 'Requested', 'processing' => 'Being prepared', 'ready' => 'Ready for release', 'released' => 'Released', 'declined' => 'Not accepted'];
+
+    public function isPaid(): bool
+    {
+        return ! $this->charge || $this->charge->remaining() <= 0;
+    }
 
     protected $guarded = ['id'];
 

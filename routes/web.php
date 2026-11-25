@@ -255,6 +255,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/', [\App\Http\Controllers\ServiceController::class, 'manage'])->name('services.manage');
         Route::post('/services', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.store');
         Route::post('/services/{service}', [\App\Http\Controllers\ServiceController::class, 'save'])->name('services.update');
+        Route::post('/{req}/notify', [\App\Http\Controllers\ServiceController::class, 'notify'])->name('services.requests.notify');
         Route::post('/{req}', [\App\Http\Controllers\ServiceController::class, 'update'])->name('services.requests.update');
     });
     Route::middleware('role:admin,bookstore')->prefix('bookstore')->group(function () {
