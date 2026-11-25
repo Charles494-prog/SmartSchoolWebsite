@@ -77,6 +77,33 @@
                 <kbd class="hidden rounded-md bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm sm:inline dark:bg-white/10">Ctrl K</kbd>
             </button>
             <div class="ml-auto flex items-center gap-1">
+                @if(\App\Http\Controllers\DevController::enabled())
+                    @php $devLan = \App\Support\School::isLan(); @endphp
+                    <div x-data="{ d:false }" class="relative">
+                        <button @click="d=!d" class="flex items-center gap-1.5 rounded-xl border border-dashed border-fuchsia-400 bg-fuchsia-50 px-3 py-1.5 text-xs font-bold text-fuchsia-700 hover:bg-fuchsia-100 dark:bg-fuchsia-500/10 dark:text-fuchsia-300" :aria-expanded="d">
+                            DEV · {{ $devLan ? 'LAN' : 'Online' }}
+                        </button>
+                        <div x-show="d" x-cloak x-transition @click.outside="d=false" class="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
+                            <div class="border-b border-slate-100 px-4 py-3 dark:border-white/10">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Mode</p>
+                                <form method="post" action="{{ route('dev.mode') }}" class="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5">@csrf
+                                    <button name="mode" value="lan" class="rounded-lg px-2 py-1.5 text-sm font-semibold {{ $devLan ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500' }}">Offline (LAN)</button>
+                                    <button name="mode" value="hosted" class="rounded-lg px-2 py-1.5 text-sm font-semibold {{ ! $devLan ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500' }}">Online</button>
+                                </form>
+                            </div>
+                            <div class="max-h-80 overflow-y-auto px-2 py-2">
+                                <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Sign in as</p>
+                                @foreach(\App\Http\Controllers\DevController::accounts() as $acc)
+                                    <form method="post" action="{{ route('dev.login') }}">@csrf<input type="hidden" name="user_id" value="{{ $acc->id }}">
+                                        <button class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-white/10 {{ $acc->id === $u->id ? 'font-semibold text-brand-700' : '' }}">
+                                            <span class="w-20 shrink-0 text-xs capitalize text-slate-500">{{ $acc->role }}</span><span class="truncate">{{ $acc->name }}</span>
+                                        </button>
+                                    </form>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <a href="{{ route('guide') }}" class="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:flex dark:text-slate-300 dark:hover:bg-white/10"><x-icon name="sparkles" class="h-4 w-4 text-violet-500" /> How it works</a>
                 <button @click="$store.theme.toggle()" class="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-white/10" title="Light / dark mode">
                     <svg x-show="!$store.theme.dark" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
