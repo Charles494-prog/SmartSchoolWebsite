@@ -114,6 +114,15 @@
                 <input x-ref="box" x-model="code" class="input text-lg" placeholder="Scan or type student no./LRN…" autofocus>
                 <button class="btn btn-primary">Scan</button>
             </form>
+            <div x-show="camOpen && cameras.length" x-cloak class="mt-4">
+                <label class="label" for="cam-select">Camera</label>
+                <select id="cam-select" class="input" x-model.number="camIndex" x-on:change="pickCam()">
+                    <template x-for="(c, i) in cameras" :key="c.id">
+                        <option :value="i" :selected="i === camIndex" x-text="c.label || ('Camera ' + (i + 1))"></option>
+                    </template>
+                </select>
+                <p class="mt-1.5 text-xs text-slate-500">This device remembers the camera you pick.</p>
+            </div>
             <button type="button" class="btn mt-4 min-h-12 w-full text-base" x-show="!camOpen" x-on:click="openCam()">
                 <x-icon name="qr" class="h-5 w-5" /> Scan with camera
             </button>
@@ -174,8 +183,9 @@
                     await this.$nextTick();
                     try {
                         if (!this.cameras.length) { try { this.cameras = await Html5Qrcode.getCameras() } catch (e) { this.cameras = [] } }
+                        if (this.cameras.length && !this.camPicked) { const saved = localStorage.getItem('ss.scanCam'); const i = this.cameras.findIndex((c) => c.id === saved); if (i >= 0) this.camIndex = i; this.camPicked = true }
                         this.cam = new Html5Qrcode('qr-reader');
-                        const source = this.cameras.length > 1 ? this.cameras[this.camIndex].id : { facingMode: 'environment' };
+                        const source = this.cameras[this.camIndex]?.id || { facingMode: 'environment' };
                         await this.cam.start(source, { fps: 12, qrbox: (w, h) => { const m = Math.floor(Math.min(w, h) * 0.7); return { width: m, height: m } } }, (t) => this.send(t));
                         this.camera = true;
                     } catch (e) {
@@ -183,7 +193,9 @@
                         this.camError = /NotAllowed|Permission/i.test(String(e)) ? 'denied' : /NotFound|no camera|Requested device/i.test(String(e)) ? 'none' : 'other';
                     }
                 },
-                async switchCam() { await this.stopCam(); this.camIndex = (this.camIndex + 1) % this.cameras.length; await this.startCam() },
+                async switchCam() { this.camIndex = (this.camIndex + 1) % this.cameras.length; await this.pickCam() },
+                camPicked: false,
+                async pickCam() { if (this.cameras[this.camIndex]) localStorage.setItem('ss.scanCam', this.cameras[this.camIndex].id); this.camError = ''; await this.stopCam(); await this.startCam() },
                 async stopCam() { if (this.cam) { try { await this.cam.stop(); this.cam.clear() } catch (e) {} } this.cam = null; this.camera = false }
             }
         }
