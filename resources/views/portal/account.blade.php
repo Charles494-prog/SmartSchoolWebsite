@@ -63,8 +63,8 @@
                 <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
                      x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, step: 1, sel: [@js($opts[0]['key'] ?? 'other')], other: '', ch: {{ $channels->first()->id }}, preview: null,
                                opts: @js($opts), max: {{ $a->balance() }},
-                               // Full balance, the overdue amount and another amount stand alone; everything else can be combined.
-                               solo(k) { return ['full', 'overdue', 'other'].includes(k) },
+                               // Full balance and another amount stand alone; everything else can be combined.
+                               solo(k) { return ['full', 'other'].includes(k) },
                                toggle(k) { if (this.solo(k)) { this.sel = [k]; return } this.sel = this.sel.filter((x) => !this.solo(x)); this.sel.includes(k) ? this.sel = this.sel.filter((x) => x !== k) : this.sel.push(k) },
                                on(k) { return this.sel.includes(k) },
                                get pick() { return this.sel.join(',') },
@@ -104,7 +104,7 @@
                             <div class="p-5">
                                 {{-- 1: what for --}}
                                 <div x-show="step === 1" class="space-y-2">
-                                    <p class="text-xs text-slate-600 dark:text-slate-400">Tick one or more. Full balance, overdue amount and another amount are chosen on their own.</p>
+                                    <p class="text-xs text-slate-600 dark:text-slate-400">Tick as many as you want. Full balance and Another amount are chosen on their own.</p>
                                     <template x-for="o in opts" :key="o.key">
                                         <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3.5" :class="on(o.key) ? 'border-brand-600 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'">
                                             <input :type="solo(o.key) ? 'radio' : 'checkbox'" class="h-4 w-4 shrink-0 accent-brand-600" :checked="on(o.key)" x-on:change="toggle(o.key)">
