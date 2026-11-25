@@ -159,7 +159,7 @@ class StudentController extends Controller
         $data = $request->validate($this->rules() + [
             'grade_level_id' => 'nullable|exists:grade_levels,id',
             'section_id' => 'nullable|exists:sections,id',
-        ]);
+        ], $this->lrnMessages($request->input('lrn')));
         $student = DB::transaction(function () use ($data) {
             $student = Student::create(collect($data)->except(['grade_level_id', 'section_id', 'photo'])->all());
             $this->savePhoto(request(), $student);
@@ -206,7 +206,7 @@ class StudentController extends Controller
     public function update(Request $request, Student $student)
     {
         $this->authorizeEdit();
-        $student->update(collect($request->validate($this->rules($student)))->except('photo')->all());
+        $student->update(collect($request->validate($this->rules($student), $this->lrnMessages($request->input('lrn'), $student->id)))->except('photo')->all());
         $this->savePhoto($request, $student);
 
         return redirect()->route('students.show', $student)->with('ok', 'Student updated.');
@@ -361,5 +361,45 @@ class StudentController extends Controller
         AuditLog::record('export', $student, description: 'Personal data export');
 
         return response()->streamDownload(fn () => print (json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)), 'student-data-'.$student->student_no.'.json', ['Content-Type' => 'application/json']);
+    }
+
+    private function lrnMessages(?string $lrn, ?int $ignore = null): array
+    {
+        $other = $lrn ? Student::where('lrn', $lrn)->when($ignore, fn ($q) => $q->where('id', '!=', $ignore))->first() : null;
+
+        return ['lrn.unique' => 'This LRN already belongs to '.($other?->full_name ?? 'another student').' – every LRN must be unique.', 'lrn.digits' => 'An LRN has exactly 12 digits.'];
+    }
+
+    /** Live check while staff type an LRN: is it already someone else's? */
+    public function lrnCheck(Request $request)
+    {
+        abort_unless($request->user()->hasRole(...self::EDITORS), 403);
+        $lrn = preg_replace('/\D/', '', (string) $request->query('lrn'));
+        $other = Student::where('lrn', $lrn)->when($request->query('ignore'), fn ($q, $id) => $q->where('id', '!=', (int) $id))->first();
+
+        return response()->json(['taken' => $other?->full_name]);
+    }
+
+    /** Staff page to enter LRNs for many students at once (students never type their own LRN). */
+    public function lrnIndex(Request $request)
+    {
+        abort_unless($request->user()->hasRole(...self::EDITORS), 403);
+        $missing = $request->query('show') !== 'all';
+        $students = Student::with('enrollments.section.gradeLevel')->when($missing, fn ($q) => $q->where(fn ($w) => $w->whereNull('lrn')->orWhere('lrn', '')))
+            ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w->where('last_name', 'like', '%'.$request->query('q').'%')->orWhere('first_name', 'like', '%'.$request->query('q').'%')))
+            ->orderBy('last_name')->orderBy('first_name')->paginate(25)->withQueryString();
+
+        return view('students.lrn', ['students' => $students, 'missing' => $missing, 'count' => Student::where(fn ($w) => $w->whereNull('lrn')->orWhere('lrn', ''))->count()]);
+    }
+
+    public function lrnSave(Request $request, Student $student)
+    {
+        abort_unless($request->user()->hasRole(...self::EDITORS), 403);
+        $other = Student::where('lrn', $request->input('lrn'))->where('id', '!=', $student->id)->first();
+        $request->validate(['lrn' => ['nullable', 'digits:12', Rule::unique('students', 'lrn')->ignore($student->id)]],
+            ['lrn.unique' => 'This LRN already belongs to '.($other?->full_name ?? 'another student').'.', 'lrn.digits' => 'An LRN has exactly 12 digits.']);
+        $student->update(['lrn' => $request->input('lrn') ?: null]);
+
+        return back()->with('ok', 'LRN saved for '.$student->full_name.'.');
     }
 }

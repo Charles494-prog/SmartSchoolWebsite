@@ -96,6 +96,9 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/students', [StudentController::class, 'index'])->middleware('role:admin,registrar,teacher,cashier,nurse,guidance,librarian')->name('students.index');
     Route::get('/quick/students', [StudentController::class, 'quick'])->name('students.quick');
     Route::get('/students/create', [StudentController::class, 'create'])->name('students.create');
+    Route::get('/students/lrn', [StudentController::class, 'lrnIndex'])->name('students.lrn');
+    Route::get('/students/lrn/check', [StudentController::class, 'lrnCheck'])->name('students.lrn-check');
+    Route::post('/students/{student}/lrn', [StudentController::class, 'lrnSave'])->name('students.lrn.save');
     Route::post('/students', [StudentController::class, 'store'])->name('students.store');
     Route::get('/students/{student}', [StudentController::class, 'show'])->name('students.show');
     Route::get('/students/{student}/edit', [StudentController::class, 'edit'])->name('students.edit');

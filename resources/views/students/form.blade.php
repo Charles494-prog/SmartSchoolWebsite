@@ -14,7 +14,7 @@
             <x-field name="middle_name" label="Middle name" :value="$student?->middle_name" />
             <x-field name="suffix" label="Suffix" :value="$student?->suffix" />
             @if($student)<div><div class="label">School ID no.</div><div class="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm font-semibold ring-1 ring-slate-200">{{ $student->student_no }}</div><p class="mt-1 text-xs text-slate-500">Made automatically. Used inside the school only.</p></div>@endif
-            <x-field name="lrn" label="LRN (from DepEd, 12 digits)" :value="$student?->lrn" inputmode="numeric" maxlength="12" help="Entered by school staff. Leave empty if the student has none yet." />
+            <x-lrn-input :value="old('lrn', $student?->lrn)" :ignore="$student?->id" />
             <x-field name="sex" label="Sex" type="select" :options="['Male' => 'Male', 'Female' => 'Female']" :value="$student?->sex" required />
             <x-field name="birthdate" label="Birthdate" type="date" :value="$student?->birthdate?->format('Y-m-d')" required />
             <x-field name="birthplace" label="Birthplace" :value="$student?->birthplace" />

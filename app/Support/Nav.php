@@ -56,6 +56,7 @@ class Nav
             if ($r === Role::REGISTRAR) {
                 $students[] = $crud('Rooms', 'rooms', 'home', 'Classrooms and how many seats each has');
             }
+            $students[] = $item('Enter LRNs', 'students.lrn', 'key', 'Type or paste each student\'s DepEd LRN', 'indigo');
             $students[] = $item('QR ID cards', 'qr.cards', 'qr', 'Print students\' QR ID cards to hand out', 'emerald');
             $students[] = $item('Move up a grade', 'promotion.index', 'trending', 'End-of-year promotion', 'emerald', 'promotion.*');
             $students[] = $crud('Transfers', 'transfers', 'repeat', 'Students who moved schools');

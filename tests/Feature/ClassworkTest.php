@@ -189,4 +189,17 @@ class ClassworkTest extends TestCase
         $this->delete("/assignments/{$a->id}")->assertRedirect();
         $this->assertNull(Assignment::find($a->id));
     }
+
+    public function test_staff_enter_unique_lrns(): void
+    {
+        $this->actingAs(User::where('email', 'registrar@school.test')->first());
+        [$a, $b] = \App\Models\Student::orderBy('id')->take(2)->get()->all();
+        $this->get('/students/lrn?show=all')->assertOk()->assertSee('Enter LRNs')->assertSee('Missing LRN');
+        $this->getJson('/students/lrn/check?lrn='.$a->lrn)->assertJson(['taken' => $a->full_name]);
+        $this->getJson('/students/lrn/check?lrn='.$a->lrn.'&ignore='.$a->id)->assertJson(['taken' => null]);
+        $this->post("/students/{$b->id}/lrn", ['lrn' => $a->lrn])->assertSessionHasErrors(['lrn' => 'This LRN already belongs to '.$a->full_name.'.']);
+        $this->post("/students/{$b->id}/lrn", ['lrn' => '123456789012'])->assertSessionHasNoErrors();
+        $this->assertSame('123456789012', $b->fresh()->lrn);
+        $this->actingAs(User::where('email', 'student@school.test')->first())->get('/students/lrn')->assertForbidden();
+    }
 }
