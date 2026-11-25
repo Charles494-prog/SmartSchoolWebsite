@@ -115,6 +115,6 @@ class AdmissionClinicStaffTest extends TestCase
     public function test_scanner_has_full_screen_mode(): void
     {
         $this->admin();
-        $this->get('/attendance/scan')->assertOk()->assertSee('Full screen')->assertSee('requestFullscreen', false)->assertSee('The camera is blocked on this address');
+        $this->get('/attendance/scan')->assertOk()->assertSee('Full screen')->assertSee('requestFullscreen', false)->assertSee('The camera is blocked on this address')->assertSee('Scan with camera');
     }
 }

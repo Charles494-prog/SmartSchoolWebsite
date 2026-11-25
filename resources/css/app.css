@@ -136,6 +136,14 @@ html { scroll-behavior: smooth; }
 .dark .group:hover .group-hover\:text-white { color: #fff; filter: none; }
 .dark ::selection { background: rgb(129 140 248 / .4); }
 
+/* Full-screen QR camera */
+#qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+#qr-reader > div:not(:has(video)), #qr-reader img[alt='Info icon'] { display: none !important; }
+#qr-reader__scan_region, #qr-reader > div { width: 100% !important; height: 100% !important; }
+#qr-shaded-region { display: none !important; }
+@keyframes scanline { 0%, 100% { top: 12%; } 50% { top: 86%; } }
+.scanline { animation: scanline 2.4s var(--ease-smooth) infinite; }
+
 @media print {
     aside, header, .no-print, [x-data^='chatBox'] { display: none !important; }
     .lg\:pl-72 { padding-left: 0 !important; }
