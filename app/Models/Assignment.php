@@ -13,11 +13,21 @@ class Assignment extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['due_at' => 'datetime', 'max_score' => 'float', 'shuffle_questions' => 'boolean', 'shuffle_answers' => 'boolean'];
+    protected $casts = ['due_at' => 'datetime', 'max_score' => 'float', 'shuffle_questions' => 'boolean', 'shuffle_answers' => 'boolean', 'allow_comments' => 'boolean', 'track_reads' => 'boolean'];
 
     public function classSubject(): BelongsTo
     {
         return $this->belongsTo(ClassSubject::class);
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(PostComment::class)->oldest();
+    }
+
+    public function reads(): HasMany
+    {
+        return $this->hasMany(PostRead::class);
     }
 
     public function submissions(): HasMany

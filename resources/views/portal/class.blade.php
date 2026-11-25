@@ -1,4 +1,4 @@
-<x-layouts.app :title="$child ? $class->subject->name : 'Class'">
+<x-layouts.app :ajaxForms="true" :title="$child ? $class->subject->name : 'Class'">
     @include('portal._switch')
     @if($child)
         @php $CW = \App\Support\Classwork::class; $mine = $CW::colorKey($class, auth()->user()); @endphp
@@ -22,7 +22,7 @@
             </div>
             <div class="space-y-3">
                 @forelse($posts as $p)
-                    @include('assignments._post', ['p' => $p, 'teacher' => false, 'sub' => $submissions[$p->id] ?? null, 'students' => 0])
+                    @include('assignments._post', ['p' => $p, 'teacher' => false, 'sub' => $submissions[$p->id] ?? null, 'students' => 0, 'muted' => $muted])
                 @empty
                     <p class="card muted">Your teacher hasn't posted anything yet.</p>
                 @endforelse

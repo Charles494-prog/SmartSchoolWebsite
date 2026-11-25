@@ -52,7 +52,7 @@
                     </button>
                     Show every day
                 </label>
-                <button type="button" @click="all('present')" class="btn btn-sm">Mark unmarked as present</button>
+                <div class="flex flex-wrap gap-2"><button type="button" @click="all('present')" class="btn btn-sm">Mark blank as present</button><button type="button" @click="all('absent')" class="btn btn-sm">Mark blank as absent</button></div>
             </div>
             <ul class="divide-y divide-slate-100 dark:divide-white/5">
                 <template x-for="(s, i) in students" :key="s.id">

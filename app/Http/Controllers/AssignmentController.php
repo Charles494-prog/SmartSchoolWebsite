@@ -65,10 +65,12 @@ class AssignmentController extends Controller
         abort_unless($this->classes()->contains('id', $class->id), 403);
         $class->load('subject', 'section.gradeLevel', 'teacher', 'slots');
         $students = $class->section->students()->get();
-        $posts = $class->assignments()->withCount(['submissions', 'submissions as graded_count' => fn ($q) => $q->whereNotNull('score')])->latest()->get();
+        $posts = $class->assignments()->with(['comments.user', 'reads.user'])->withCount(['submissions', 'submissions as graded_count' => fn ($q) => $q->whereNotNull('score')])->latest()->get();
         $terms = $class->section->gradeLevel->terms ?: 4;
 
-        return view('assignments.class', compact('class', 'students', 'posts', 'terms'));
+        $mutedIds = DB::table('class_comment_mutes')->where('class_subject_id', $class->id)->pluck('user_id')->all();
+
+        return view('assignments.class', compact('class', 'students', 'posts', 'terms', 'mutedIds'));
     }
 
     public function store(Request $request)
@@ -275,7 +277,10 @@ class AssignmentController extends Controller
         abort_unless($u->isStaff() || $student?->currentEnrollment()?->section_id === $assignment->classSubject->section_id
             || ($u->role === 'parent' && $u->children()->get()->contains(fn ($c) => $c->currentEnrollment()?->section_id === $assignment->classSubject->section_id)), 403);
 
-        return Storage::disk('local')->download($assignment->attachment_path);
+        // Pictures and videos show inside the post (like a social feed); other files download.
+        return request()->boolean('inline') && preg_match('/\.(jpe?g|png|gif|webp|mp4|webm|mov)$/i', $assignment->attachment_path)
+            ? Storage::disk('local')->response($assignment->attachment_path, null, ['Cache-Control' => 'private, max-age=3600'])
+            : Storage::disk('local')->download($assignment->attachment_path);
     }
 
     public function file(Submission $submission)

@@ -150,7 +150,8 @@ class PortalController extends Controller
 
             return [
                 'class' => $class->load('subject', 'teacher', 'section.gradeLevel', 'slots'),
-                'posts' => $class->assignments()->with('classSubject.section.gradeLevel', 'classSubject.subject')->latest()->get(),
+                'posts' => $class->assignments()->with('classSubject.section.gradeLevel', 'classSubject.subject', 'comments.user')->latest()->get(),
+                'muted' => PostCommentController::muted($class->id, (int) auth()->id()),
                 'submissions' => Submission::where('student_id', $c->id)->whereIn('assignment_id', $class->assignments()->select('id'))->get()->keyBy('assignment_id'),
             ];
         });

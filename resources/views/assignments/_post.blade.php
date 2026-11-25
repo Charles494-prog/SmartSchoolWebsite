@@ -4,7 +4,7 @@
     $hasDesign = filled($p->body_html) || filled($p->body_js);
 @endphp
 <article x-data="{ open: false }" class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" x-show="filter === 'all' || filter === '{{ $p->type }}' || (filter === 'work' && {{ $graded ? 'true' : 'false' }}) || (filter === 'todo' && {{ ! $teacher && $graded && ! $sub ? 'true' : 'false' }})">
-    <button type="button" class="flex w-full items-center gap-4 p-4 text-left" x-on:click="open = !open" :aria-expanded="open">
+    <button type="button" class="flex w-full items-center gap-4 p-4 text-left" x-on:click="open = !open{{ ! $teacher && $p->track_reads && auth()->user()->role === 'student' ? "; if (open && !\$el.dataset.read) { \$el.dataset.read = 1; fetch('".route('posts.read', $p)."', { method: 'POST', headers: { 'X-CSRF-TOKEN': '".csrf_token()."' } }) }" : '' }}" :aria-expanded="open">
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full {{ $tClass }}"><x-icon :name="$tIcon" class="h-5 w-5" /></span>
         <span class="min-w-0 flex-1">
             <span class="flex flex-wrap items-center gap-2">
@@ -38,9 +38,16 @@
                     class="block h-48 w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700" title="{{ $p->title }} – teacher's content"></iframe>
         @endif
         @if($p->attachment_path)
-            <a class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-white/5" href="{{ route('assignments.attachment', $p) }}">
-                <x-icon name="clip" class="h-4 w-4" /> {{ basename($p->attachment_path) }}
-            </a>
+            @php $ext = strtolower(pathinfo($p->attachment_path, PATHINFO_EXTENSION)); $src = route('assignments.attachment', [$p, 'inline' => 1]); @endphp
+            @if(in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true))
+                <a href="{{ $src }}" target="_blank" rel="noopener" class="block overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-white/5"><img src="{{ $src }}" alt="Picture attached to {{ $p->title }}" loading="lazy" class="mx-auto max-h-[28rem] w-auto object-contain"></a>
+            @elseif(in_array($ext, ['mp4', 'webm', 'mov'], true))
+                <video src="{{ $src }}" controls preload="metadata" class="max-h-[28rem] w-full rounded-xl border border-slate-200 bg-black dark:border-slate-700"><track kind="captions"></video>
+            @else
+                <a class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-white/5" href="{{ route('assignments.attachment', $p) }}">
+                    <x-icon name="clip" class="h-4 w-4" /> {{ basename($p->attachment_path) }}
+                </a>
+            @endif
         @endif
 
         @if($teacher)
@@ -65,6 +72,66 @@
                     <button class="btn btn-primary">{{ $sub ? 'Turn in again' : 'Turn in' }}</button>
                 </form>
             @endif
+        @endif
+
+        {{-- Seen by + comments --}}
+        @php
+            $mutedIds ??= []; $muted ??= false;
+            $me = auth()->user();
+            $canComment = $teacher || ($me->role === 'student' && $p->allow_comments && ! $muted);
+        @endphp
+        @if($teacher)
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-slate-50 px-3 py-2 text-sm dark:bg-white/5" x-data="{ seen: false }">
+                <form method="post" action="{{ route('posts.settings', $p) }}" class="flex flex-wrap items-center gap-x-5 gap-y-2" x-data x-on:change="$el.requestSubmit()">@csrf
+                    <label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="allow_comments" value="1" class="h-4 w-4 rounded" @checked($p->allow_comments)> Students can comment</label>
+                    <label class="flex min-h-11 items-center gap-2"><input type="checkbox" name="track_reads" value="1" class="h-4 w-4 rounded" @checked($p->track_reads)> Show who has seen it</label>
+                </form>
+                @if($p->track_reads)
+                    <button type="button" class="ml-auto inline-flex min-h-11 items-center gap-1.5 font-medium text-brand-700 dark:text-brand-300" x-on:click="seen = !seen" :aria-expanded="seen"><x-icon name="eye" class="h-4 w-4" /> Seen by {{ $p->reads->count() }} of {{ $students }}</button>
+                    <ul x-show="seen" x-cloak class="flex w-full flex-wrap gap-1.5">
+                        @forelse($p->reads->sortBy('read_at') as $r)
+                            <li class="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-slate-200 dark:bg-white/10 dark:ring-white/10" title="{{ $r->read_at->format('M d, g:i A') }}">{{ $r->user?->name }}</li>
+                        @empty
+                            <li class="text-xs text-slate-500">No one has opened it yet.</li>
+                        @endforelse
+                    </ul>
+                @endif
+            </div>
+        @endif
+
+        @if($p->allow_comments || $p->comments->isNotEmpty() || $teacher)
+            <section class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800" aria-label="Comments">
+                <h4 class="text-sm font-semibold text-slate-700 dark:text-slate-200">{{ $p->comments->count() }} {{ str('comment')->plural($p->comments->count()) }}</h4>
+                @foreach($p->comments as $cm)
+                    @php $isMuted = in_array($cm->user_id, $mutedIds, true); @endphp
+                    <div class="flex gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-200">{{ collect(explode(' ', (string) $cm->user?->name))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('') }}</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-white/5">
+                                <p class="text-xs font-semibold text-slate-900 dark:text-white">{{ $cm->user?->name }}@if($cm->user?->role === 'teacher' || $cm->user?->role === 'admin') <span class="ml-1 rounded bg-brand-100 px-1 text-[10px] text-brand-800 dark:bg-brand-500/20 dark:text-brand-200">Teacher</span>@endif @if($isMuted)<span class="ml-1 text-[10px] font-normal text-rose-600">can't comment</span>@endif</p>
+                                <p class="text-sm whitespace-pre-line text-slate-800 dark:text-slate-200">{{ $cm->body }}</p>
+                            </div>
+                            <div class="mt-0.5 flex flex-wrap items-center gap-3 px-2 text-xs text-slate-500">
+                                <span>{{ $cm->created_at->diffForHumans() }}</span>
+                                @if($teacher || $cm->user_id === $me->id)
+                                    <form method="post" action="{{ route('posts.comments.destroy', $cm) }}" x-data x-on:submit="if (!confirm('Delete this comment?')) $event.preventDefault()">@csrf @method('delete')<button class="min-h-8 font-medium hover:text-rose-600">Delete</button></form>
+                                @endif
+                                @if($teacher && $cm->user?->role === 'student')
+                                    <form method="post" action="{{ route('posts.mute', [$p->class_subject_id, $cm->user_id]) }}" x-data x-on:submit="if (!confirm(@js($isMuted ? 'Let '.$cm->user->name.' comment again in this class?' : 'Stop '.$cm->user->name.' from commenting in this class?'))) $event.preventDefault()">@csrf<button class="min-h-8 font-medium hover:text-rose-600">{{ $isMuted ? 'Allow commenting' : 'Stop commenting' }}</button></form>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+                @if($canComment)
+                    <form method="post" action="{{ route('posts.comments.store', $p) }}" class="flex items-end gap-2" x-data="{ body: '' }" x-on:ajax-done.window="body = ''">@csrf
+                        <textarea name="body" x-model="body" rows="1" maxlength="1000" class="input min-h-11 flex-1 resize-y" placeholder="{{ $teacher ? 'Reply to the class…' : 'Add a class comment…' }}" aria-label="Write a comment" required></textarea>
+                        <button class="btn btn-primary shrink-0" :disabled="!body.trim()">Post</button>
+                    </form>
+                @elseif($me->role === 'student')
+                    <p class="text-xs text-slate-500">{{ $muted ? 'Your teacher turned off commenting for you in this class.' : 'Comments are turned off for this post.' }}</p>
+                @endif
+            </section>
         @endif
     </div>
 </article>

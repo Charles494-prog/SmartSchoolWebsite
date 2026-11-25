@@ -1,4 +1,4 @@
-<x-layouts.app :title="$class->subject->name.' · '.$class->section->name">
+<x-layouts.app :ajaxForms="true" :title="$class->subject->name.' · '.$class->section->name">
     @php
         $CW = \App\Support\Classwork::class;
         $weights = $class->weights();
@@ -45,7 +45,7 @@
                     @endforeach
                 </div>
                 @forelse($posts as $p)
-                    @include('assignments._post', ['p' => $p, 'teacher' => true, 'sub' => null, 'students' => $students->count()])
+                    @include('assignments._post', ['p' => $p, 'teacher' => true, 'sub' => null, 'students' => $students->count(), 'mutedIds' => $mutedIds])
                 @empty
                     <div class="card py-12 text-center">
                         <p class="text-lg font-semibold">Nothing posted yet</p>
@@ -161,7 +161,7 @@
                         </div>
                     </div>
 
-                    <x-field name="attachment" label="Attach a file (optional, up to 20 MB – PDF, slides, worksheet…)" type="file" />
+                    <x-field name="attachment" label="Add a picture, video or file (optional, up to 20 MB – photo, MP4 video, PDF, slides…)" type="file" />
                     <button class="btn btn-primary w-full" x-text="type === 'quiz' ? 'Create quiz and add questions' : @js('Post to '.$class->section->name)">Post to {{ $class->section->name }}</button>
                 </form>
             </div>

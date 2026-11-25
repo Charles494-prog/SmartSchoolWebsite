@@ -21,6 +21,7 @@ use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\OnlinePaymentController;
 use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\PortalController;
+use App\Http\Controllers\PostCommentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuizController;
 use App\Http\Controllers\SectionController;
@@ -147,6 +148,13 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::get('/finance/soa/{enrollment}', [FinanceController::class, 'soa'])->name('finance.soa');
     Route::get('/assignments/{assignment}/attachment', [AssignmentController::class, 'attachment'])->name('assignments.attachment');
     Route::get('/assignments/{assignment}/content', [AssignmentController::class, 'content'])->name('assignments.content');
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('/posts/{assignment}/comments', [PostCommentController::class, 'store'])->name('posts.comments.store');
+        Route::delete('/post-comments/{comment}', [PostCommentController::class, 'destroy'])->name('posts.comments.destroy');
+        Route::post('/posts/{assignment}/settings', [PostCommentController::class, 'settings'])->name('posts.settings');
+        Route::post('/classes/{class}/mute/{user}', [PostCommentController::class, 'mute'])->name('posts.mute');
+    });
+    Route::post('/posts/{assignment}/read', [PostCommentController::class, 'read'])->middleware('throttle:120,1')->name('posts.read');
 
     // Registrar & admin
     Route::middleware('role:admin,registrar')->group(function () {
