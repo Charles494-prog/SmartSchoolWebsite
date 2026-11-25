@@ -7,8 +7,9 @@
               <span x-text="full ? 'Exit full screen' : 'Full screen'">Full screen</span>
           </button>
       </div>
+      <div :class="camOpen && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]'">
             {{-- Camera scanner: fills the page area, menu and top bar stay visible --}}
-            <div x-show="camOpen" x-cloak x-ref="camWrap" x-transition.opacity.duration.250ms class="relative mb-4 flex h-[calc(100dvh-9.5rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl bg-black text-white shadow-xl" :class="full && 'mx-auto max-w-7xl'" role="region" aria-label="Camera scanner">
+            <div x-show="camOpen" x-cloak x-ref="camWrap" x-transition.opacity.duration.250ms class="relative flex h-[calc(100dvh-12rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl bg-black text-white shadow-xl lg:sticky lg:top-24" role="region" aria-label="Camera scanner">
                 <div class="relative flex-1 overflow-hidden">
                     <div id="qr-reader" class="absolute inset-0"></div>
 
@@ -82,7 +83,7 @@
                 </div>
             </div>
             </div>
-      <div x-show="!camOpen" class="grid gap-4 lg:grid-cols-2" :class="full && 'mx-auto max-w-7xl lg:grid-cols-[2fr_3fr]'">
+      <div class="grid gap-4" :class="camOpen ? 'mt-4 lg:mt-0' : (full ? 'mx-auto max-w-7xl lg:grid-cols-[2fr_3fr]' : 'lg:grid-cols-2')">
         <div class="card">
             @if($gate)
                 <h1 class="h2">Gate scanner</h1>
@@ -105,13 +106,13 @@
                 <input x-ref="box" x-model="code" class="input text-lg" placeholder="Scan or type student no./LRN…" autofocus>
                 <button class="btn btn-primary">Scan</button>
             </form>
-            <button type="button" class="btn mt-4 min-h-12 w-full text-base" x-on:click="openCam()">
+            <button type="button" class="btn mt-4 min-h-12 w-full text-base" x-show="!camOpen" x-on:click="openCam()">
                 <x-icon name="qr" class="h-5 w-5" /> Scan with camera
             </button>
 
         </div>
         <div class="space-y-3">
-            <div :class="full ? 'min-h-[50vh]' : 'min-h-48'" class="card flex flex-col items-center justify-center text-center transition"
+            <div :class="full && !camOpen ? 'min-h-[50vh]' : 'min-h-48'" class="card flex flex-col items-center justify-center text-center transition"
                  :class="{ 'bg-green-600 text-white': last && last.status==='present', 'bg-slate-800 text-white': last && last.status==='out', 'bg-amber-500 text-white': last && last.status==='late', 'bg-blue-600 text-white': last && last.status==='already', 'bg-rose-600 text-white': last && !last.ok }">
                 <template x-if="!last"><p class="muted">Waiting for a scan…</p></template>
                 <template x-if="last">
@@ -127,6 +128,7 @@
                 <ul class="space-y-1 text-sm"><template x-for="r in recent"><li><span x-text="r.time"></span> · <b x-text="r.name || '?'"></b> – <span x-text="r.message"></span></li></template></ul>
             </div>
         </div>
+      </div>
       </div>
     </div>
     <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
