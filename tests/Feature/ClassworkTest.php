@@ -77,7 +77,13 @@ class ClassworkTest extends TestCase
         $student = User::where('email', 'student@school.test')->first();
         $this->post('/dev/login', ['user_id' => $student->id])->assertRedirect('/');
         $this->assertAuthenticatedAs($student);
-        $this->post('/dev/login', ['user_id' => User::where('email', 'not like', '%@school.test')->value('id') ?? 999999])->assertNotFound();
+        $this->post('/dev/login', ['user_id' => User::where('email', 'not like', '%@school.test')->where('role', '!=', 'admin')->value('id') ?? 999999])->assertNotFound();
+        $this->post('/dev/setup')->assertRedirect(route('setup.wizard', 'welcome'));
+        $this->assertSame('admin', auth()->user()->role, 'wizard runs as the Superadmin');
+        $this->get(route('setup.wizard', 'subjects'))->assertOk()->assertSee('Top achievers to list');
+        foreach (array_keys(\App\Http\Controllers\SetupWizardController::steps()) as $step) {
+            $this->get(route('setup.wizard', $step))->assertOk();
+        }
     }
 
     public function test_classwork_feeds_the_gradebook_only_when_it_counts(): void

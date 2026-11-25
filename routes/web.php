@@ -49,6 +49,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', ThrottleWrites::class])->group(function () {
     Route::post('/dev/mode', [\App\Http\Controllers\DevController::class, 'mode'])->name('dev.mode');
     Route::post('/dev/login', [\App\Http\Controllers\DevController::class, 'login'])->name('dev.login');
+    Route::post('/dev/setup', [\App\Http\Controllers\DevController::class, 'setup'])->name('dev.setup');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');

@@ -22,8 +22,9 @@ class DevController extends Controller
     /** Demo accounts only (the sample data uses @school.test addresses). */
     public static function accounts()
     {
-        return User::where('email', 'like', '%@school.test')->where('is_active', true)
-            ->where(fn ($q) => $q->where('role', '!=', 'parent')->orWhere('email', 'parent@school.test'))
+        // Demo accounts, plus the Superadmin/admin accounts so their screens can be checked too.
+        return User::where('is_active', true)->where(fn ($q) => $q->where('role', 'admin')->orWhere(fn ($d) => $d->where('email', 'like', '%@school.test')
+            ->where(fn ($w) => $w->where('role', '!=', 'parent')->orWhere('email', 'parent@school.test'))))
             ->orderBy('role')->orderBy('email')->get(['id', 'name', 'email', 'role']);
     }
 
@@ -39,10 +40,23 @@ class DevController extends Controller
     public function login(Request $request)
     {
         abort_unless(self::enabled(), 404);
-        $user = User::whereKey($request->validate(['user_id' => 'required|integer'])['user_id'])->where('email', 'like', '%@school.test')->firstOrFail();
+        $user = User::whereKey($request->validate(['user_id' => 'required|integer'])['user_id'])->where(fn ($q) => $q->where('email', 'like', '%@school.test')->orWhere('role', 'admin'))->firstOrFail();
         Auth::login($user);
         $request->session()->regenerate();
 
         return redirect('/')->with('ok', 'Dev mode: signed in as '.$user->name.' ('.$user->role.').');
+    }
+
+    /** Run the setup wizard again from the start (as the Superadmin) to check every step. */
+    public function setup(Request $request)
+    {
+        abort_unless(self::enabled(), 404);
+        if ($request->user()->role !== 'admin') {
+            Auth::login(User::where('role', 'admin')->where('is_active', true)->orderBy('id')->firstOrFail());
+            $request->session()->regenerate();
+        }
+        Setting::put('setup_completed_at', '');
+
+        return redirect()->route('setup.wizard', 'welcome')->with('ok', 'Dev mode: setup wizard restarted. Your data stays; each step shows what is already set.');
     }
 }

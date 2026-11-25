@@ -91,12 +91,16 @@
                                     <button name="mode" value="hosted" class="rounded-lg px-2 py-1.5 text-sm font-semibold {{ ! $devLan ? 'bg-white shadow text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500' }}">Online</button>
                                 </form>
                             </div>
+                            <form method="post" action="{{ route('dev.setup') }}" class="border-b border-slate-100 px-4 py-3 dark:border-white/10">@csrf
+                                <button class="flex w-full items-center justify-center gap-2 rounded-xl bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"><x-icon name="sparkles" class="h-4 w-4" /> Run setup wizard again</button>
+                                <p class="mt-1 text-center text-[11px] text-slate-500">Signs in as the Superadmin if needed</p>
+                            </form>
                             <div class="max-h-80 overflow-y-auto px-2 py-2">
                                 <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Sign in as</p>
                                 @foreach(\App\Http\Controllers\DevController::accounts() as $acc)
                                     <form method="post" action="{{ route('dev.login') }}">@csrf<input type="hidden" name="user_id" value="{{ $acc->id }}">
                                         <button class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-white/10 {{ $acc->id === $u->id ? 'font-semibold text-brand-700' : '' }}">
-                                            <span class="w-20 shrink-0 text-xs capitalize text-slate-500">{{ $acc->role }}</span><span class="truncate">{{ $acc->name }}</span>
+                                            <span class="w-20 shrink-0 text-xs capitalize {{ $acc->role === 'admin' ? 'font-bold text-fuchsia-600' : 'text-slate-500' }}">{{ $acc->role === 'admin' ? 'Superadmin' : $acc->role }}</span><span class="truncate">{{ $acc->name }}</span>
                                         </button>
                                     </form>
                                 @endforeach
