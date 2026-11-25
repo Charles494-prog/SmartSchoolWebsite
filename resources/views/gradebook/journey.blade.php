@@ -2,7 +2,8 @@
     @php
         $fmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
         $period = $term ? \App\Support\School::periodName($terms).' '.$term : 'Whole year';
-        $avg = $term ? $avgByTerm[$term] : $rc['general_average'];
+        $done = $avgByTerm->filter()->count();
+        $avg = $term ? $avgByTerm[$term] : ($done ? round($avgByTerm->filter()->avg(), 2) : null);
         $honor = \App\Services\Grading::honor($avg);
         $compColor = ['ww' => 'bg-indigo-500', 'pt' => 'bg-emerald-500', 'qa' => 'bg-amber-500'];
         $compName = ['ww' => 'Quiz', 'pt' => 'Project', 'qa' => 'Exam'];
@@ -20,7 +21,7 @@
             </div>
             <div class="text-right">
                 <div class="text-5xl font-extrabold">{{ $avg ?? '—' }}</div>
-                <div class="text-sm text-white/80">average</div>
+                <div class="text-sm text-white/80">{{ ! $term && $done < $terms ? 'year average so far ('.$done.' of '.$terms.')' : 'average' }}</div>
                 @if($honor)<span class="mt-1 inline-block rounded-full bg-white/20 px-3 py-1 text-sm font-semibold">🏅 {{ $honor }}</span>@endif
             </div>
         </div>
@@ -49,7 +50,7 @@
     {{-- Every graded item, per subject --}}
     <div class="mt-5 grid gap-4 lg:grid-cols-2">
         @foreach($subjects as $s)
-            @php $g = $term ? ($s['terms'][$term] ?? null) : \App\Services\Grading::finalGrade($s['terms']); @endphp
+            @php $g = $term ? ($s['terms'][$term] ?? null) : \App\Services\Grading::runningFinal($s['terms']); @endphp
             <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" x-data="{ open: {{ $loop->index < 2 ? 'true' : 'false' }} }">
                 <button type="button" class="flex w-full items-center gap-3 p-5 text-left" x-on:click="open = !open">
                     <div class="mr-auto"><p class="font-semibold">{{ $s['cs']->subject->name }}</p><p class="text-xs text-slate-500">{{ $s['cs']->teacher?->name }} · {{ $s['items']->count() }} graded {{ str('item')->plural($s['items']->count()) }}</p></div>

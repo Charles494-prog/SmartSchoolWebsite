@@ -207,6 +207,14 @@ class Grading
         return $out;
     }
 
+    /** Year average so far: the average of the grading periods that already have a grade (live, before Q3/Q4). */
+    public static function runningFinal(array $terms): ?float
+    {
+        $vals = array_values(array_filter($terms, fn ($g) => $g !== null));
+
+        return $vals === [] ? null : round(array_sum($vals) / count($vals), 2);
+    }
+
     public static function finalGrade(array $terms): ?float
     {
         $vals = array_values(array_filter($terms, fn ($g) => $g !== null));
@@ -253,11 +261,12 @@ class Grading
             $rc = self::reportCard($e, $classSubjects);
             $grades = [];
             foreach ($rc['subjects'] as $sub) {
-                $grades[$sub['name']] = $term === null ? $sub['final'] : ($sub['terms'][$term] ?? null);
+                // Whole year is live: average of the periods graded so far (official final still needs every period).
+                $grades[$sub['name']] = $term === null ? self::runningFinal($sub['terms']) : ($sub['terms'][$term] ?? null);
             }
             if ($term === null) {
                 $e->updateQuietly(['general_average' => $rc['general_average']]);
-                $avg = $rc['general_average'];
+                $avg = $grades !== [] && ! in_array(null, $grades, true) ? round(array_sum($grades) / count($grades), 2) : null;
             } else {
                 $avg = $grades !== [] && ! in_array(null, $grades, true) ? round(array_sum($grades) / count($grades), 2) : null;
             }

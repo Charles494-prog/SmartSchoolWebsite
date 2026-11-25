@@ -126,4 +126,17 @@ GIFT);
         $this->assertTrue(Award::where('name', 'Kindness Award')->exists());
         $this->post('/honors/nominations', ['award_id' => Award::first()->id, 'student_id' => $other->students()->first()->id])->assertForbidden();
     }
+
+    public function test_whole_year_is_live_and_gradebook_explains_each_grade(): void
+    {
+        $this->assertSame(99.0, \App\Services\Grading::runningFinal([1 => 100, 2 => 98, 3 => null, 4 => null]));
+        $this->assertNull(\App\Services\Grading::finalGrade([1 => 100, 2 => 98, 3 => null, 4 => null]), 'official final still waits for every period');
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $section = \App\Models\Section::where('adviser_id', $teacher->id)->first();
+        $r = $this->get("/honors?section_id={$section->id}&term=final")->assertOk()->assertSee('so far');
+        $this->assertNotEmpty($r->viewData('top'), 'whole-year list shows before Q3/Q4 exist');
+        $cs = ClassSubject::where('teacher_id', $teacher->id)->first();
+        $this->get("/gradebook/{$cs->id}?term=1")->assertOk()->assertSee('grade is computed')->assertSee('Initial grade');
+    }
 }

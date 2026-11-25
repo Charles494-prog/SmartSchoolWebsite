@@ -106,8 +106,9 @@
                 </thead>
                 <tbody>
                 @forelse($sheet as $sid => $row)
+                    </tbody><tbody x-data="{ open: false }" class="border-b border-slate-100 dark:border-slate-800">
                     <tr>
-                        <td class="sticky left-0 whitespace-nowrap bg-white">{{ $row['student']->full_name }}</td>
+                        <td class="sticky left-0 whitespace-nowrap bg-white dark:bg-slate-900"><button type="button" class="flex items-center gap-1.5 text-left hover:text-brand-600" x-on:click="open = !open" :aria-expanded="open" title="Show how this grade is computed"><span class="text-slate-400 transition" :class="open && 'rotate-90'"><x-icon name="chevron" class="h-3.5 w-3.5" /></span>{{ $row['student']->full_name }}</button></td>
                         @foreach($assessments as $a)
                             @php $v = old("scores.{$a->id}.{$sid}", $scores[$sid][$a->id]->score ?? null); @endphp
                             <td class="p-1 text-center">
@@ -116,7 +117,43 @@
                             </td>
                         @endforeach
                         <td class="text-center text-slate-500">{{ $row['initial'] ?? '' }}</td>
-                        <td class="text-center font-bold {{ $row['quarterly'] !== null && $row['quarterly'] < (float) \App\Models\Setting::get('passing_grade') ? 'text-red-600' : '' }}">{{ $row['quarterly'] ?? '' }}</td>
+                        <td class="text-center font-bold {{ $row['quarterly'] !== null && $row['quarterly'] < (float) \App\Models\Setting::get('passing_grade') ? 'text-red-600' : '' }}"><button type="button" class="hover:underline" x-on:click="open = !open">{{ $row['quarterly'] ?? '' }}</button></td>
+                    </tr>
+                    <tr x-show="open" x-cloak>
+                        <td colspan="99" class="bg-slate-50 px-4 py-4 dark:bg-white/5">
+                            @php
+                                $used = collect($w)->filter(fn ($wt, $c) => $wt > 0 && (($row['totals'][$c][1] ?? 0) > 0))->sum();
+                                $compLabel = ['ww' => 'Quizzes / written work', 'pt' => 'Projects / performance', 'qa' => 'Exams / summative', 'at' => 'Attendance'];
+                                $f = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
+                            @endphp
+                            <p class="mb-3 text-sm font-semibold">How {{ $row['student']->first_name }}'s grade is computed</p>
+                            <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+                                <table class="w-full text-sm">
+                                    <thead class="text-xs text-slate-500"><tr><th class="py-1 text-left font-medium">Part</th><th class="text-right font-medium">Score</th><th class="text-right font-medium">%</th><th class="text-right font-medium">Weight</th><th class="text-right font-medium">Points</th></tr></thead>
+                                    <tbody>
+                                    @foreach($w as $c => $wt)
+                                        @continue($wt <= 0)
+                                        @php [$sc, $mx] = $row['totals'][$c] ?? [0, 0]; $pct = $mx > 0 ? $sc / $mx * 100 : null; $eff = $used > 0 ? $wt * 100 / $used : 0; @endphp
+                                        <tr class="border-t border-slate-200 dark:border-slate-700 {{ $pct === null ? 'text-slate-400' : '' }}">
+                                            <td class="py-1.5">{{ $compLabel[$c] ?? $c }}</td>
+                                            <td class="text-right">{{ $mx > 0 ? $f($sc).' / '.$f($mx) : 'none yet' }}</td>
+                                            <td class="text-right">{{ $pct !== null ? $f($pct).'%' : '—' }}</td>
+                                            <td class="text-right">{{ $wt }}%@if($pct !== null && $used < 100)<span class="text-xs text-slate-400"> → {{ $f($eff) }}%</span>@endif</td>
+                                            <td class="text-right font-semibold">{{ $pct !== null ? $f($pct * $eff / 100) : '—' }}</td>
+                                        </tr>
+                                    @endforeach
+                                    <tr class="border-t-2 border-slate-300 font-bold dark:border-slate-600"><td class="py-1.5" colspan="4">Initial grade</td><td class="text-right">{{ $row['initial'] ?? '—' }}</td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="rounded-xl bg-white p-4 text-sm shadow-sm dark:bg-slate-900">
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ \App\Support\School::periodName($terms) }} grade</p>
+                                    <p class="text-4xl font-extrabold {{ $row['quarterly'] !== null && $row['quarterly'] < (float) \App\Models\Setting::get('passing_grade') ? 'text-red-600' : 'text-brand-600' }}">{{ $row['quarterly'] ?? '—' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ \App\Models\Setting::get('use_transmutation') === '1' ? 'Initial grade '.($row['initial'] ?? '—').' changed with the DepEd transmutation table.' : 'Initial grade '.($row['initial'] ?? '—').' rounded to a whole number.' }}</p>
+                                    @if($used > 0 && $used < 100)<p class="mt-2 text-xs text-amber-700">Some parts have no scores yet, so the others count proportionally more until they do.</p>@endif
+                                    <p class="mt-2 text-xs text-slate-500">{{ \App\Services\Grading::descriptor($row['quarterly']) }}</p>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="99" class="py-8 text-center text-slate-500">No students in this section yet.</td></tr>

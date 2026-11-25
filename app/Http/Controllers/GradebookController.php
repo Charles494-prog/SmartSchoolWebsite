@@ -268,7 +268,7 @@ class GradebookController extends Controller
         $term = $request->query('term') === 'final' ? null : min(max((int) $request->query('term', 1), 1), $terms);
         $classes = $e->section->classSubjects()->with('subject', 'section.gradeLevel', 'assessments', 'teacher')->get()->sortBy('subject.name');
         $rc = Grading::reportCard($e, $classes);
-        abort_if(collect($rc['subjects'])->contains(fn ($s) => collect($term ? [$s['terms'][$term] ?? null] : [$s['final']])->filter(fn ($g) => $g !== null && $g < (float) (\App\Models\Setting::get('passing_grade') ?: 75))->isNotEmpty())
+        abort_if(collect($rc['subjects'])->contains(fn ($s) => collect($term ? [$s['terms'][$term] ?? null] : [Grading::runningFinal($s['terms'])])->filter(fn ($g) => $g !== null && $g < (float) (\App\Models\Setting::get('passing_grade') ?: 75))->isNotEmpty())
             && ! $request->user()->canViewStudent($student), 403, 'This student\'s grades are private.');
         $scores = Score::where('student_id', $student->id)->whereIn('assessment_id', $classes->flatMap->assessments->pluck('id'))->get()->keyBy('assessment_id');
         $subjects = $classes->map(fn ($cs) => [

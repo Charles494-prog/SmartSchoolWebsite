@@ -2,7 +2,7 @@
     @php
         $S = \App\Models\Setting::class;
         $isAdmin = auth()->user()->hasRole('admin', 'registrar');
-        $period = $term ? \App\Support\School::periodName($terms).' '.$term : 'Whole school year';
+        $period = $term ? \App\Support\School::periodName($terms).' '.$term : 'Whole school year (so far)';
         $where = $scope === 'level' ? ($section?->gradeLevel->name.' – all sections') : $section?->label();
         $honorStyle = ['With Highest Honors' => 'bg-amber-100 text-amber-800 ring-amber-300', 'With High Honors' => 'bg-slate-100 text-slate-700 ring-slate-300', 'With Honors' => 'bg-orange-100 text-orange-800 ring-orange-300'];
         $counts = $top->groupBy('honor')->map->count();
@@ -24,7 +24,7 @@
             <label><span class="mb-1 block text-xs font-medium text-slate-500">Period</span>
                 <select name="term" class="input h-11" x-on:change="$refs.f.submit()">
                     @foreach(range(1, $terms) as $t)<option value="{{ $t }}" @selected($term === $t)>{{ \App\Support\School::periodName($terms) }} {{ $t }}</option>@endforeach
-                    <option value="final" @selected($term === null)>Whole year (final)</option>
+                    <option value="final" @selected($term === null)>Whole year – live average</option>
                 </select></label>
             <button type="button" x-on:click="window.print()" class="btn h-11">Print</button>
         </form>
