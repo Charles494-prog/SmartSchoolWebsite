@@ -1,4 +1,4 @@
-@php $tiles = \App\Support\Nav::tiles($u); @endphp
+@php $tileGroups = \App\Support\Nav::groupedTiles($u); @endphp
 <x-layouts.app title="Home">
     {{-- Greeting --}}
     <div class="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-6 dark:border-white/10">
@@ -87,13 +87,31 @@
         </div>
     @endisset
 
-    {{-- What would you like to do? --}}
-    <div class="mb-4 flex items-end justify-between">
-        <div><h2 class="text-lg font-bold text-slate-900">What would you like to do?</h2><p class="muted">Everything you can open with your account.</p></div>
-    </div>
-    <div class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        @foreach($tiles as $t)<x-tile :item="$t" />@endforeach
-    </div>
+    {{-- What would you like to do? – every feature, grouped, with a live filter --}}
+    <section class="mb-8" x-data="{ q: '', match(text) { const t = this.q.trim().toLowerCase(); return !t || text.includes(t) } }" aria-labelledby="todo-h">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div><h2 id="todo-h" class="text-lg font-bold text-slate-900">What would you like to do?</h2><p class="muted">Everything you can open with your account, grouped by area.</p></div>
+            <label class="relative block w-full sm:w-72">
+                <span class="sr-only">Filter features</span>
+                <x-icon name="search" class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input type="search" x-model="q" x-on:keydown.escape="q = ''" class="input min-h-11 pl-9" placeholder="Type to filter, e.g. “Su”" autocomplete="off">
+            </label>
+        </div>
+        <div class="space-y-6">
+            @foreach($tileGroups as $group => $items)
+                @php $groupText = collect($items)->map(fn ($i) => mb_strtolower($i['label'].' '.$i['desc'].' '.$group))->implode(' | '); @endphp
+                <div x-show="match(@js($groupText))" x-transition.opacity.duration.200ms>
+                    <h3 class="mb-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">{{ $group }}</h3>
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach($items as $t)
+                            <div x-show="match(@js(mb_strtolower($t['label'].' '.$t['desc'].' '.$group)))" x-transition.opacity.duration.200ms><x-tile :item="$t" /></div>
+                        @endforeach
+                    </div>
+                </div>
+            @endforeach
+        </div>
+        <p x-cloak x-show="q && !@js(collect($tileGroups)->flatMap(fn ($items, $g) => collect($items)->map(fn ($i) => mb_strtolower($i['label'].' '.$i['desc'].' '.$g)))->values()).some(t => match(t))" class="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No feature matches “<span x-text="q"></span>”. Try another word.</p>
+    </section>
 
     @isset($enrolledCount)
         <div class="grid gap-4 lg:grid-cols-3">

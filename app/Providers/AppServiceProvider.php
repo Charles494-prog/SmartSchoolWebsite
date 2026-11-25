@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\Setting;
 use App\Support\EnvCheck;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +31,9 @@ class AppServiceProvider extends ServiceProvider
             }
             logger()->warning('N+1 lazy load', ['model' => $model::class, 'relation' => $relation]);
         });
+
+        // Queue workers live for hours: reload settings before each job so changes made in the app apply.
+        Queue::looping(fn () => Setting::flush());
 
         // Every signed-in change (POST/PUT/PATCH/DELETE) shares one generous per-user budget.
         RateLimiter::for('writes', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));

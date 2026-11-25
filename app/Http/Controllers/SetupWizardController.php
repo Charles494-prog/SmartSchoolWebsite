@@ -87,9 +87,12 @@ class SetupWizardController extends Controller
 
     private function saveSchool(Request $r): string
     {
-        $d = $r->validate(['school_name' => 'required|max:150', 'school_address' => 'nullable|max:255', 'school_head' => 'nullable|max:150', 'school_phone' => 'nullable|max:50', 'school_email' => 'nullable|email|max:150']);
-        foreach ($d as $k => $v) {
+        $d = $r->validate(['school_name' => 'required|max:150', 'school_address' => 'nullable|max:255', 'school_head' => 'nullable|max:150', 'school_phone' => 'nullable|max:50', 'school_email' => 'nullable|email|max:150', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048']);
+        foreach (collect($d)->except('logo') as $k => $v) {
             Setting::put($k, (string) $v);
+        }
+        if ($r->hasFile('logo')) {
+            Setting::storeLogo($r->file('logo'));
         }
 
         return 'Saved your school details.';

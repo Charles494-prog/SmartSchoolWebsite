@@ -44,7 +44,7 @@ class AdminController extends Controller
     {
         $rules = ['school_name' => 'required|max:150', 'passing_grade' => 'required|numeric|between:50,100', 'late_after' => 'required|date_format:H:i', 'use_transmutation' => 'boolean', 'notify_absent' => 'boolean', 'notify_late' => 'boolean',
             'honors_with_highest' => 'required|numeric', 'honors_with_high' => 'required|numeric', 'honors_with' => 'required|numeric', 'library_loan_days' => 'required|integer|min:1', 'library_fine_per_day' => 'required|numeric|min:0',
-            'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|max:2048',
+            'privacy_notice' => 'required|max:5000', 'logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
             'deployment_mode' => 'nullable|in:lan,hosted', 'school_type' => 'nullable|in:public,private', 'tuition_mode' => 'required_if:school_type,private|in:same,per_level',
             'tuition_all' => 'nullable|required_if:tuition_mode,same|numeric|min:0|max:10000000', 'tuition' => 'array', 'tuition.*' => 'nullable|numeric|min:0|max:10000000'];
         $data = $request->validate($rules + collect(self::SETTINGS)->flatMap(fn ($g) => $g)->map(fn () => 'nullable|max:255')->except(array_keys($rules))->all());
@@ -59,18 +59,24 @@ class AdminController extends Controller
             Tuition::save($data['school_type'], $data['tuition_mode'] ?? 'per_level', isset($data['tuition_all']) ? (float) $data['tuition_all'] : null, $data['tuition'] ?? []);
         }
         if ($request->hasFile('logo')) {
-            Setting::put('logo_path', $request->file('logo')->store('branding', 'local'));
+            Setting::storeLogo($request->file('logo'));
         }
 
         return back()->with('ok', 'Settings saved.');
     }
 
-    public function logo()
+    /** The school logo (also the browser-tab icon). Versioned URLs (?v=) are cached for a year. */
+    public function logo(Request $request)
     {
         $p = Setting::get('logo_path');
         abort_unless($p && Storage::disk('local')->exists($p), 404);
 
-        return response()->file(Storage::disk('local')->path($p), ['Cache-Control' => 'public, max-age=3600']);
+        $versioned = $request->query('v') === substr(md5($p), 0, 8);
+
+        return response()->file(Storage::disk('local')->path($p), [
+            'Cache-Control' => $versioned ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function audit(Request $request)

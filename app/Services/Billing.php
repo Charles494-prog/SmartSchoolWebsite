@@ -51,7 +51,7 @@ class Billing
         $surcharge = $planModel ? round(($gross - $discountTotal) * $planModel->surcharge_percent / 100, 2) : 0;
         $account->update(['discount_amount' => $discountTotal, 'net_amount' => round($gross - $discountTotal + $surcharge, 2)]);
 
-        self::buildInstallments($account, Carbon::parse($e->schoolYear->starts_on));
+        self::buildInstallments($account, Carbon::parse($e->loadMissing('schoolYear')->schoolYear->starts_on));
 
         return $account->fresh();
     }

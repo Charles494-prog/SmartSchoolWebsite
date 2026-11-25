@@ -5,6 +5,7 @@
     $palette = collect($nav)->flatMap(fn ($items, $group) => collect($items)->map(fn ($i) => ['label' => $i['label'], 'hint' => $i['desc'], 'url' => $i['url'], 'group' => $group ?: 'Go to']))->values();
     $unread = $u->unreadNotifications()->count();
     $school = \App\Models\Setting::get('school_name');
+    $logo = \App\Models\Setting::logoUrl();
     $initials = collect(explode(' ', $u->name))->filter()->map(fn ($p) => mb_substr($p, 0, 1))->take(2)->implode('');
     $isPortal = $u->hasRole('student', 'parent');
     $canSearch = $u->hasRole('admin', 'registrar', 'teacher', 'cashier', 'nurse', 'guidance', 'librarian');
@@ -17,6 +18,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#4f46e5">
     <title>{{ $title ?? 'Home' }} · {{ $school }}</title>
+    @include('components.layouts._favicon', ['logo' => $logo])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="h-full font-sans text-slate-800 antialiased dark:text-slate-200" x-data="{ menu: false, mini: localStorage.getItem('navMini') === '1' }" x-init="$watch('mini', v => localStorage.setItem('navMini', v ? '1' : '0'))" @keydown.window.prevent.ctrl.k="$dispatch('palette')" @keydown.window.prevent.meta.k="$dispatch('palette')">
@@ -25,10 +27,10 @@
 <div x-show="menu" x-cloak x-transition.opacity @click="menu=false" class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden"></div>
 
 {{-- Sidebar --}}
-<aside :class="[menu ? 'translate-x-0' : '-translate-x-full', mini ? 'lg:w-20' : 'lg:w-72']" class="fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col bg-white ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 transition-transform duration-200 lg:translate-x-0">
+<aside :class="[menu ? 'translate-x-0' : '-translate-x-full', mini ? 'lg:w-20' : 'lg:w-72']" class="fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col bg-white ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 transition-[transform,width] duration-300 lg:translate-x-0">
     <a href="{{ $isPortal ? route('portal') : route('dashboard') }}" class="flex items-center gap-3 px-6 pt-6 pb-4">
-        @if(\App\Models\Setting::get('logo_path'))
-            <img src="{{ route('school.logo') }}" class="h-10 w-10 rounded-xl object-contain ring-1 ring-slate-200" alt="">
+        @if($logo)
+            <img src="{{ $logo }}" class="h-10 w-10 rounded-xl object-contain ring-1 ring-slate-200" alt="">
         @else
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><x-icon name="cap" class="h-5 w-5" /></div>
         @endif
@@ -40,9 +42,8 @@
     </a>
 
     <nav class="flex-1 overflow-y-auto px-4 py-4">
-        @php $groups = \App\Support\Nav::for($u); @endphp
         <div class="space-y-1">
-            @foreach($groups as $group => $items)
+            @foreach($nav as $group => $items)
                 @php $hasActive = collect($items)->contains('active', true); @endphp
                 @if($group === '')
                     @foreach($items as $i)@include('components.layouts._nav-link', ['i' => $i])@endforeach
@@ -59,10 +60,6 @@
                 @endif
             @endforeach
         </div>
-        <button @click="$dispatch('palette')" class="mt-6 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 dark:ring-white/10 dark:hover:bg-white/5">
-            <x-icon name="search" class="h-5 w-5 shrink-0 text-slate-400" /> <span :class="mini && 'lg:hidden'">Search everything</span>
-            <kbd :class="mini && 'lg:hidden'" class="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10">Ctrl K</kbd>
-        </button>
     </nav>
     <button type="button" class="hidden min-h-11 items-center gap-3 border-t border-slate-100 px-7 py-3 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-800 lg:flex dark:border-white/10 dark:hover:bg-white/5" x-on:click="mini = !mini" :aria-label="mini ? 'Expand menu' : 'Collapse menu'">
         <x-icon name="chevron-left" class="h-5 w-5 shrink-0 transition" ::class="mini && 'rotate-180'" /><span :class="mini && 'lg:hidden'">Collapse menu</span>
@@ -70,7 +67,7 @@
 
 </aside>
 
-<div :class="mini ? 'lg:pl-20' : 'lg:pl-72'" class="lg:pl-72 transition-[padding] duration-200">
+<div :class="mini ? 'lg:pl-20' : 'lg:pl-72'" class="lg:pl-72 transition-[padding] duration-300">
     {{-- Top bar --}}
     <header class="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-slate-900/80">
         <div class="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6">
@@ -142,8 +139,8 @@
 
 {{-- Command palette (Ctrl+K) --}}
 <div x-data="palette(@js($palette), @js($canSearch ? route('students.quick') : null))" x-show="open" x-cloak @palette.window="show()" @keydown.escape.window="open=false"
-     class="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/40 p-4 pt-[12vh] backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Command palette">
-    <div @click.outside="open=false" class="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
+     x-transition.opacity.duration.200ms class="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/40 p-4 pt-[12vh] backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div @click.outside="open=false" x-show="open" x-transition:enter="transition duration-300" x-transition:enter-start="opacity-0 scale-95 -translate-y-2" x-transition:enter-end="opacity-100 scale-100 translate-y-0" class="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
         <div class="flex items-center gap-3 border-b border-slate-100 px-4 dark:border-white/10">
             <x-icon name="search" class="h-5 w-5 text-slate-400" />
             <input x-ref="q" x-model="q" @input.debounce.200ms="search()" @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)" @keydown.enter.prevent="go()"

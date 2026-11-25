@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Welcome' }} · {{ \App\Models\Setting::get('school_name') }}</title>
+    @include('components.layouts._favicon', ['logo' => \App\Models\Setting::logoUrl()])
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-full bg-white font-sans text-slate-800 antialiased">
@@ -11,7 +12,7 @@
         <div class="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4 sm:px-6">
             <a href="{{ url('/') }}" class="flex items-center gap-3">
                 @if(\App\Models\Setting::get('logo_path'))
-                    <img src="{{ route('school.logo') }}" class="h-9 w-9 rounded-lg object-contain" alt="">
+                    <img src="{{ \App\Models\Setting::logoUrl() }}" class="h-9 w-9 rounded-lg object-contain" alt="">
                 @else
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white"><x-icon name="cap" class="h-5 w-5" /></div>
                 @endif

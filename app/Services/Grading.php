@@ -173,6 +173,7 @@ class Grading
     /** Date range of a grading period: the school year split into equal parts. */
     public static function termRange(ClassSubject $cs, int $term): array
     {
+        $cs->loadMissing('section.schoolYear', 'section.gradeLevel');
         $sy = $cs->section->schoolYear;
         $n = max(1, $cs->section->gradeLevel->terms ?: 4);
         $days = $sy->starts_on->diffInDays($sy->ends_on) + 1;

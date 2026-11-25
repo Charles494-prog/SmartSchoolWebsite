@@ -18,17 +18,22 @@
     ];
 @endphp
 <x-layouts.app title="Set up your school">
-    <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="wizard-q">
-        <div class="flex max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl dark:bg-slate-900">
+    <div class="{{ $step === 'welcome' ? 'anim-fade-in' : '' }} fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-xl sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="wizard-q"
+         x-data="{ pct: Number(sessionStorage.getItem('wizardPct') ?? {{ $step === 'welcome' ? 0 : $pct }}), leaving: false }"
+         x-init="requestAnimationFrame(() => requestAnimationFrame(() => pct = {{ $pct }})); sessionStorage.setItem('wizardPct', {{ $pct }})"
+         x-on:click="if ($event.target.closest('a[href]:not([target])')) leaving = true"
+         x-on:submit="leaving = true">
+        <div class="{{ $step === 'welcome' ? 'anim-window' : '' }} flex max-h-[100dvh] w-full max-w-2xl flex-col overflow-hidden bg-white/95 shadow-2xl ring-1 ring-slate-900/10 backdrop-blur-2xl transition duration-300 sm:max-h-[90vh] sm:rounded-3xl dark:bg-slate-900/90 dark:ring-white/10"
+             :class="leaving && 'opacity-60 scale-[.99]'">
             {{-- Top bar --}}
             <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-3 dark:border-white/10">
-                <span class="text-sm font-semibold text-slate-900">School setup</span>
+                <span class="text-sm font-semibold text-slate-900 dark:text-white">School setup</span>
                 @if($pos !== false)<span class="text-xs text-slate-500">Step {{ $pos + 1 }} of {{ count($counted) }} · {{ $title }}</span>@endif
                 <a href="{{ route('dashboard') }}" class="ml-auto flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close setup (you can come back from Home)"><x-icon name="x" /></a>
             </div>
-            <div class="h-1 bg-slate-100"><div class="h-1 bg-brand-600 transition-all" style="width: {{ $pct }}%"></div></div>
+            <div class="h-1 bg-slate-100 dark:bg-white/10" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $pct }}"><div class="h-1 rounded-r-full bg-brand-600 transition-[width] duration-700" :style="'width: ' + pct + '%'" style="width: {{ $pct }}%"></div></div>
 
-            <div class="flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+            <div class="anim-stagger flex-1 overflow-y-auto px-5 py-6 sm:px-8">
                 {{-- Assistant bubble --}}
                 <div class="flex items-start gap-3">
                     <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white"><x-icon name="cap" class="h-5 w-5" /></span>
@@ -52,7 +57,7 @@
 
                 @if($errors->any())<div class="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
 
-                <form id="wizard-form" method="post" action="{{ in_array($step, ['welcome', 'students', 'done']) ? '#' : route('setup.save', $step) }}" class="mt-6 space-y-5">
+                <form id="wizard-form" enctype="multipart/form-data" method="post" action="{{ in_array($step, ['welcome', 'students', 'done']) ? '#' : route('setup.save', $step) }}" class="mt-6 space-y-5">
                     @csrf
                     @switch($step)
                         @case('welcome')
@@ -72,6 +77,20 @@
                                 <x-field name="school_phone" label="Phone" :value="$S('school_phone')" />
                             </div>
                             <x-field name="school_email" label="School email" type="email" :value="$S('school_email')" />
+                            <div x-data="{ preview: @js(\App\Models\Setting::logoUrl()) }">
+                                <span class="label">School logo <span class="font-normal text-slate-500">(optional)</span></span>
+                                <div class="flex items-center gap-4">
+                                    <span class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10">
+                                        <img x-show="preview" x-cloak :src="preview" class="h-full w-full object-contain" alt="Logo preview">
+                                        <x-icon name="cap" class="h-6 w-6 text-slate-400" x-show="!preview" />
+                                    </span>
+                                    <div>
+                                        <label class="btn min-h-11 cursor-pointer">Choose logo<input type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="sr-only" x-on:change="preview = $event.target.files[0] ? URL.createObjectURL($event.target.files[0]) : preview"></label>
+                                        <p class="mt-1.5 text-xs text-slate-500">Square PNG, JPG or WebP, up to 2 MB. Shown on the menu, report cards and the browser tab.</p>
+                                        @error('logo')<p class="field-error">{{ $message }}</p>@enderror
+                                    </div>
+                                </div>
+                            </div>
                             @break
 
                         @case('year')

@@ -7,7 +7,7 @@
         'slate' => 'bg-slate-100 text-slate-600 group-hover:bg-slate-700',
     ];
 @endphp
-<a href="{{ $item['url'] }}" class="group card flex items-start gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand-200">
+<a href="{{ $item['url'] }}" class="group card flex h-full items-start gap-4 p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:ring-brand-200">
     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition group-hover:text-white {{ $colors[$item['color']] ?? $colors['indigo'] }}">
         <x-icon :name="$item['icon']" class="h-5 w-5" />
     </div>

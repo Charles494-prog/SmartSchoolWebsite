@@ -162,6 +162,16 @@ class Nav
         return $items->values()->all();
     }
 
+    /** Items for the "What would you like to do?" section, grouped by category (Home left out). */
+    public static function groupedTiles(User $u): array
+    {
+        return collect(self::for($u))
+            ->map(fn ($items) => array_values(array_filter($items, fn ($i) => $i['icon'] !== 'home' || $i['label'] !== 'Home')))
+            ->filter()
+            ->mapWithKeys(fn ($items, $group) => [$group ?: 'General' => $items])
+            ->all();
+    }
+
     /** All items except Home, for the "What would you like to do?" tiles. */
     public static function tiles(User $u): array
     {
