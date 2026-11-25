@@ -161,6 +161,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
 
         Route::get('/assignments', [AssignmentController::class, 'index'])->name('assignments.index');
         Route::post('/assignments', [AssignmentController::class, 'store'])->name('assignments.store');
+        Route::get('/assignments/class/{class}', [AssignmentController::class, 'classroom'])->name('assignments.class');
         Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])->name('assignments.show');
         Route::post('/submissions/{submission}/grade', [AssignmentController::class, 'grade'])->name('assignments.grade');
         Route::get('/submissions/{submission}/file', [AssignmentController::class, 'file'])->name('assignments.file');

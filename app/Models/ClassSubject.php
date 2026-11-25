@@ -58,6 +58,11 @@ class ClassSubject extends Model
         return $this->ww_weight !== null;
     }
 
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(Assignment::class);
+    }
+
     public function gradingRequests(): HasMany
     {
         return $this->hasMany(GradingRequest::class);

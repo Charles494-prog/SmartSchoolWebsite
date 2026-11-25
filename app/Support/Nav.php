@@ -21,17 +21,17 @@ class Nav
         ];
 
         if ($is(Role::STUDENT, Role::PARENT)) {
-            return ['' => [
+            return ['' => array_values(array_filter([
                 $item('Home', 'portal', 'home', 'Summary and news'),
                 $item('Grades', 'portal.grades', 'award', 'Grades per subject and report card', 'amber'),
                 $item('Attendance', 'portal.attendance', 'check-square', 'Days present, late and absent', 'emerald'),
                 $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
-                $item('Assignments', 'portal.assignments', 'clipboard', 'Homework and projects', 'violet', 'portal.assignments*'),
+                School::allows('classwork') ? $item('Assignments', 'portal.assignments', 'clipboard', 'Homework and projects', 'violet', 'portal.assignments*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
                 $item('Messages', 'messages.index', 'message', 'Talk to teachers and the school', 'indigo', 'messages.*'),
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
                 $item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet'),
-            ]];
+            ]))];
         }
 
         if ($is(Role::GUARD)) {
@@ -66,7 +66,9 @@ class Nav
         $acad = [];
         if ($is(Role::TEACHER, Role::ADMIN, Role::REGISTRAR)) {
             $acad[] = $item($r === Role::TEACHER ? 'My classes & grades' : 'Grades', 'gradebook.index', 'book-open', 'Enter scores and compute grades', 'amber', 'gradebook.*');
-            $acad[] = $item('Assignments', 'assignments.index', 'clipboard', 'Give homework, check submissions', 'violet', 'assignments.*');
+            if (School::allows('classwork')) {
+                $acad[] = $item('Class cards', 'assignments.index', 'clipboard', 'Each class: assignments, projects and submissions', 'violet', 'assignments.*');
+            }
             $acad[] = $item('Honor roll', 'honors', 'award', 'Ranking and honors per section', 'amber');
             $acad[] = $item('Timetable', 'timetable', 'clock', 'Weekly schedule by room, section or teacher', 'sky');
         }
@@ -148,7 +150,7 @@ class Nav
         $pick = match ($u->role) {
             Role::ADMIN => ['Home', 'Students', 'Classes & sections', 'Grades', 'Student balances', 'School settings'],
             Role::REGISTRAR => ['Home', 'Applications', 'Students', 'Classes & sections', 'Grades', 'Messages'],
-            Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'Assignments', 'Messages'],
+            Role::TEACHER => ['Home', 'My classes & grades', 'Scan QR in my class', 'Advisory attendance', 'Class cards', 'Messages'],
             Role::GUARD => ['Gate scanner', 'Messages'],
             Role::CASHIER => ['Home', 'Student balances', 'Receipts', 'Overdue', 'Students', 'Messages'],
             Role::STUDENT, Role::PARENT => ['Home', 'Grades', 'Attendance', 'Class schedule', 'Payments', 'Messages'],

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Announcement;
 use App\Models\Application;
 use App\Models\Assessment;
+use App\Models\Assignment;
 use App\Models\AttendanceRecord;
 use App\Models\Book;
 use App\Models\ClassSubject;
@@ -34,9 +35,12 @@ class DemoSeeder extends Seeder
     {
         $this->call(DatabaseSeeder::class);
         mt_srand(42);
-        Setting::put('school_name', 'Sampaguita Integrated School');
-        Setting::put('school_address', 'Rizal St., Brgy. San Isidro, Quezon City');
-        Setting::put('school_head', 'Dr. Maria Santos');
+        // Keep a school's real name/address if it already set one.
+        foreach (['school_name' => 'Sampaguita Integrated School', 'school_address' => 'Rizal St., Brgy. San Isidro, Quezon City', 'school_head' => 'Dr. Maria Santos'] as $k => $v) {
+            if (! Setting::get($k)) {
+                Setting::put($k, $v);
+            }
+        }
 
         $start = Carbon::create(now()->month >= 6 ? now()->year : now()->year - 1, 6, 16);
         $sy = SchoolYear::firstOrCreate(['name' => $start->year.'-'.($start->year + 1)], ['starts_on' => $start, 'ends_on' => $start->copy()->addMonths(10), 'is_current' => true]);
@@ -116,6 +120,32 @@ class DemoSeeder extends Seeder
                 }
             }
             $cs->submissions()->create(['term' => 1, 'status' => 'approved', 'submitted_by' => $cs->teacher_id]);
+        }
+
+        // Class cards (Online mode): assignments, projects and activities with some student work
+        $posts = [
+            ['assignment', 'Reading log – Week 3', "Read the assigned chapter and write 5 sentences about the main idea.", -6, 20],
+            ['activity', 'Group activity: concept map', "With your group, make a concept map of today's lesson. Upload a photo.", -1, 30],
+            ['assignment', 'Worksheet 4', "Answer items 1–15. Show your solution.", 3, 25],
+            ['project', 'Quarter project', "Make a poster or short video about a real-life use of this subject. Rubric attached in class.", 14, 100],
+        ];
+        foreach (ClassSubject::whereHas('section', fn ($q) => $q->where('school_year_id', $sy->id))->with('subject')->get() as $cs) {
+            if ($cs->assignments()->exists()) {
+                continue;
+            }
+            $students = $cs->section->students()->get();
+            foreach ($posts as $pi => [$type, $title, $text, $days, $max]) {
+                $a = Assignment::create(['class_subject_id' => $cs->id, 'type' => $type, 'title' => $cs->subject->name.': '.$title, 'instructions' => $text, 'due_at' => today()->addDays($days)->setTime(17, 0), 'max_score' => $max]);
+                foreach ($students as $si => $st) {
+                    $turnIn = $days < 0 ? ($si * 7 + $cs->id) % 10 < 8 : ($days < 7 ? ($si + $cs->id) % 3 === 0 : false);
+                    if (! $turnIn) {
+                        continue;
+                    }
+                    $graded = $days < -3 && $si % 4 !== 0;
+                    $a->submissions()->create(['student_id' => $st->id, 'body' => 'Here is my work for '.$title.'.', 'submitted_at' => $a->due_at->copy()->subHours(($si % 5) * 6 - 4),
+                        'score' => $graded ? round($max * (0.7 + (($si * 13 + $pi) % 30) / 100)) : null, 'feedback' => $graded ? 'Good job! Keep it up.' : null]);
+                }
+            }
         }
 
         // Attendance for the last 10 school days

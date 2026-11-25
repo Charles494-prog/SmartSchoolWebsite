@@ -80,6 +80,7 @@ class PortalController extends Controller
 
     public function assignments(Request $request)
     {
+        abort_unless(\App\Support\School::allows('classwork'), 404);
         return $this->view($request, 'portal.assignments', fn ($c, $e) => [
             'assignments' => $e?->section_id ? Assignment::with('classSubject.subject')->whereHas('classSubject', fn ($q) => $q->where('section_id', $e->section_id))->latest('due_at')->get() : collect(),
             'submissions' => Submission::where('student_id', $c->id)->get()->keyBy('assignment_id'),
@@ -88,6 +89,7 @@ class PortalController extends Controller
 
     public function submit(Request $request, Assignment $assignment)
     {
+        abort_unless(\App\Support\School::allows('classwork'), 404);
         $u = $request->user();
         abort_unless($u->role === 'student', 403, 'Only the student can submit.');
         $student = Student::where('user_id', $u->id)->firstOrFail();

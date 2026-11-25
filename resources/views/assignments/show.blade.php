@@ -1,8 +1,8 @@
 <x-layouts.app :title="$a->title">
-    <a href="{{ route('assignments.index') }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />Assignments</a>
+    <a href="{{ route('assignments.class', $a->class_subject_id) }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />{{ $a->classSubject->subject->name }} · {{ $a->classSubject->section->name }}</a>
     <div class="card mt-3">
         <h1 class="h1">{{ $a->title }}</h1>
-        <p class="muted">{{ $a->classSubject->subject->name }} · {{ $a->classSubject->section->label() }} · due {{ $a->due_at->format('M d, Y g:i A') }} · out of {{ $a->max_score }}</p>
+        <p class="muted"><span class="font-semibold capitalize">{{ $a->type }}</span> · {{ $a->classSubject->subject->name }} · {{ $a->classSubject->section->label() }} · due {{ $a->due_at->format('M d, Y g:i A') }} · out of {{ $a->max_score }}</p>
         <p class="mt-2 whitespace-pre-line text-sm">{{ $a->instructions }}</p>
     </div>
     <div class="card mt-4 overflow-x-auto p-0">

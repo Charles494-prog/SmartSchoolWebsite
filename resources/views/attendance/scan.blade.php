@@ -17,7 +17,7 @@
                   </select>
               </label>
           @endunless
-          <label class="block" x-show="camOpen && cameras.length > 1" x-cloak>
+          <label class="block" x-show="cameras.length" x-cloak>
               <span class="mb-1 block text-xs font-medium text-slate-500">Camera</span>
               <select class="input h-11 max-w-56 py-0 text-sm" x-model.number="camIndex" x-on:change="pickCam()">
                   <template x-for="(c, i) in cameras" :key="c.id"><option :value="i" :selected="i === camIndex" x-text="c.label || ('Camera ' + (i + 1))"></option></template>

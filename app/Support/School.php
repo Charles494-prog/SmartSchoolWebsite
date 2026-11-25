@@ -22,6 +22,8 @@ class School
         'email_notifications' => [self::HOSTED => true, self::LAN => false],
         'student_reminders' => [self::HOSTED => true, self::LAN => false],
         'configurable_message_retention' => [self::HOSTED => true, self::LAN => false],
+        // Class cards with assignments/projects (Google Classroom style). In LAN mode teachers use the gradebook only.
+        'classwork' => [self::HOSTED => true, self::LAN => false],
     ];
 
     public static function mode(): string

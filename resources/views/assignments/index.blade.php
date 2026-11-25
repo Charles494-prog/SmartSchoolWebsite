@@ -1,30 +1,44 @@
-<x-layouts.app title="Assignments">
-    <h1 class="h1 mb-4">Assignments</h1>
-    <div class="grid gap-4 lg:grid-cols-3">
-        <div class="card overflow-x-auto p-0 lg:col-span-2">
-            <table class="table">
-                <thead><tr><th>Title</th><th>Class</th><th>Due</th><th>Submitted</th></tr></thead>
-                <tbody>
-                @forelse($items as $a)
-                    <tr><td><a class="link" href="{{ route('assignments.show', $a) }}">{{ $a->title }}</a></td><td>{{ $a->classSubject->subject->name }} · {{ $a->classSubject->section->name }}</td><td>{{ $a->due_at->format('M d, g:i A') }}</td><td>{{ $a->submissions_count }}</td></tr>
-                @empty
-                    <tr><td colspan="4" class="py-8 text-center text-slate-500">No assignments yet.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
-        <div class="card h-fit">
-            <h2 class="h2 mb-3">New assignment</h2>
-            <form method="post" action="{{ route('assignments.store') }}" enctype="multipart/form-data" class="space-y-3">
-                @csrf
-                <x-field name="class_subject_id" label="Class" type="select" :options="$classes" required />
-                <x-field name="title" label="Title" required />
-                <x-field name="instructions" label="Instructions" type="textarea" />
-                <x-field name="due_at" label="Due" type="datetime-local" :value="now()->addWeek()->setTime(17, 0)->format('Y-m-d\TH:i')" required />
-                <x-field name="max_score" label="Highest score" type="number" value="100" required />
-                <x-field name="attachment" label="Attachment (optional)" type="file" />
-                <button class="btn btn-primary w-full">Post to students</button>
-            </form>
+<x-layouts.app title="Class cards">
+    <div class="mb-6 flex flex-wrap items-end gap-3">
+        <div class="mr-auto">
+            <h1 class="h1">Class cards</h1>
+            <p class="muted">One card per subject you teach. Open a card to post assignments, projects and activities and check your students' work.</p>
         </div>
     </div>
+
+    @if($classes->isEmpty())
+        <div class="card py-12 text-center">
+            <p class="text-lg font-semibold">No classes yet</p>
+            <p class="muted mt-1">When the registrar assigns you a subject in Classes &amp; sections, its card appears here.</p>
+        </div>
+    @else
+        <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            @foreach($classes as $cs)
+                @php $slot = $cs->slots->sortBy('starts_at')->first(); $due = $next[$cs->id] ?? null; $review = $toReview[$cs->id] ?? 0; @endphp
+                <a href="{{ route('assignments.class', $cs) }}" class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-slate-800 dark:bg-slate-900">
+                    <div class="relative bg-gradient-to-br {{ \App\Support\Classwork::color($cs) }} p-5 text-white">
+                        <div class="text-xl font-bold leading-tight group-hover:underline">{{ $cs->subject->name }}</div>
+                        <div class="mt-0.5 text-sm text-white/85">{{ $cs->section->label() }}</div>
+                        <div class="mt-3 text-xs text-white/80">{{ $cs->teacher?->name }}@if($slot) · {{ ampm(substr($slot->starts_at, 0, 5)) }}–{{ ampm(substr($slot->ends_at, 0, 5)) }}@endif</div>
+                        @if($review)
+                            <span class="absolute top-4 right-4 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-900 shadow">{{ $review }} to check</span>
+                        @endif
+                    </div>
+                    <div class="flex flex-1 flex-col gap-1 p-5">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Next due</p>
+                        @if($due)
+                            <p class="font-medium text-slate-900 dark:text-white">{{ $due->title }}</p>
+                            <p class="text-sm text-slate-500">{{ $due->due_at->format('D, M d · g:i A') }}</p>
+                        @else
+                            <p class="text-sm text-slate-500">Nothing due – post something new.</p>
+                        @endif
+                    </div>
+                    <div class="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm text-slate-500 dark:border-slate-800">
+                        <span>{{ $cs->assignments_count }} {{ \Illuminate\Support\Str::plural('post', $cs->assignments_count) }}</span>
+                        <span class="font-medium text-brand-600 dark:text-brand-400">Open →</span>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+    @endif
 </x-layouts.app>
