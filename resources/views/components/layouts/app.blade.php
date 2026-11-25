@@ -12,7 +12,7 @@
 @endphp
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50 dark:bg-slate-950" x-data :class="{ dark: $store.theme.dark }">
-<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">if (localStorage.theme === 'dark' || (!localStorage.theme && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark')</script>
+<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">if (localStorage.theme === 'dark') document.documentElement.classList.add('dark')</script>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

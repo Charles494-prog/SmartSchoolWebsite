@@ -85,4 +85,19 @@ class BrandingAndHomeTest extends TestCase
         Setting::flush();
         $this->assertSame('New', Setting::get('school_name'));
     }
+
+    public function test_light_mode_is_the_default(): void
+    {
+        $html = $this->actingAs($this->admin())->get('/dashboard')->assertOk()->getContent();
+        $this->assertStringContainsString("if (localStorage.theme === 'dark') document.documentElement.classList.add('dark')", $html);
+        $this->assertStringNotContainsString('prefers-color-scheme', $html);
+    }
+
+    public function test_announcements_feed_has_composer_and_posts(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin)->get('/announcements')->assertOk()->assertSee('on your mind', false)->assertSee('No announcements yet');
+        $this->post('/announcements', ['title' => 'Foundation Day', 'body' => 'No classes on Friday.', 'audience' => 'all'])->assertRedirect();
+        $this->get('/announcements')->assertOk()->assertSee('Foundation Day')->assertSee('No classes on Friday.')->assertSee($admin->name)->assertSee('Delete post');
+    }
 }

@@ -22,7 +22,7 @@ class CommunicationController extends Controller
         $u = $request->user();
 
         return view('messages.announcements', [
-            'items' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Announcement::with('author', 'section')->latest()->paginate(20)
+            'items' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Announcement::with('author', 'section')->orderByDesc('is_pinned')->latest('published_at')->latest('id')->paginate(20)
                 : Announcement::with('author', 'section')->visibleTo($u)->orderByDesc('is_pinned')->latest('published_at')->paginate(20),
             'canPost' => $u->hasRole(Role::ADMIN, Role::REGISTRAR, Role::TEACHER),
             'sections' => $u->hasRole(Role::ADMIN, Role::REGISTRAR) ? Section::with('gradeLevel')->whereHas('schoolYear', fn ($q) => $q->where('is_current', true))->get()->mapWithKeys(fn ($s) => [$s->id => $s->label()])
