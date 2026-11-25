@@ -43,6 +43,10 @@ class PortalController extends Controller
     public function home(Request $request)
     {
         return $this->view($request, 'portal.home', fn ($c, $e) => [
+            // Student's to-do list: every piece of classwork not yet turned in (stays until it is).
+            'todo' => ($request->user()->role === 'student' && $request->user()->pref('todo_home', true) && \App\Support\School::allows('classwork') && $e?->section_id)
+                ? Assignment::with('classSubject.subject')->whereHas('classSubject', fn ($q) => $q->where('section_id', $e->section_id))->whereNotNull('due_at')
+                    ->whereDoesntHave('submissions', fn ($q) => $q->where('student_id', $c->id))->orderBy('due_at')->get() : collect(),
             'report' => $e ? Grading::reportCard($e) : null,
             'attendance' => AttendanceRecord::where('student_id', $c->id)->whereNull('class_subject_id')->whereMonth('date', now()->month)->whereYear('date', now()->year)->get(),
             'balance' => $e?->account?->balance(),

@@ -19,6 +19,21 @@
 @endphp
 <x-layouts.app title="Home">
     @include('portal._switch')
+    @if(($todo ?? collect())->isNotEmpty())
+        <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="mb-3 flex items-center gap-2"><h2 class="text-lg font-semibold">To do</h2><span class="rounded-full bg-amber-100 px-2 text-xs font-bold text-amber-800">{{ $todo->count() }}</span>
+                <a href="{{ route('welcome') }}" class="ml-auto text-xs text-slate-400 hover:text-slate-600">Change</a></div>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach($todo as $t)
+                    <li><a href="{{ $t->type === 'quiz' ? route('quiz.take', $t) : route('portal.class', $t->class_subject_id) }}" class="flex items-center gap-3 py-2.5 hover:text-brand-600">
+                        <span class="h-2 w-2 shrink-0 rounded-full {{ $t->due_at->isPast() ? 'bg-rose-500' : ($t->due_at->diffInDays() < 2 ? 'bg-amber-500' : 'bg-slate-300') }}"></span>
+                        <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ $t->title }}</span><span class="text-xs text-slate-500">{{ $t->classSubject->subject->name }}</span></span>
+                        <span class="text-xs {{ $t->due_at->isPast() ? 'font-semibold text-rose-600' : 'text-slate-500' }}">{{ $t->due_at->isPast() ? 'Late · was due '.$t->due_at->format('M d') : 'Due '.$t->due_at->format('M d, g:i A') }}</span>
+                    </a></li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
     @if($child)
         <x-page-header :title="auth()->user()->role === 'parent' ? 'Welcome, '.auth()->user()->name : 'Welcome, '.$child->first_name"
                        :subtitle="$child->full_name.' · '.($enrollment?->gradeLevel?->name ?? '').($enrollment?->section ? ' – '.$enrollment->section->name : '')" />

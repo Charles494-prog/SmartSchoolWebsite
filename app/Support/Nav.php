@@ -9,7 +9,34 @@ use App\Models\User;
  */
 class Nav
 {
+    /** Features each role can never hide (the admin can change this in Settings → Personal setup). */
+    public const LOCKED_DEFAULT = [
+        'guard' => ['Gate scanner'], 'teacher' => ['My classes & grades', 'My classes', 'Advisory attendance'], 'cashier' => ['Student balances'],
+        'student' => ['Grades', 'My classes'], 'parent' => ['Grades'], 'registrar' => ['Applications', 'Students'], 'nurse' => ['Clinic'],
+        'guidance' => ['Guidance'], 'librarian' => ['Library'], 'hr' => ['Payroll', 'Employees'],
+    ];
+
+    public static function locked(string $role): array
+    {
+        $set = json_decode((string) \App\Models\Setting::get('locked_features'), true);
+
+        return array_merge(['Home', 'How it works'], is_array($set) && isset($set[$role]) ? $set[$role] : (self::LOCKED_DEFAULT[$role] ?? []));
+    }
+
+    /** The menu with the person's own hidden features taken out (never the locked ones). */
     public static function for(User $u): array
+    {
+        $all = self::full($u);
+        $hide = array_diff((array) $u->pref('hidden', []), self::locked($u->role));
+        if (! $hide || $u->role === Role::ADMIN) {
+            return $all;
+        }
+
+        return collect($all)->map(fn ($items) => array_values(array_filter($items, fn ($i) => ! in_array($i['label'], $hide, true))))->filter()->all();
+    }
+
+    /** Every feature this role can use (before personal choices). */
+    public static function full(User $u): array
     {
         $r = $u->role;
         $is = fn (string ...$roles) => in_array($r, $roles, true);

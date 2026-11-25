@@ -58,6 +58,13 @@ class AdminController extends Controller
             $v = (self::TYPES[$k] ?? '') === 'toggle' ? ($request->boolean($k) ? '1' : '0') : ($data[$k] ?? '');
             Setting::put($k, $v);
         }
+        if ($request->boolean('locked_present')) {
+            $locked = collect((array) $request->input('locked', []))->map(fn ($l) => array_values(array_filter((array) $l, 'is_string')))->all();
+            foreach (['teacher', 'student', 'parent', 'registrar', 'cashier', 'guard', 'nurse', 'guidance', 'librarian', 'hr'] as $role) {
+                $locked[$role] ??= [];
+            }
+            Setting::put('locked_features', json_encode($locked));
+        }
         if ($request->has('honors_titles_when')) {
             Setting::put('honors_titles_when', $data['honors_titles_when'] ?? 'each_period');
             Setting::put('honors_titles_levels', implode(',', $data['honors_titles_levels'] ?? []));

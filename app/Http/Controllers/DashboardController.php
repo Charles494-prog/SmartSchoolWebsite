@@ -27,6 +27,11 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $u = $request->user();
+        if ($u->pref('start', 'Home') !== 'Home' && ! $request->session()->pull('start_done') && ! $request->has('home') && ! $request->session()->has('start_applied')) {
+            $request->session()->put('start_applied', true);   // only right after signing in
+
+            return redirect((new WelcomeController)->startUrl($u));
+        }
         if ($u->hasRole(Role::STUDENT, Role::PARENT)) {
             return redirect()->route('portal');
         }

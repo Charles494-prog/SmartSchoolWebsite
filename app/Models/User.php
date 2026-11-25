@@ -14,7 +14,7 @@ class User extends Authenticatable
 {
     use Auditable, HasFactory, Notifiable;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'phone', 'is_active', 'must_change_password', 'last_login_at', 'bio', 'avatar_path'];
+    protected $fillable = ['name', 'email', 'password', 'role', 'phone', 'is_active', 'must_change_password', 'last_login_at', 'bio', 'avatar_path', 'preferences', 'onboarded_at'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -26,7 +26,15 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'must_change_password' => 'boolean',
+            'preferences' => 'array',
+            'onboarded_at' => 'datetime',
         ];
+    }
+
+    /** One of this person's own settings (from their first-time setup). */
+    public function pref(string $key, mixed $default = null): mixed
+    {
+        return data_get($this->preferences ?? [], $key, $default);
     }
 
     public function hasRole(string ...$roles): bool

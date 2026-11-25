@@ -47,6 +47,8 @@ Route::middleware('guest')->group(function () {
 
 // ---------------------------------------------------------------- signed-in
 Route::middleware(['auth', ThrottleWrites::class])->group(function () {
+    Route::get('/welcome', [\App\Http\Controllers\WelcomeController::class, 'show'])->name('welcome');
+    Route::post('/welcome', [\App\Http\Controllers\WelcomeController::class, 'save'])->name('welcome.save');
     Route::post('/dev/unlock', [\App\Http\Controllers\DevController::class, 'unlock'])->middleware('throttle:5,1')->name('dev.unlock');
     Route::post('/dev/mode', [\App\Http\Controllers\DevController::class, 'mode'])->name('dev.mode');
     Route::post('/dev/login', [\App\Http\Controllers\DevController::class, 'login'])->name('dev.login');

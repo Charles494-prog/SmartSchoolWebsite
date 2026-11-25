@@ -223,6 +223,7 @@ class AssignmentController extends Controller
             }
         });
         $submission->student->user?->notify(new GeneralNotice('Work graded', $a->title.': '.$data['score'].'/'.$a->max_score, route('portal.class', $a->class_subject_id, false)));
+        \App\Support\LiveReports::send($submission->student, $a->title.' ('.$a->classSubject->subject->name.')', $data['score'].'/'.$a->max_score);
 
         return back()->with('ok', 'Graded'.($a->assessment_id ? ' and saved to the gradebook.' : '.'));
     }

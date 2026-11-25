@@ -90,6 +90,7 @@
                     <div x-show="o" x-cloak x-transition @click.outside="o=false" class="absolute right-0 mt-2 max-h-[80vh] w-72 overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-slate-900/10 dark:bg-slate-900 dark:ring-white/10">
                         <div class="border-b border-slate-100 px-4 py-3"><div class="text-sm font-semibold">{{ $u->name }}</div><div class="truncate text-xs text-slate-500">{{ $u->email }}</div></div>
                         <a href="{{ route('profile.edit') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="user" class="h-4 w-4 text-slate-400" /> My profile</a>
+                        @if($u->role !== 'admin')<a href="{{ route('welcome') }}" class="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-white/5"><x-icon name="sparkles" class="h-4 w-4 text-slate-400" /> Personal setup</a>@endif
                         <a href="{{ route('privacy') }}" class="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-50"><x-icon name="shield" class="h-4 w-4 text-slate-400" /> Privacy</a>
                         <button type="button" @click="$store.theme.toggle()" class="flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5">
                             <svg x-show="!$store.theme.dark" class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>

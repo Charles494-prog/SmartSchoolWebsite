@@ -2,7 +2,7 @@
     @include('portal._switch')
     @if($child)
         @php $CW = \App\Support\Classwork::class; $mine = $CW::colorKey($class, auth()->user()); @endphp
-        <div x-data="{ filter: 'all', colors: false }">
+        <div x-data="{ filter: @js(auth()->user()->pref('hide_turned_in') ? 'todo' : 'all'), colors: false }">
             <a href="{{ route('portal.classes', request()->only('child')) }}" class="link text-sm"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />My classes</a>
             <div class="relative mt-3 rounded-2xl {{ $CW::color($class, auth()->user()) }} p-6 text-white sm:p-8">
                 <h1 class="text-3xl font-bold">{{ $class->subject->name }}</h1>
@@ -16,7 +16,7 @@
                 </form>
             </div>
             <div class="my-5 flex flex-wrap gap-2">
-                @foreach(['all' => 'Everything', 'work' => 'Classwork', 'announcement' => 'Announcements', 'material' => 'Documents'] as $k => $label)
+                @foreach(['all' => 'Everything', 'todo' => 'Not turned in', 'work' => 'Classwork', 'announcement' => 'Announcements', 'material' => 'Documents'] as $k => $label)
                     <button type="button" class="rounded-full border px-3 py-1 text-sm" :class="filter === '{{ $k }}' ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'" x-on:click="filter = '{{ $k }}'">{{ $label }}</button>
                 @endforeach
             </div>

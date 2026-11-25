@@ -3,7 +3,7 @@
     [$tLabel, $tIcon, $tClass, $graded] = \App\Support\Classwork::TYPES[$p->type] ?? \App\Support\Classwork::TYPES['assignment'];
     $hasDesign = filled($p->body_html) || filled($p->body_js);
 @endphp
-<article x-data="{ open: false }" class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" x-show="filter === 'all' || filter === '{{ $p->type }}' || (filter === 'work' && {{ $graded ? 'true' : 'false' }})">
+<article x-data="{ open: false }" class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" x-show="filter === 'all' || filter === '{{ $p->type }}' || (filter === 'work' && {{ $graded ? 'true' : 'false' }}) || (filter === 'todo' && {{ ! $teacher && $graded && ! $sub ? 'true' : 'false' }})">
     <button type="button" class="flex w-full items-center gap-4 p-4 text-left" x-on:click="open = !open" :aria-expanded="open">
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full {{ $tClass }}"><x-icon :name="$tIcon" class="h-5 w-5" /></span>
         <span class="min-w-0 flex-1">

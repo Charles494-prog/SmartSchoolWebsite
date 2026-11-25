@@ -287,6 +287,9 @@ class Quiz
         DB::transaction(function () use ($a, $studentId, $best) {
             $sub = Submission::firstOrNew(['assignment_id' => $a->id, 'student_id' => $studentId]);
             $sub->fill(['body' => 'Quiz attempt '.$best->attempt_no, 'submitted_at' => $best->finished_at, 'score' => $best->needs_review ? null : $best->score])->save();
+            if (! $best->needs_review) {
+                \App\Support\LiveReports::send($best->student, $a->title.' (quiz)', $best->score.'/'.$a->max_score);
+            }
             if ($a->assessment_id && ! $best->needs_review && ! $a->classSubject->isLocked((int) $a->term)) {
                 Score::updateOrCreate(['assessment_id' => $a->assessment_id, 'student_id' => $studentId], ['score' => $best->score]);
             }
