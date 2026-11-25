@@ -240,15 +240,25 @@ class Grading
     }
 
     /** Recompute and store general averages for a section; returns ranking (best first). */
-    public static function rankSection(Section $section): array
+    /**
+     * Ranking of a section, best first. Without $term: by general average (whole year, stored on the enrollment).
+     * With $term: by the average of that grading period's subject grades – so honors show during the year too.
+     */
+    public static function rankSection(Section $section, ?int $term = null): array
     {
         $rows = [];
         $classSubjects = $section->classSubjects()->with(['subject', 'section.gradeLevel', 'assessments'])->get(); // once per section, not per student
         foreach ($section->enrollments()->where('status', 'enrolled')->with('student')->get() as $e) {
             $e->setRelation('section', $section);
             $rc = self::reportCard($e, $classSubjects);
-            $e->updateQuietly(['general_average' => $rc['general_average']]);
-            $rows[] = ['enrollment' => $e, 'average' => $rc['general_average'], 'honor' => $rc['honor']];
+            if ($term === null) {
+                $e->updateQuietly(['general_average' => $rc['general_average']]);
+                $avg = $rc['general_average'];
+            } else {
+                $grades = array_map(fn ($s) => $s['terms'][$term] ?? null, $rc['subjects']);
+                $avg = $grades !== [] && ! in_array(null, $grades, true) ? round(array_sum($grades) / count($grades), 2) : null;
+            }
+            $rows[] = ['enrollment' => $e, 'average' => $avg, 'honor' => self::honor($avg)];
         }
         usort($rows, fn ($a, $b) => ($b['average'] ?? -1) <=> ($a['average'] ?? -1));
 

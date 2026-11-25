@@ -146,4 +146,13 @@ class PortalController extends Controller
 
         return back()->with('ok', $color ? 'Card colour changed (only you see this).' : 'Back to your teacher\'s colour.');
     }
+
+    /** Students and their family can print the student's own QR ID card. */
+    public function idCard(Request $request)
+    {
+        $child = $this->child($request);
+        abort_unless($child, 404);
+
+        return redirect()->route('students.id', $child);
+    }
 }

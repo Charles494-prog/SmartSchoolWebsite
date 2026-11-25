@@ -78,7 +78,7 @@ class AssignmentController extends Controller
             'title' => 'required|max:150', 'instructions' => 'nullable|max:10000',
             'due_at' => 'nullable|date', 'max_score' => 'nullable|numeric|min:1|max:1000',
             'component' => 'nullable|in:ww,pt,qa', 'term' => 'nullable|required_with:component|integer|min:1|max:6',
-            'body_html' => 'nullable|max:100000', 'body_css' => 'nullable|max:50000', 'body_js' => 'nullable|max:50000',
+            'body_html' => 'nullable|max:200000',
             'attachment' => 'nullable|file|max:20480',
         ]);
         $class = ClassSubject::with('subject', 'section.gradeLevel')->findOrFail($data['class_subject_id']);
@@ -187,10 +187,16 @@ class AssignmentController extends Controller
             || ($u->role === 'parent' && $u->children()->get()->contains(fn ($c) => $c->currentEnrollment()?->section_id === $section)), 403);
 
         $resize = 'const s=()=>parent.postMessage({ssFrame:'.$assignment->id.',h:document.documentElement.scrollHeight},"*");addEventListener("load",s);new ResizeObserver(s).observe(document.documentElement);';
-        $html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            .'<style>html,body{margin:0;font-family:system-ui,sans-serif;color:#0f172a}body{padding:4px}img,video,iframe{max-width:100%}</style>'
-            .'<style>'.$assignment->body_css.'</style></head><body>'.$assignment->body_html
-            .'<script>'.$assignment->body_js.'</script><script>'.$resize.'</script></body></html>';
+        $code = (string) $assignment->body_html;
+        if (preg_match('/<html[\s>]/i', $code)) {
+            // A full page was pasted: keep it as is, just add the auto-height script.
+            $html = stripos($code, '</body>') !== false ? str_ireplace('</body>', '<script>'.$resize.'</script></body>', $code) : $code.'<script>'.$resize.'</script>';
+        } else {
+            $html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                .'<style>html,body{margin:0;font-family:system-ui,sans-serif;color:#0f172a}body{padding:4px}img,video,iframe{max-width:100%}</style>'
+                .($assignment->body_css ? '<style>'.$assignment->body_css.'</style>' : '').'</head><body>'.$code
+                .($assignment->body_js ? '<script>'.$assignment->body_js.'</script>' : '').'<script>'.$resize.'</script></body></html>';
+        }
 
         return response($html)->header('Content-Type', 'text/html; charset=utf-8')->header('X-SmartSchool-Sandbox', '1');
     }

@@ -115,7 +115,7 @@ class DemoSeeder extends Seeder
             foreach ($items as [$term, $comp, $title, $max]) {
                 $a = Assessment::create(['class_subject_id' => $cs->id, 'term' => $term, 'component' => $comp, 'title' => $title, 'max_score' => $max, 'given_on' => $sy->starts_on->copy()->addWeeks(3 * $term)]);
                 foreach ($students as $idx => $s) {
-                    $ability = $idx === 5 ? 0.45 : 0.62 + (($s->id * 7 + $cs->id) % 35) / 100;
+                    $ability = $idx === 5 ? 0.45 : ($idx < 3 ? 0.92 + $idx * 0.025 : 0.62 + (($s->id * 7 + $cs->id) % 35) / 100); // a few honor students per section
                     Score::create(['assessment_id' => $a->id, 'student_id' => $s->id, 'score' => round(min($max, $max * $ability + mt_rand(-2, 2)), 0)]);
                 }
             }
@@ -143,7 +143,7 @@ class DemoSeeder extends Seeder
             foreach ($posts as $pi => [$type, $title, $text, $days, $max, $component]) {
                 $a = Assignment::create(['class_subject_id' => $cs->id, 'type' => $type, 'title' => $title, 'instructions' => $text,
                     'due_at' => $days === null ? null : today()->addDays($days)->setTime(17, 0), 'max_score' => $max, 'component' => $component, 'term' => $component ? 2 : null,
-                    'body_html' => $pi === 0 ? $design[0] : null, 'body_css' => $pi === 0 ? $design[1] : null, 'body_js' => $pi === 0 ? $design[2] : null,
+                    'body_html' => $pi === 0 ? '<style>'.$design[1].'</style>'.$design[0].'<script>'.$design[2].'</script>' : null,
                     'created_at' => now()->subDays(10 - $pi)]);
                 if ($component) {
                     $as = Assessment::create(['class_subject_id' => $cs->id, 'term' => 2, 'component' => $component, 'title' => $title, 'max_score' => $max, 'given_on' => $a->due_at->toDateString()]);

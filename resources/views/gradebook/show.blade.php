@@ -1,6 +1,6 @@
 @php $locked = in_array($submission?->status, ['submitted', 'approved']); $w = $cs->weights(); $labels = ['ww' => 'Quizzes', 'pt' => 'Projects', 'qa' => 'Exams / summative', 'at' => 'Attendance']; $isAdmin = auth()->user()->isAdmin(); @endphp
 <x-layouts.app :title="$cs->subject->name.' · '.$cs->section->label()" :hideErrorSummary="true">
-    @php $online = \App\Support\School::allows('classwork') && auth()->user()->role === 'teacher'; @endphp
+    @php $online = \App\Support\School::allows('classwork'); @endphp
     @if($online)
         <a href="{{ route('assignments.class', $cs) }}" class="link"><x-icon name="arrow-left" class="mr-1 inline h-4 w-4" />{{ $cs->subject->name }} class card</a>
     @else

@@ -226,11 +226,20 @@ class GradebookController extends Controller
         $sections = Section::where('school_year_id', $sy?->id)->with('gradeLevel')
             ->when($u->role === Role::TEACHER, fn ($q) => $q->whereIn('id', $u->teacherSectionIds()))->get()->sortBy(fn ($s) => [$s->gradeLevel->sort_order, $s->name]);
         $section = $sections->firstWhere('id', (int) $request->query('section_id')) ?? $sections->first();
+        $terms = $section?->gradeLevel->terms ?: 4;
+        $term = $request->query('term') === 'final' ? null : (int) $request->query('term', 0);
+        if ($section && $term === 0) {
+            // Default: the latest grading period that has grades for everyone, else the whole year.
+            $term = collect(range($terms, 1))->first(fn ($t) => collect(Grading::rankSection($section, $t))->whereNotNull('average')->isNotEmpty());
+        }
+        $term = $term ? min(max($term, 1), $terms) : null;
 
         return view('gradebook.honors', [
             'sections' => $sections->mapWithKeys(fn ($s) => [$s->id => $s->label()]),
             'section' => $section,
-            'ranking' => $section ? Grading::rankSection($section) : [],
+            'terms' => $terms,
+            'term' => $term,
+            'ranking' => $section ? Grading::rankSection($section, $term) : [],
         ]);
     }
 }

@@ -149,14 +149,14 @@
                     {{-- Moodle-style design --}}
                     <div class="rounded-2xl border border-slate-200 dark:border-slate-700">
                         <button type="button" class="flex w-full items-center justify-between p-4 text-left text-sm font-semibold" x-on:click="design = !design">
-                            <span>Design it yourself (HTML, CSS, JavaScript) <span class="font-normal text-slate-500">– optional</span></span>
+                            <span>Design it yourself (paste HTML / CSS / JS code) <span class="font-normal text-slate-500">– optional</span></span>
                             <span :class="design && 'rotate-90'" class="transition"><x-icon name="chevron" class="h-4 w-4" /></span>
                         </button>
                         <div x-show="design" x-cloak class="space-y-3 border-t border-slate-100 p-4 dark:border-slate-800">
                             <p class="text-xs text-slate-500">Shown inside its own box on the post, so your styles and scripts only affect that box – never the rest of SmartSchool. You can paste embed codes too (YouTube, an <b>H5P</b> embed from h5p.org or Lumi, Google Slides).</p>
-                            <label class="block"><span class="label">HTML</span><textarea name="body_html" rows="6" class="input font-mono text-xs" placeholder="<h2 class=&quot;pop&quot;>Photosynthesis</h2>">{{ old('body_html') }}</textarea></label>
-                            <label class="block"><span class="label">CSS</span><textarea name="body_css" rows="4" class="input font-mono text-xs" placeholder=".pop { animation: pop 1s ease-out } @keyframes pop { from { transform: scale(.5); opacity: 0 } }">{{ old('body_css') }}</textarea></label>
-                            <label class="block"><span class="label">JavaScript</span><textarea name="body_js" rows="4" class="input font-mono text-xs" placeholder="document.querySelector('.pop').onclick = () => alert('Hi!')">{{ old('body_js') }}</textarea></label>
+                            <label class="block"><span class="label">Your code</span>
+                                <textarea name="body_html" rows="14" spellcheck="false" class="input font-mono text-xs" placeholder="Paste one whole block – HTML with <style> and <script> inside, or a full page (<!doctype html>…). Embed codes work too.">{{ old('body_html') }}</textarea>
+                            </label>
                         </div>
                     </div>
 

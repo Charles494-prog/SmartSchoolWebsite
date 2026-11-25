@@ -83,6 +83,7 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/assignments', [PortalController::class, 'assignments'])->name('portal.assignments');
         Route::post('/assignments/{assignment}', [PortalController::class, 'submit'])->name('portal.submit');
         Route::get('/classes', [PortalController::class, 'classes'])->name('portal.classes');
+        Route::get('/id-card', [PortalController::class, 'idCard'])->name('portal.id');
         Route::get('/classes/{class}', [PortalController::class, 'classroom'])->name('portal.class');
         Route::post('/classes/{class}/color', [PortalController::class, 'color'])->name('portal.color');
     });

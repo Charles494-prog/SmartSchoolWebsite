@@ -28,6 +28,7 @@ class Nav
                 $item('Class schedule', 'portal.schedule', 'clock', 'Weekly timetable', 'sky'),
                 School::allows('classwork') ? $item('My classes', 'portal.classes', 'clipboard', 'Class cards: announcements, documents and work', 'violet', 'portal.class*') : null,
                 $item('Payments', 'portal.account', 'wallet', 'Balance, due dates and receipts', 'rose'),
+                $item('Print ID card', 'portal.id', 'qr', 'Your QR ID card for the gate and class', 'emerald'),
                 $item('Messages', 'messages.index', 'message', 'Talk to teachers and the school', 'indigo', 'messages.*'),
                 $item('Calendar', 'calendar', 'calendar', 'Holidays, exams and events', 'sky'),
                 $item('How it works', 'guide', 'sparkles', 'How to use this portal', 'violet'),

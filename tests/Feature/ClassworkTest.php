@@ -145,4 +145,17 @@ class ClassworkTest extends TestCase
 
         return $extra + $keys;
     }
+
+    public function test_student_and_parent_print_their_own_id_card(): void
+    {
+        foreach (['student@school.test', 'parent@school.test'] as $email) {
+            $u = User::where('email', $email)->first();
+            $this->actingAs($u);
+            $kid = $u->role === 'student' ? $u->student : $u->children()->first();
+            $this->get('/portal/id-card')->assertRedirect(route('students.id', $kid));
+            $this->get(route('students.id', $kid))->assertOk();
+            $other = \App\Models\Student::where('id', '!=', $kid->id)->first();
+            $this->get(route('students.id', $other))->assertForbidden();
+        }
+    }
 }
