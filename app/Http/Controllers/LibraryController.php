@@ -46,14 +46,21 @@ class LibraryController extends Controller
 
     public function borrow(Request $request)
     {
-        $data = $request->validate(['book_id' => 'required|exists:books,id', 'student_id' => 'required|exists:students,id']);
+        $data = $request->validate([
+            'book_id' => 'required|exists:books,id', 'student_id' => 'required|exists:students,id',
+            'due_on' => 'nullable|date|after_or_equal:today', 'copies' => 'nullable|integer|min:1|max:10',
+            'condition' => 'nullable|in:new,good,fair,worn', 'note' => 'nullable|max:255',
+        ], ['due_on.after_or_equal' => 'The due date cannot be in the past.']);
         $book = Book::findOrFail($data['book_id']);
-        if ($book->available() < 1) {
-            return back()->with('error', 'No copies available.');
+        $copies = (int) ($data['copies'] ?? 1);
+        if ($book->available() < $copies) {
+            return back()->with('error', 'Only '.$book->available().' '.str('copy')->plural($book->available()).' available.');
         }
-        BookLoan::create($data + ['borrowed_on' => today(), 'due_on' => today()->addDays((int) Setting::get('library_loan_days'))]);
+        $due = isset($data['due_on']) ? \Carbon\Carbon::parse($data['due_on']) : today()->addDays((int) Setting::get('library_loan_days'));
+        BookLoan::create(['book_id' => $book->id, 'student_id' => $data['student_id'], 'borrowed_on' => today(), 'due_on' => $due, 'copies' => $copies,
+            'condition' => $data['condition'] ?? null, 'note' => $data['note'] ?? null]);
 
-        return back()->with('ok', 'Book lent. Due '.today()->addDays((int) Setting::get('library_loan_days'))->format('M d, Y').'.');
+        return back()->with('ok', 'Book lent. Due '.$due->format('M d, Y').'.');
     }
 
     public function return(BookLoan $loan)

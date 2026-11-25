@@ -80,7 +80,7 @@
                 @forelse($loans as $l)
                     @php $late = $l->due_on->isPast() && ! $l->due_on->isToday(); @endphp
                     <li class="flex flex-wrap items-center gap-4 px-5 py-3.5">
-                        <div class="min-w-0 flex-1"><p class="font-medium">{{ $l->book->title }}</p><p class="text-sm text-slate-500">{{ $l->student?->full_name ?? $l->user?->name }} · borrowed {{ $l->borrowed_on->format('M d') }}</p></div>
+                        <div class="min-w-0 flex-1"><p class="font-medium">{{ $l->book->title }}</p><p class="text-sm text-slate-500">{{ $l->student?->full_name ?? $l->user?->name }} · borrowed {{ $l->borrowed_on->format('M d') }}{{ $l->copies > 1 ? ' · '.$l->copies.' copies' : '' }}{{ $l->condition ? ' · '.ucfirst($l->condition) : '' }}</p>@if($l->note)<p class="text-xs text-slate-500">“{{ $l->note }}”</p>@endif</div>
                         <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $late ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600' }}">{{ $late ? 'Late · was due '.$l->due_on->format('M d') : 'Due '.$l->due_on->format('M d') }}</span>
                         <form method="post" action="{{ route('library.return', $l) }}">@csrf<button class="btn btn-sm">Returned</button></form>
                     </li>
@@ -95,13 +95,22 @@
             <form method="post" action="{{ route('library.borrow') }}" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">@csrf
                 <input type="hidden" name="book_id" :value="lend"><input type="hidden" name="student_id" :value="who?.id">
                 <h2 class="text-lg font-semibold">Lend “<span x-text="lendTitle"></span>”</h2>
-                <p class="mb-4 text-sm text-slate-500">Due back in {{ \App\Models\Setting::get('library_loan_days') ?: 7 }} days.</p>
+                <p class="mb-4 text-sm text-slate-500">Choose the borrower, due date and details.</p>
                 <div class="relative">
                     <input x-model="q" x-on:input="who = null" class="input" placeholder="Type the student's name" autocomplete="off">
                     <ul x-show="hits.length && !who" class="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                         <template x-for="s in hits" :key="s.id"><li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-white/5" x-on:click="who = s; q = s.name" x-text="s.name"></button></li></template>
                     </ul>
                 </div>
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <label class="block"><span class="label">Due back</span><input type="date" name="due_on" value="{{ today()->addDays((int) (\App\Models\Setting::get('library_loan_days') ?: 7))->toDateString() }}" min="{{ today()->toDateString() }}" class="input"></label>
+                    <label class="block"><span class="label">Copies</span><input type="number" name="copies" value="1" min="1" max="10" class="input"></label>
+                </div>
+                <div class="mt-3"><span class="label">Condition when lent</span>
+                    <div class="grid grid-cols-4 gap-2">@foreach(['new' => 'New', 'good' => 'Good', 'fair' => 'Fair', 'worn' => 'Worn'] as $k => $v)
+                        <label class="cursor-pointer rounded-lg py-1.5 text-center text-sm ring-1 ring-slate-200 has-[:checked]:bg-brand-50 has-[:checked]:font-semibold has-[:checked]:ring-2 has-[:checked]:ring-brand-500 dark:ring-slate-700"><input type="radio" name="condition" value="{{ $k }}" class="sr-only" @checked($k === 'good')>{{ $v }}</label>@endforeach</div>
+                </div>
+                <label class="mt-3 block"><span class="label">Note (optional)</span><input name="note" class="input" placeholder="e.g. For the book report, cover slightly torn"></label>
                 <div class="mt-5 flex justify-end gap-2"><button type="button" class="btn" x-on:click="lend = null">Cancel</button><button class="btn btn-primary" :disabled="!who">Lend</button></div>
             </form>
         </div>
@@ -119,7 +128,16 @@
                     <x-field name="isbn" label="ISBN" :value="$edit?->isbn" />
                 </div>
                 <x-field name="publisher" label="Publisher" :value="$edit?->publisher" />
-                <label class="block text-sm"><span class="label">Cover photo (optional)</span><input type="file" name="cover" accept="image/*" class="text-sm"></label>
+                <div x-data="{ prev: @js($edit?->cover_path ? route('library.cover', $edit) : null) }">
+                    <span class="label">Cover photo (optional)</span>
+                    <label class="flex cursor-pointer items-center gap-4 rounded-xl border-2 border-dashed border-slate-300 p-3 hover:border-brand-400 hover:bg-brand-50/40 dark:border-slate-700">
+                        <span class="flex h-24 w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100 dark:bg-slate-800">
+                            <img x-show="prev" :src="prev" alt="" class="h-full w-full object-cover"><x-icon name="file" class="h-6 w-6 text-slate-400" x-show="!prev" />
+                        </span>
+                        <span class="text-sm"><span class="block font-medium text-slate-800 dark:text-slate-100" x-text="prev ? 'Change cover' : 'Upload a cover'"></span><span class="text-xs text-slate-500">JPG or PNG. Without one, a coloured cover with the title is used.</span></span>
+                        <input type="file" name="cover" accept="image/*" class="sr-only" x-on:change="prev = $event.target.files[0] ? URL.createObjectURL($event.target.files[0]) : prev">
+                    </label>
+                </div>
                 <button class="btn btn-primary w-full">Save</button>
             </form>
         </div>

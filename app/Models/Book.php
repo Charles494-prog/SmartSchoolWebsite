@@ -19,6 +19,6 @@ class Book extends Model
 
     public function available(): int
     {
-        return $this->copies - $this->loans()->whereNull('returned_on')->count();
+        return $this->copies - (int) $this->loans()->whereNull('returned_on')->sum('copies');
     }
 }
