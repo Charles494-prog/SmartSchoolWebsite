@@ -7,41 +7,14 @@
               <span x-text="full ? 'Exit full screen' : 'Full screen'">Full screen</span>
           </button>
       </div>
-      <div class="grid gap-4 lg:grid-cols-2" :class="full && 'mx-auto max-w-7xl lg:grid-cols-[2fr_3fr]'">
-        <div class="card">
-            @if($gate)
-                <h1 class="h2">Gate scanner</h1>
-                <p class="mt-1 text-sm text-slate-500">First scan of the day = <b>IN</b> (late after {{ ampm($lateAfter) }}). Next scan when leaving = <b>OUT</b>. Parents are notified when a student is late.</p>
-                <div class="mt-4"></div>
-            @else
-                <h1 class="h2">QR scanner</h1>
-                <div class="mt-4 mb-4">
-                    <label class="label">{{ $canGate ? 'Where are you scanning?' : 'Which class are you teaching now?' }}</label>
-                    <select x-model="classId" class="input">
-                        @if($canGate)<option value="">School gate – in and out (late after {{ ampm($lateAfter) }})</option>@endif
-                        @foreach($classes as $id => $label)<option value="{{ $id }}">{{ $canGate ? 'Class: ' : '' }}{{ $label }}</option>@endforeach
-                    </select>
-                    @if(! $canGate && $classes->isEmpty())<p class="field-error">You have no classes assigned yet.</p>@endif
-                    <p class="mt-1.5 text-xs text-slate-500" x-text="classId ? 'Records who attended this subject today. Late = 15 minutes after the class starts.' : 'First scan = IN, next scan = OUT.'"></p>
-                </div>
-            @endif
-            <p class="muted mb-3">Scan the student's ID card with a USB QR scanner (it types into the box) or this device's camera.</p>
-            <form @submit.prevent="send(code)" class="flex gap-2">
-                <input x-ref="box" x-model="code" class="input text-lg" placeholder="Scan or type student no./LRN…" autofocus>
-                <button class="btn btn-primary">Scan</button>
-            </form>
-            <button type="button" class="btn mt-4 min-h-12 w-full text-base" x-on:click="openCam()">
-                <x-icon name="qr" class="h-5 w-5" /> Scan with camera
-            </button>
-
-            {{-- Full-screen camera scanner --}}
-            <div x-show="camOpen" x-cloak x-ref="camWrap" x-transition.opacity.duration.250ms class="fixed inset-0 z-[90] flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label="Camera scanner">
+            {{-- Camera scanner: fills the page area, menu and top bar stay visible --}}
+            <div x-show="camOpen" x-cloak x-ref="camWrap" x-transition.opacity.duration.250ms class="relative mb-4 flex h-[calc(100dvh-9.5rem)] min-h-[420px] flex-col overflow-hidden rounded-2xl bg-black text-white shadow-xl" :class="full && 'mx-auto max-w-7xl'" role="region" aria-label="Camera scanner">
                 <div class="relative flex-1 overflow-hidden">
                     <div id="qr-reader" class="absolute inset-0"></div>
 
                     {{-- Aim frame --}}
                     <div x-show="camera" class="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div class="relative aspect-square w-[min(70vw,60vh)] rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,.45)]">
+                        <div class="relative aspect-square w-[min(60%,55vh)] rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,.45)]">
                             <span class="absolute -top-1 -left-1 h-10 w-10 rounded-tl-3xl border-t-4 border-l-4 border-white"></span>
                             <span class="absolute -top-1 -right-1 h-10 w-10 rounded-tr-3xl border-t-4 border-r-4 border-white"></span>
                             <span class="absolute -bottom-1 -left-1 h-10 w-10 rounded-bl-3xl border-b-4 border-l-4 border-white"></span>
@@ -109,6 +82,33 @@
                 </div>
             </div>
             </div>
+      <div x-show="!camOpen" class="grid gap-4 lg:grid-cols-2" :class="full && 'mx-auto max-w-7xl lg:grid-cols-[2fr_3fr]'">
+        <div class="card">
+            @if($gate)
+                <h1 class="h2">Gate scanner</h1>
+                <p class="mt-1 text-sm text-slate-500">First scan of the day = <b>IN</b> (late after {{ ampm($lateAfter) }}). Next scan when leaving = <b>OUT</b>. Parents are notified when a student is late.</p>
+                <div class="mt-4"></div>
+            @else
+                <h1 class="h2">QR scanner</h1>
+                <div class="mt-4 mb-4">
+                    <label class="label">{{ $canGate ? 'Where are you scanning?' : 'Which class are you teaching now?' }}</label>
+                    <select x-model="classId" class="input">
+                        @if($canGate)<option value="">School gate – in and out (late after {{ ampm($lateAfter) }})</option>@endif
+                        @foreach($classes as $id => $label)<option value="{{ $id }}">{{ $canGate ? 'Class: ' : '' }}{{ $label }}</option>@endforeach
+                    </select>
+                    @if(! $canGate && $classes->isEmpty())<p class="field-error">You have no classes assigned yet.</p>@endif
+                    <p class="mt-1.5 text-xs text-slate-500" x-text="classId ? 'Records who attended this subject today. Late = 15 minutes after the class starts.' : 'First scan = IN, next scan = OUT.'"></p>
+                </div>
+            @endif
+            <p class="muted mb-3">Scan the student's ID card with a USB QR scanner (it types into the box) or this device's camera.</p>
+            <form @submit.prevent="send(code)" class="flex gap-2">
+                <input x-ref="box" x-model="code" class="input text-lg" placeholder="Scan or type student no./LRN…" autofocus>
+                <button class="btn btn-primary">Scan</button>
+            </form>
+            <button type="button" class="btn mt-4 min-h-12 w-full text-base" x-on:click="openCam()">
+                <x-icon name="qr" class="h-5 w-5" /> Scan with camera
+            </button>
+
         </div>
         <div class="space-y-3">
             <div :class="full ? 'min-h-[50vh]' : 'min-h-48'" class="card flex flex-col items-center justify-center text-center transition"
@@ -152,12 +152,10 @@
                 camError: '', camOpen: false, cameras: [], camIndex: 0, flash: false, flashTimer: null,
                 async openCam() {
                     this.camOpen = true; this.camError = '';
-                    try { await this.$refs.camWrap.requestFullscreen?.() } catch (e) {}
                     await this.startCam();
                 },
                 async closeCam() {
                     await this.stopCam(); this.camOpen = false; this.camError = '';
-                    if (document.fullscreenElement && !this.full) { try { await document.exitFullscreen() } catch (e) {} }
                     this.$nextTick(() => this.$refs.box.focus());
                 },
                 async startCam() {
