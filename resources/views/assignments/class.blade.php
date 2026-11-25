@@ -115,6 +115,7 @@
                         </div>
                     </fieldset>
 
+                    <p x-show="type === 'quiz'" class="rounded-xl bg-brand-50 p-3 text-sm text-brand-800 dark:bg-brand-500/10 dark:text-brand-200">After you post, the <b>quiz builder</b> opens so you can add questions (multiple choice, true/false, matching…) or import GIFT.</p>
                     <x-field name="title" label="Title" required />
                     <x-field name="instructions" label="Message / instructions" type="textarea" />
 
@@ -161,7 +162,7 @@
                     </div>
 
                     <x-field name="attachment" label="Attach a file (optional, up to 20 MB – PDF, slides, worksheet…)" type="file" />
-                    <button class="btn btn-primary w-full">Post to {{ $class->section->name }}</button>
+                    <button class="btn btn-primary w-full" x-text="type === 'quiz' ? 'Create quiz and add questions' : @js('Post to '.$class->section->name)">Post to {{ $class->section->name }}</button>
                 </form>
             </div>
         </div>

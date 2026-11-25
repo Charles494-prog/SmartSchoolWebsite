@@ -49,6 +49,7 @@
                     <a href="{{ route('quiz.edit', $p) }}" class="btn btn-primary btn-sm">Edit questions</a>
                     <a href="{{ route('quiz.results', $p) }}" class="btn btn-sm">Quiz results</a>
                 @elseif($graded)<a href="{{ route('assignments.show', $p) }}" class="btn btn-primary btn-sm">Check work</a>@endif
+                <a href="{{ route('assignments.show', [$p, 'edit' => 1]) }}" class="btn btn-sm">Edit</a>
                 @if($p->assessment_id)<a href="{{ route('gradebook.show', [$p->class_subject_id, 'term' => $p->term]) }}" class="btn btn-sm">See in gradebook</a>@endif
                 <form method="post" action="{{ route('assignments.destroy', $p) }}" x-on:submit="if (!confirm(@js('Delete this post?'.($p->assessment_id ? ' Its gradebook column and scores are deleted too.' : '')))) $event.preventDefault()">@csrf @method('DELETE')<button class="btn btn-sm text-rose-600">Delete</button></form>
             </div>

@@ -181,6 +181,8 @@ Route::middleware(['auth', ThrottleWrites::class])->group(function () {
         Route::get('/assignments/class/{class}', [AssignmentController::class, 'classroom'])->name('assignments.class');
         Route::post('/assignments/class/{class}/color', [AssignmentController::class, 'color'])->name('assignments.color');
         Route::delete('/assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
+        Route::put('/assignments/{assignment}', [AssignmentController::class, 'update'])->name('assignments.update');
+        Route::post('/assignments/{assignment}/students/{student}/grade', [AssignmentController::class, 'gradeStudent'])->name('assignments.grade-student');
         Route::get('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'edit'])->name('quiz.edit');
         Route::put('/assignments/{assignment}/quiz', [\App\Http\Controllers\QuizController::class, 'save'])->name('quiz.save');
         Route::post('/assignments/{assignment}/quiz/import', [\App\Http\Controllers\QuizController::class, 'import'])->name('quiz.import');

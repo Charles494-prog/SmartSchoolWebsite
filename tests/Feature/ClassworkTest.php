@@ -164,4 +164,29 @@ class ClassworkTest extends TestCase
             $this->get(route('students.id', $other))->assertForbidden();
         }
     }
+
+    public function test_teacher_edits_deletes_and_scores_paper_work(): void
+    {
+        $teacher = User::where('email', 'teacher@school.test')->first();
+        $this->actingAs($teacher);
+        $class = ClassSubject::where('teacher_id', $teacher->id)->first();
+        $this->post('/assignments', ['class_subject_id' => $class->id, 'type' => 'assignment', 'title' => 'Essay', 'due_at' => now()->addDay()->format('Y-m-d H:i'), 'max_score' => 20, 'component' => ''])->assertRedirect();
+        $a = Assignment::where('title', 'Essay')->first();
+        $this->get("/assignments/{$a->id}")->assertOk()->assertSee('Edit')->assertSee('Delete')->assertSee('turned in');
+
+        $this->put("/assignments/{$a->id}", ['title' => 'Essay v2', 'max_score' => 25, 'due_at' => now()->addDays(2)->format('Y-m-d H:i'), 'component' => 'pt', 'term' => 3])->assertRedirect();
+        $a->refresh();
+        $this->assertSame('Essay v2', $a->title);
+        $this->assertNotNull($a->assessment_id, 'now counts toward Projects – gradebook column created');
+
+        $student = $class->section->students()->first();
+        $this->post("/assignments/{$a->id}/students/{$student->id}/grade", ['score' => 22])->assertRedirect();
+        $this->assertEquals(22, \App\Models\Score::where('assessment_id', $a->assessment_id)->where('student_id', $student->id)->value('score'));
+
+        $this->put("/assignments/{$a->id}", ['title' => 'Essay v2', 'max_score' => 25, 'due_at' => now()->addDays(2)->format('Y-m-d H:i'), 'component' => ''])->assertRedirect();
+        $this->assertNull($a->fresh()->assessment_id, 'not included any more – column removed');
+
+        $this->delete("/assignments/{$a->id}")->assertRedirect();
+        $this->assertNull(Assignment::find($a->id));
+    }
 }

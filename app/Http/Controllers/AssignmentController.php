@@ -119,6 +119,66 @@ class AssignmentController extends Controller
         return redirect()->route('assignments.class', $class)->with('ok', $label.' posted'.($a->component ? ' – it is now a column in the gradebook.' : '.'));
     }
 
+    /** Edit a post. Changing where it counts moves its gradebook column (unless that period is already submitted). */
+    public function update(Request $request, Assignment $assignment)
+    {
+        $this->onlineOnly();
+        $this->own($assignment);
+        $data = $request->validate([
+            'title' => 'required|max:150', 'instructions' => 'nullable|max:10000', 'due_at' => 'nullable|date', 'max_score' => 'nullable|numeric|min:1|max:1000',
+            'component' => 'nullable|in:ww,pt,qa', 'term' => 'nullable|required_with:component|integer|min:1|max:6', 'body_html' => 'nullable|max:200000',
+            'attachment' => 'nullable|file|max:20480', 'remove_attachment' => 'boolean',
+        ]);
+        $cs = $assignment->classSubject;
+        $graded = Classwork::gradable($assignment->type);
+        if (! $graded) {
+            $data['due_at'] = $data['max_score'] = $data['component'] = $data['term'] = null;
+        }
+        $data['component'] = $data['component'] ?: null;
+        $data['term'] = $data['component'] ? (int) $data['term'] : null;
+        foreach (array_filter([$assignment->term, $data['term']]) as $t) {
+            if ($cs->isLocked((int) $t) && ($assignment->component !== $data['component'] || (int) $assignment->term !== (int) $data['term'] || (float) $assignment->max_score !== (float) $data['max_score'])) {
+                return back()->withInput()->with('error', School::term((int) $t, $cs->section->gradeLevel->terms).' grades are already submitted – the grading part, period and points can\'t change now.');
+            }
+        }
+        if ($request->boolean('remove_attachment')) {
+            $data['attachment_path'] = null;
+        }
+        if ($request->hasFile('attachment')) {
+            $data['attachment_path'] = $request->file('attachment')->store('assignments', 'local');
+        }
+        unset($data['attachment'], $data['remove_attachment']);
+
+        DB::transaction(function () use ($assignment, $data, $cs) {
+            $assignment->update($data);
+            if ($assignment->component) {
+                $assessment = Assessment::updateOrCreate(['id' => $assignment->assessment_id], ['class_subject_id' => $cs->id, 'term' => $assignment->term, 'component' => $assignment->component, 'title' => $assignment->title, 'max_score' => $assignment->max_score, 'given_on' => ($assignment->due_at ?? now())->toDateString()]);
+                if ($assignment->assessment_id !== $assessment->id) {
+                    $assignment->update(['assessment_id' => $assessment->id]);
+                    foreach ($assignment->submissions()->whereNotNull('score')->get() as $sub) {
+                        Score::updateOrCreate(['assessment_id' => $assessment->id, 'student_id' => $sub->student_id], ['score' => $sub->score]);
+                    }
+                }
+            } elseif ($assignment->assessment_id) {
+                Assessment::whereKey($assignment->assessment_id)->delete();
+                $assignment->update(['assessment_id' => null]);
+            }
+        });
+
+        return back()->with('ok', 'Saved.');
+    }
+
+    /** Score a student who didn't turn in online (paper work, absent, etc.). */
+    public function gradeStudent(Request $request, Assignment $assignment, \App\Models\Student $student)
+    {
+        $this->onlineOnly();
+        $this->own($assignment);
+        abort_unless($student->currentEnrollment()?->section_id === $assignment->classSubject->section_id, 404);
+        $sub = Submission::firstOrCreate(['assignment_id' => $assignment->id, 'student_id' => $student->id], ['body' => 'Scored by the teacher', 'submitted_at' => now()]);
+
+        return $this->grade($request, $sub);
+    }
+
     public function destroy(Assignment $assignment)
     {
         $this->onlineOnly();
