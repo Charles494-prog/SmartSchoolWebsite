@@ -79,7 +79,7 @@
                             </div>
                         </div>
                         <p x-show="camera && !(last && flash)" class="text-center text-sm text-white/80">Point the camera at the QR code on the ID card</p>
-                        <p x-show="camera && !(last && flash) && {{ $gate ? 'true' : '!classId' }}" class="mt-1 text-center text-xs text-white/60">Scans must be at least 2 minutes apart for IN and OUT.</p>
+                        <p x-show="camera && !(last && flash) && {{ $gate ? 'true' : '!classId' }}" class="mt-1 text-center text-xs text-white/60">Same student: wait 2 minutes between IN and OUT. Other students can scan right away.</p>
                     </div>
                 </div>
             </div>
@@ -105,8 +105,8 @@
             <div x-show="{{ $gate ? 'true' : '!classId' }}" class="mb-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" role="note">
                 <x-icon name="clock" class="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                    <p class="font-semibold">Scans must be at least 2 minutes apart</p>
-                    <p class="mt-0.5">A second scan within 2 minutes is ignored, so a double-scan won't check a student OUT by mistake. In an emergency a student can still go out and come back in – just wait 2 minutes between scans.</p>
+                    <p class="font-semibold">Same student: wait 2 minutes before scanning again</p>
+                    <p class="mt-0.5">Different students can scan one after another with no waiting. The 2-minute wait is only for the <b>same</b> student: if Juan scans IN at 7:30, his card won't check him OUT until 7:32. This stops a double-scan from checking him out by mistake, but still lets him leave quickly in an emergency.</p>
                 </div>
             </div>
             <p class="muted mb-3">Scan the student's ID card with a USB QR scanner (it types into the box) or this device's camera.</p>
