@@ -38,7 +38,9 @@ class Attendance
                 return ['ok' => true, 'status' => 'already', 'message' => 'Already checked out at '.ampm($existing->time_out).'.', 'student' => $student];
             }
             if ($existing->time_in && Carbon::parse($at->toDateString().' '.$existing->time_in)->diffInMinutes($at) < 10) {
-                return ['ok' => true, 'status' => 'already', 'message' => 'Already checked in at '.ampm($existing->time_in).'.', 'student' => $student];
+                $outFrom = Carbon::parse($at->toDateString().' '.$existing->time_in)->addMinutes(10)->format('H:i');
+
+                return ['ok' => true, 'status' => 'already', 'message' => 'Already checked in at '.ampm($existing->time_in).'. Scan again from '.ampm($outFrom).' to check OUT.', 'student' => $student];
             }
             $existing->update(['time_out' => $at->format('H:i:s')]);
 
